@@ -138,7 +138,7 @@ def build_assistant_reply(question: str) -> Dict[str, List]:
             ],
         }
 
-    if "排名" in question_text or "cop" in question_text and "建筑" in question_text:
+    if "排名" in question_text or ("cop" in question_text and "建筑" in question_text):
         ranking = build_cop_ranking(dataset)
         if ranking:
             top = ranking[0]

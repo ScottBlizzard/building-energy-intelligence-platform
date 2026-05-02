@@ -3,6 +3,7 @@ from functools import lru_cache
 from typing import Dict, List, Optional
 
 import pandas as pd
+from fastapi import HTTPException
 
 from app.core.config import get_settings
 
@@ -75,6 +76,20 @@ def get_building_options() -> List[Dict[str, str]]:
         .sort_values(["building_type", "building_name"])
     )
     return buildings.to_dict(orient="records")
+
+
+def load_dataset_or_raise(
+    building_id: Optional[str] = None,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
+) -> pd.DataFrame:
+    """Load filtered dataset, raising HTTPException on errors."""
+    try:
+        return get_filtered_dataset(
+            building_id=building_id, start_time=start_time, end_time=end_time
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
 
 
 def get_dataset_meta() -> Dict:

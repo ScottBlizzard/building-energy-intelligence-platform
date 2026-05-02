@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Query
 
 from app.services.analysis_service import (
     build_anomaly_summary,
@@ -10,23 +10,10 @@ from app.services.analysis_service import (
     build_cop_ranking,
     build_time_summary,
 )
-from app.services.data_loader import get_filtered_dataset
+from app.services.data_loader import load_dataset_or_raise
 
 
 router = APIRouter()
-
-
-def _load_dataset(
-    building_id: Optional[str] = None,
-    start_time: Optional[datetime] = None,
-    end_time: Optional[datetime] = None,
-):
-    try:
-        return get_filtered_dataset(
-            building_id=building_id, start_time=start_time, end_time=end_time
-        )
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
 
 
 @router.get("/time-summary")
@@ -36,7 +23,7 @@ def get_time_summary(
     end_time: Optional[datetime] = None,
     freq: str = Query(default="D", pattern="^(H|D|W|M)$"),
 ):
-    frame = _load_dataset(
+    frame = load_dataset_or_raise(
         building_id=building_id, start_time=start_time, end_time=end_time
     )
     return {"items": build_time_summary(frame, freq=freq)}
@@ -47,7 +34,7 @@ def get_building_comparison(
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
 ):
-    frame = _load_dataset(start_time=start_time, end_time=end_time)
+    frame = load_dataset_or_raise(start_time=start_time, end_time=end_time)
     return {"items": build_building_comparison(frame)}
 
 
@@ -56,7 +43,7 @@ def get_cop_ranking(
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
 ):
-    frame = _load_dataset(start_time=start_time, end_time=end_time)
+    frame = load_dataset_or_raise(start_time=start_time, end_time=end_time)
     return {"items": build_cop_ranking(frame)}
 
 
@@ -66,7 +53,7 @@ def get_anomalies(
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
 ):
-    frame = _load_dataset(
+    frame = load_dataset_or_raise(
         building_id=building_id, start_time=start_time, end_time=end_time
     )
     return {"items": build_anomaly_summary(frame)}
@@ -78,7 +65,7 @@ def get_anomaly_reasons(
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
 ):
-    frame = _load_dataset(
+    frame = load_dataset_or_raise(
         building_id=building_id, start_time=start_time, end_time=end_time
     )
     return {"items": build_anomaly_reason_counts(frame)}

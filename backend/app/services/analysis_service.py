@@ -58,12 +58,16 @@ def build_overview(frame: pd.DataFrame) -> Dict:
     }
 
 
+_FREQ_MAP = {"H": "h", "D": "D", "W": "W", "M": "ME"}
+
+
 def build_time_summary(frame: pd.DataFrame, freq: str = "D") -> List[Dict]:
     if frame.empty:
         return []
 
+    pandas_freq = _FREQ_MAP.get(freq, freq)
     working = frame.copy().set_index("timestamp")
-    summary = working.resample(freq).agg(
+    summary = working.resample(pandas_freq).agg(
         {
             "electricity_kwh": "sum",
             "water_m3": "sum",

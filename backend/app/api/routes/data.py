@@ -7,29 +7,16 @@ from app.services.analysis_service import build_overview, to_serializable_record
 from app.services.data_loader import (
     get_building_options,
     get_dataset_meta,
-    get_filtered_dataset,
+    load_dataset_or_raise,
 )
 
 
 router = APIRouter()
 
 
-def _load_dataset(
-    building_id: Optional[str] = None,
-    start_time: Optional[datetime] = None,
-    end_time: Optional[datetime] = None,
-):
-    try:
-        return get_filtered_dataset(
-            building_id=building_id, start_time=start_time, end_time=end_time
-        )
-    except (FileNotFoundError, ValueError) as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-
-
 @router.get("/overview")
 def get_overview():
-    frame = _load_dataset()
+    frame = load_dataset_or_raise()
     return build_overview(frame)
 
 
@@ -56,7 +43,7 @@ def get_records(
     end_time: Optional[datetime] = None,
     limit: int = Query(default=100, ge=1, le=500),
 ):
-    frame = _load_dataset(
+    frame = load_dataset_or_raise(
         building_id=building_id, start_time=start_time, end_time=end_time
     )
     limited = frame.head(limit)
