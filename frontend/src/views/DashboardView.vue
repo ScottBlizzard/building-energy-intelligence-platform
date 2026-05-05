@@ -1,6 +1,13 @@
 <script setup>
 import { computed, onMounted, reactive, ref } from "vue";
 
+import AppHeader from "../components/AppHeader.vue";
+import TabNavigation from "../components/TabNavigation.vue";
+import StatusBanner from "../components/StatusBanner.vue";
+import FilterToolbar from "../components/FilterToolbar.vue";
+import AnalyticsSummary from "../components/AnalyticsSummary.vue";
+import LoadingSpinner from "../components/LoadingSpinner.vue";
+import EmptyState from "../components/EmptyState.vue";
 import AssistantPanel from "../components/AssistantPanel.vue";
 import DataTable from "../components/DataTable.vue";
 import KpiCard from "../components/KpiCard.vue";
@@ -185,6 +192,18 @@ async function handleAsk(question) {
   }
 }
 
+function handleFilterChange(filters) {
+  recordFilters.buildingId = filters.building_id;
+  recordFilters.limit = filters.limit;
+  loadRecords();
+}
+
+function resetFilters() {
+  recordFilters.buildingId = "";
+  recordFilters.limit = 10;
+  loadRecords();
+}
+
 onMounted(async () => {
   await loadOverview();
   await Promise.all([loadRecords(), loadAnalytics()]);
@@ -193,53 +212,38 @@ onMounted(async () => {
 
 <template>
   <main class="dashboard-shell">
-    <section class="hero">
-      <div class="hero__copy">
-        <span class="hero__eyebrow">Software Engineering Management Project</span>
-        <h1>建筑能源智能管理与运维优化系统</h1>
-        <p class="hero__intro">
-          这个版本已经不是纯展示型首页，而是适合第一次任务分发的协作仓库起点。
-          你现在可以把数据、后端、前端和 AI 工作并行拆给不同成员。
-        </p>
-        <div class="hero__badges">
-          <span class="status-pill">{{ apiStatus }}</span>
-          <span class="status-pill status-pill--outline">技术栈：Vue 3 / FastAPI / Pandas</span>
-        </div>
+    <AppHeader>
+      <template #actions>
+        <StatusBanner 
+          :status="apiStatus" 
+          :type="apiStatus.includes('已连接') ? 'success' : 'warning'"
+        />
+      </template>
+    </AppHeader>
+    
+    <div class="hero-stats">
+      <div class="stat-card">
+        <span class="stat-label">数据记录</span>
+        <strong class="stat-value">{{ overview.total_records || datasetMeta.record_count || 0 }}</strong>
       </div>
-      <div class="hero__panel">
-        <div class="hero__panel-grid">
-          <div class="panel-tile">
-            <span>数据记录</span>
-            <strong>{{ overview.total_records || datasetMeta.record_count || 0 }}</strong>
-          </div>
-          <div class="panel-tile">
-            <span>建筑数量</span>
-            <strong>{{ overview.building_count || datasetMeta.building_count || 0 }}</strong>
-          </div>
-          <div class="panel-tile">
-            <span>平均 COP</span>
-            <strong>{{ overview.average_cop || 0 }}</strong>
-          </div>
-          <div class="panel-tile">
-            <span>异常记录</span>
-            <strong>{{ overview.abnormal_record_count || 0 }}</strong>
-          </div>
-        </div>
+      <div class="stat-card">
+        <span class="stat-label">建筑数量</span>
+        <strong class="stat-value">{{ overview.building_count || datasetMeta.building_count || 0 }}</strong>
       </div>
-    </section>
+      <div class="stat-card">
+        <span class="stat-label">平均 COP</span>
+        <strong class="stat-value">{{ overview.average_cop || 0 }}</strong>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">异常记录</span>
+        <strong class="stat-value">{{ overview.abnormal_record_count || 0 }}</strong>
+      </div>
+    </div>
 
-    <section class="tab-bar">
-      <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        type="button"
-        class="tab-button"
-        :class="{ 'tab-button--active': activeTab === tab.key }"
-        @click="activeTab = tab.key"
-      >
-        {{ tab.label }}
-      </button>
-    </section>
+    <TabNavigation 
+      :tabs="tabs" 
+      v-model:activeTab="activeTab"
+    />
 
     <template v-if="activeTab === 'overview'">
       <section class="kpi-grid">
@@ -305,26 +309,25 @@ onMounted(async () => {
     <template v-else-if="activeTab === 'data'">
       <div class="content-grid content-grid--single">
         <SectionCard eyebrow="Filters" title="数据浏览" description="这里是前端与后端第一次联调时最先要跑通的模块。">
-          <div class="filter-row">
-            <label class="field-label">
-              <span>建筑筛选</span>
-              <select v-model="recordFilters.buildingId">
-                <option value="">全部建筑</option>
-                <option v-for="item in buildings" :key="item.building_id" :value="item.building_id">
-                  {{ item.building_name }}
-                </option>
-              </select>
-            </label>
-            <label class="field-label field-label--small">
-              <span>条数</span>
-              <input v-model.number="recordFilters.limit" type="number" min="1" max="50" />
-            </label>
-            <button class="primary-button" type="button" :disabled="loading.records" @click="loadRecords">
-              {{ loading.records ? "加载中..." : "刷新记录" }}
-            </button>
+          <FilterToolbar
+            :buildings="buildings"
+            :loading="loading.records"
+            @filterChange="handleFilterChange"
+          />
+          
+          <div v-if="loading.records" class="data-loading">
+            <LoadingSpinner text="正在加载数据..." />
           </div>
-
-          <DataTable :columns="recordColumns" :rows="records" empty-text="没有查到符合条件的记录" />
+          <div v-else-if="records.length === 0" class="data-empty">
+            <EmptyState 
+              icon="🔍"
+              title="暂无数据"
+              description="当前筛选条件下没有找到符合条件的记录"
+              actionText="重置筛选"
+              @action="resetFilters"
+            />
+          </div>
+          <DataTable v-else :columns="recordColumns" :rows="records" empty-text="没有查到符合条件的记录" />
         </SectionCard>
 
         <SectionCard eyebrow="Contract" title="字段冻结说明" description="这一块非常适合第一次任务分发时统一给所有人。">
@@ -414,3 +417,47 @@ onMounted(async () => {
     </template>
   </main>
 </template>
+
+<style scoped>
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(20, 34, 48, 0.08);
+  border-radius: 22px;
+  padding: 20px;
+  text-align: center;
+  backdrop-filter: blur(18px);
+}
+
+.stat-label {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  display: block;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--accent-deep);
+}
+
+.data-loading,
+.data-empty {
+  padding: 40px;
+  text-align: center;
+}
+
+@media (max-width: 768px) {
+  .hero-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+</style>
