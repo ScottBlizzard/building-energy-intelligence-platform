@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from app.services.export_service import build_csv_content, build_export_filename
@@ -28,7 +28,11 @@ def export_csv(
     if not csv_content:
         raise HTTPException(status_code=404, detail="No records found for the given filters.")
 
-    filename = build_export_filename(building_id)
+    filename = build_export_filename(
+        building_id=building_id,
+        start_time=start_time,
+        end_time=end_time,
+    )
     return StreamingResponse(
         StringIO(csv_content),
         media_type="text/csv",

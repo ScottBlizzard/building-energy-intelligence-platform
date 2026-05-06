@@ -1,5 +1,5 @@
 <script setup>
-import { reactive, watch } from 'vue';
+import { computed } from "vue";
 
 const props = defineProps({
   buildings: {
@@ -9,40 +9,61 @@ const props = defineProps({
   loading: {
     type: Boolean,
     default: false
+  },
+  exporting: {
+    type: Boolean,
+    default: false
+  },
+  timeRange: {
+    type: Object,
+    default: () => ({ start: "", end: "" })
   }
 });
 
-const emit = defineEmits(['filterChange']);
+const emit = defineEmits(["apply", "reset", "export"]);
+const filters = defineModel("filters", {
+  type: Object,
+  default: () => ({
+    buildingId: "",
+    startTime: "",
+    endTime: "",
+    limit: 10
+  })
+});
 
-const filters = reactive({
-  buildingId: '',
-  limit: 10
+const rangeHint = computed(() => {
+  if (!props.timeRange?.start || !props.timeRange?.end) {
+    return "当前未获取到可用时间范围";
+  }
+  return `当前数据范围：${props.timeRange.start.replace("T", " ")} 至 ${props.timeRange.end.replace("T", " ")}`;
 });
 
 function applyFilters() {
-  emit('filterChange', {
-    building_id: filters.buildingId,
-    limit: filters.limit
-  });
+  emit("apply");
 }
 
 function resetFilters() {
-  filters.buildingId = '';
-  filters.limit = 10;
-  applyFilters();
+  Object.assign(filters.value, {
+    buildingId: "",
+    startTime: "",
+    endTime: "",
+    limit: 10
+  });
+  emit("reset");
 }
 
-watch(filters, () => {
-  applyFilters();
-}, { deep: true });
+function exportRecords() {
+  emit("export");
+}
 </script>
 
 <template>
   <div class="filter-toolbar">
+    <p class="filter-hint">{{ rangeHint }}</p>
     <div class="filter-row">
       <label class="field-label">
         <span>建筑筛选</span>
-        <select v-model="filters.buildingId" :disabled="loading">
+        <select v-model="filters.buildingId" :disabled="loading || exporting">
           <option value="">全部建筑</option>
           <option 
             v-for="building in buildings" 
@@ -54,6 +75,28 @@ watch(filters, () => {
         </select>
       </label>
       
+      <label class="field-label">
+        <span>开始时间</span>
+        <input
+          v-model="filters.startTime"
+          type="datetime-local"
+          :min="timeRange.start || undefined"
+          :max="timeRange.end || undefined"
+          :disabled="loading || exporting"
+        />
+      </label>
+
+      <label class="field-label">
+        <span>结束时间</span>
+        <input
+          v-model="filters.endTime"
+          type="datetime-local"
+          :min="timeRange.start || undefined"
+          :max="timeRange.end || undefined"
+          :disabled="loading || exporting"
+        />
+      </label>
+
       <label class="field-label field-label--small">
         <span>显示条数</span>
         <input 
@@ -61,7 +104,7 @@ watch(filters, () => {
           type="number" 
           min="1" 
           max="50" 
-          :disabled="loading"
+          :disabled="loading || exporting"
         />
       </label>
       
@@ -69,7 +112,7 @@ watch(filters, () => {
         <button 
           class="primary-button" 
           type="button" 
-          :disabled="loading"
+          :disabled="loading || exporting"
           @click="applyFilters"
         >
           {{ loading ? "加载中..." : "刷新数据" }}
@@ -78,10 +121,19 @@ watch(filters, () => {
         <button 
           class="secondary-button" 
           type="button" 
-          :disabled="loading"
+          :disabled="loading || exporting"
           @click="resetFilters"
         >
           重置
+        </button>
+
+        <button
+          class="secondary-button secondary-button--accent"
+          type="button"
+          :disabled="loading || exporting"
+          @click="exportRecords"
+        >
+          {{ exporting ? "导出中..." : "导出 CSV" }}
         </button>
       </div>
     </div>
@@ -91,6 +143,12 @@ watch(filters, () => {
 <style scoped>
 .filter-toolbar {
   margin-bottom: 20px;
+}
+
+.filter-hint {
+  margin: 0 0 12px;
+  color: var(--ink-soft);
+  font-size: 13px;
 }
 
 .filter-row {
@@ -160,6 +218,11 @@ watch(filters, () => {
   min-height: 46px;
 }
 
+.secondary-button--accent {
+  border-color: rgba(15, 139, 141, 0.2);
+  color: var(--accent-deep);
+}
+
 .primary-button:disabled,
 .secondary-button:disabled {
   cursor: not-allowed;
@@ -178,6 +241,7 @@ watch(filters, () => {
   
   .filter-actions {
     justify-content: stretch;
+    flex-wrap: wrap;
   }
   
   .primary-button,

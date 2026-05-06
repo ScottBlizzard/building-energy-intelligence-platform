@@ -1,6 +1,6 @@
 # 基于大模型的建筑能源智能管理与运维优化系统
 
-这是课程项目的统一代码仓库。当前版本已经不仅是空骨架，而是一个适合 4 人并行协作的原型起点：包含前后端基础实现、可联调页面、样例数据、知识库占位、接口契约、协作规则和测试占位。
+这是课程项目的统一代码仓库。当前版本已经完成第一次整合，不再只是原型骨架，而是一个前后端、数据、知识素材和演示流程都已接回同一仓库的可继续开发版本。
 
 ## 项目目标
 
@@ -13,10 +13,10 @@
 
 ## 当前仓库包含什么
 
-- `backend/`：FastAPI 后端，已包含总览、元数据、查询、分析和问答占位接口。
-- `frontend/`：Vue 3 + Vite 前端，已升级为多模块演示工作台。
-- `data/`：样例能耗数据、数据字典、原始/处理后数据目录和生成脚本。
-- `knowledge_base/`：运维手册、术语表、常见问题占位内容。
+- `backend/`：FastAPI 后端，已包含总览、元数据、查询、分析、导出和知识引用型问答接口。
+- `frontend/`：Vue 3 + Vite 前端，已形成“总览 / 数据浏览 / 统计分析 / 智能问答”四区工作台。
+- `data/`：样例能耗数据、数据字典、原始/处理后数据目录和数据检查说明。
+- `knowledge_base/`：异常诊断、设备维护、建筑类型、术语规则和结构化问答素材。
 - `docs/`：课程交付文档、接口契约、协作规则、集成清单和测试计划。
 - `scripts/`：启动脚本、检查脚本和样例数据生成脚本。
 
@@ -53,7 +53,7 @@
 - 后端：FastAPI + Pandas
 - 前端：Vue 3 + Vite
 - 可视化：后续接入 ECharts
-- 智能问答：先提供规则化占位接口，后续接入 LLM / RAG
+- 智能问答：当前为规则 + 知识文件引用，后续接入 LLM / RAG
 - 数据格式：CSV 为主，后续可扩展数据库
 
 ## 快速启动
@@ -105,6 +105,7 @@ npm run dev
 - `GET /api/v1/analytics/cop-ranking`
 - `GET /api/v1/analytics/anomalies`
 - `GET /api/v1/analytics/anomaly-reasons`
+- `GET /api/v1/export/csv`
 - `POST /api/v1/assistant/query`
 
 ## 数据与知识库说明
@@ -113,7 +114,7 @@ npm run dev
 - 数据字典：[`data/dictionaries/energy_records_dictionary.csv`](data/dictionaries/energy_records_dictionary.csv)
 - 知识库入口：[`knowledge_base/README.md`](knowledge_base/README.md)
 
-当前样例数据已经可以用于联调和演示。若要重新生成更大规模的数据，可运行：
+当前样例数据已经可以用于联调和演示；第一轮数据检查说明和外部来源简表已经放在 `data/processed/`。若要重新生成更大规模的数据，可运行：
 
 ```powershell
 python .\scripts\generate_sample_dataset.py
@@ -131,6 +132,7 @@ python .\scripts\generate_sample_dataset.py
 - 集成清单：[`docs/08-integration-checklist.md`](docs/08-integration-checklist.md)
 - 测试计划：[`docs/09-testing-plan.md`](docs/09-testing-plan.md)
 - 数据源调研：[`docs/10-data-source-research.md`](docs/10-data-source-research.md)
+- 第一次整合总结：[`docs/11-first-integration-summary.md`](docs/11-first-integration-summary.md)
 
 ## 协作建议
 
@@ -152,8 +154,7 @@ python .\scripts\generate_sample_dataset.py
 
 ## 建议下一步
 
-1. 用当前仓库直接开始第一次任务分发，保证每个人只改自己负责区域。
-2. 先完成数据、后端、前端、AI 四部分的基础版功能。
-3. 做第一次整合，统一字段、接口和页面流程。
-4. 再进入第二轮功能补齐和联调。
-5. 最后统一测试、演示脚本和提交材料。
+1. 基于当前第一次整合结果，开始第二轮任务分发。
+2. 优先补正式图表、更多异常分析场景和更像样的问答体验。
+3. 继续扩展知识库与数据真实性，逐步向 RAG 方案过渡。
+4. 完成第二轮联调、演示脚本和期末提交材料。

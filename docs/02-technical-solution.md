@@ -16,17 +16,19 @@
 - `api/routes/health.py`：运行状态检查。
 - `api/routes/data.py`：数据概览和记录查询。
 - `api/routes/analytics.py`：时间汇总、建筑对比、异常分析。
+- `api/routes/export.py`：原始记录 CSV 导出。
 - `api/routes/assistant.py`：问答接口。
 - `services/data_loader.py`：读取和过滤数据集。
 - `services/analysis_service.py`：统计分析逻辑。
-- `services/assistant_service.py`：问答占位逻辑。
+- `services/export_service.py`：CSV 导出逻辑。
+- `services/assistant_service.py`：规则问答、知识文件引用和追问建议逻辑。
 
 ### 2.2 前端模块
 
 - 项目首页：展示系统定位、KPI、模块状态。
-- 数据模块：后续展示查询表格和筛选器。
-- 分析模块：后续接入趋势图、对比图和异常列表。
-- 问答模块：后续接入聊天式交互和答案引用来源。
+- 数据模块：展示查询表格、建筑/时间筛选器和导出入口。
+- 分析模块：展示趋势图、对比图、COP 排名和异常列表。
+- 问答模块：提供推荐问题、结构化回答、引用来源和继续追问。
 
 ## 3. 数据设计
 
@@ -57,12 +59,20 @@
 
 - `GET /api/v1/analytics/time-summary`
 - `GET /api/v1/analytics/building-comparison`
+- `GET /api/v1/analytics/cop-ranking`
 - `GET /api/v1/analytics/anomalies`
+- `GET /api/v1/analytics/anomaly-reasons`
 
-### 4.4 问答接口
+### 4.4 导出接口
+
+- `GET /api/v1/export/csv`
+- 支持按建筑和时间范围导出当前筛选结果
+- 适合作为第一次整合后的独立后端增量能力
+
+### 4.5 问答接口
 
 - `POST /api/v1/assistant/query`
-- 当前使用规则化占位逻辑
+- 当前使用规则逻辑 + 第一轮知识素材引用
 - 后续升级为“检索 -> 重排 -> 大模型生成”的链路
 
 ## 5. 智能问答演进路径
@@ -70,7 +80,8 @@
 ### 当前阶段
 
 - 使用规则化逻辑快速给出演示答案
-- 可以引用样例数据与知识库文件路径
+- 可以引用样例数据、数据质量报告、术语规则、异常诊断和设备维护知识文件
+- 已支持推荐追问，适合课堂连续演示
 
 ### 下一阶段
 
@@ -81,7 +92,8 @@
 
 ## 6. 后续重点扩展
 
-- 补充数据导入和清洗脚本
-- 增加 ECharts 图表接口与导出能力
-- 增加认证、日志和异常处理
-- 增加测试覆盖率
+- 引入正式图表库（如 ECharts），替换当前轻量占位图
+- 补充更多数据导入和清洗脚本
+- 将知识库切分为知识片段并建立向量索引
+- 增加认证、日志和更细粒度异常处理
+- 持续增加测试覆盖率

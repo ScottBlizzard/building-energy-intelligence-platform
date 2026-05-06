@@ -53,6 +53,12 @@
 - `end_time`
 - `limit`
 
+返回核心字段：
+
+- `count`
+- `total_filtered_count`
+- `items`
+
 ### `GET /api/v1/analytics/time-summary`
 
 用途：返回时段汇总统计
@@ -68,17 +74,54 @@
 
 用途：返回建筑间对比结果
 
+查询参数：
+
+- `start_time`
+- `end_time`
+
 ### `GET /api/v1/analytics/cop-ranking`
 
 用途：返回建筑 COP 排名
+
+查询参数：
+
+- `start_time`
+- `end_time`
 
 ### `GET /api/v1/analytics/anomalies`
 
 用途：返回异常明细
 
+查询参数：
+
+- `building_id`
+- `start_time`
+- `end_time`
+
 ### `GET /api/v1/analytics/anomaly-reasons`
 
 用途：返回异常原因计数
+
+查询参数：
+
+- `building_id`
+- `start_time`
+- `end_time`
+
+### `GET /api/v1/export/csv`
+
+用途：导出当前筛选范围内的原始记录 CSV
+
+查询参数：
+
+- `building_id`
+- `start_time`
+- `end_time`
+
+返回形式：
+
+- `text/csv` 文件流
+- 文件名会根据建筑和时间筛选条件自动生成
 
 ### `POST /api/v1/assistant/query`
 
@@ -112,4 +155,3 @@
 - 前端同学不要自行改返回字段名。
 - 后端同学不要在未同步的情况下改接口路径。
 - 若必须改契约，先改此文档，再统一通知组内。
-

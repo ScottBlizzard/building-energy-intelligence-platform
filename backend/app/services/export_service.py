@@ -33,8 +33,20 @@ def build_csv_content(
 
 def build_export_filename(
     building_id: Optional[str] = None,
+    start_time: Optional[datetime] = None,
+    end_time: Optional[datetime] = None,
 ) -> str:
     """Generate a descriptive filename for the export."""
+    parts = ["energy_records"]
+
     if building_id:
-        return "energy_records_{0}.csv".format(building_id)
-    return "energy_records_export.csv"
+        parts.append(building_id)
+    if start_time is not None:
+        parts.append("from-{0}".format(start_time.strftime("%Y%m%d-%H%M")))
+    if end_time is not None:
+        parts.append("to-{0}".format(end_time.strftime("%Y%m%d-%H%M")))
+
+    if len(parts) == 1:
+        parts.append("export")
+
+    return "{0}.csv".format("_".join(parts))

@@ -45,3 +45,17 @@ def test_export_csv_filename_includes_building_id():
     response = client.get("/api/v1/export/csv", params={"building_id": building_id})
     disposition = response.headers.get("content-disposition", "")
     assert building_id in disposition
+
+
+def test_export_csv_filename_includes_date_filters():
+    response = client.get(
+        "/api/v1/export/csv",
+        params={
+            "start_time": "2026-03-01T00:00:00",
+            "end_time": "2026-03-02T00:00:00",
+        },
+    )
+    assert response.status_code == 200
+    disposition = response.headers.get("content-disposition", "")
+    assert "from-20260301-0000" in disposition
+    assert "to-20260302-0000" in disposition

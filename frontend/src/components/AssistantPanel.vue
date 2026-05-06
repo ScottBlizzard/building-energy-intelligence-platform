@@ -30,6 +30,10 @@ function useSuggestion(value) {
   question.value = value;
   emit("ask", value);
 }
+
+function askFollowUp(value) {
+  useSuggestion(value);
+}
 </script>
 
 <template>
@@ -72,11 +76,36 @@ function useSuggestion(value) {
 
       <div v-if="reply.follow_up?.length" class="citation-block">
         <strong>建议继续追问</strong>
-        <ul>
-          <li v-for="item in reply.follow_up" :key="item">{{ item }}</li>
-        </ul>
+        <div class="follow-up-list">
+          <button
+            v-for="item in reply.follow_up"
+            :key="item"
+            type="button"
+            class="suggestion-chip"
+            @click="askFollowUp(item)"
+          >
+            {{ item }}
+          </button>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
+<style scoped>
+.follow-up-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.suggestion-chip {
+  border: 1px solid rgba(18, 93, 115, 0.1);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--accent-deep);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+</style>

@@ -5,7 +5,6 @@ import AppHeader from "../components/AppHeader.vue";
 import TabNavigation from "../components/TabNavigation.vue";
 import StatusBanner from "../components/StatusBanner.vue";
 import FilterToolbar from "../components/FilterToolbar.vue";
-import AnalyticsSummary from "../components/AnalyticsSummary.vue";
 import LoadingSpinner from "../components/LoadingSpinner.vue";
 import EmptyState from "../components/EmptyState.vue";
 import AssistantPanel from "../components/AssistantPanel.vue";
@@ -13,6 +12,7 @@ import DataTable from "../components/DataTable.vue";
 import KpiCard from "../components/KpiCard.vue";
 import SectionCard from "../components/SectionCard.vue";
 import {
+  downloadCsvExport,
   fetchAnomalies,
   fetchAnomalyReasons,
   fetchBuildingComparison,
@@ -25,40 +25,71 @@ import {
   queryAssistant
 } from "../lib/api";
 
+function createEmptyOverview() {
+  return {
+    total_records: 0,
+    building_count: 0,
+    average_cop: 0,
+    abnormal_record_count: 0,
+    time_range: { start: "-", end: "-" },
+    totals: {}
+  };
+}
+
+function createEmptyDatasetMeta() {
+  return {
+    fields: [],
+    building_options: [],
+    record_count: 0,
+    building_count: 0,
+    time_range: { start: "-", end: "-" }
+  };
+}
+
+function createDefaultRecordFilters() {
+  return {
+    buildingId: "",
+    startTime: "",
+    endTime: "",
+    limit: 10
+  };
+}
+
 const activeTab = ref("overview");
-const apiStatus = ref("正在尝试连接后端接口...");
-
-const overview = ref({
-  total_records: 0,
-  building_count: 0,
-  average_cop: 0,
-  abnormal_record_count: 0,
-  time_range: { start: "-", end: "-" },
-  totals: {}
+const apiStatus = reactive({
+  message: "正在尝试连接后端接口...",
+  type: "info"
 });
+const overview = ref(createEmptyOverview());
 
-const datasetMeta = ref({
-  fields: [],
-  building_options: [],
-  record_count: 0,
-  building_count: 0,
-  time_range: { start: "-", end: "-" }
-});
+const datasetMeta = ref(createEmptyDatasetMeta());
 
 const buildings = ref([]);
 const records = ref([]);
 const assistantReply = ref(null);
+const recordSummary = reactive({
+  count: 0,
+  totalFilteredCount: 0
+});
 const loading = reactive({
   overview: false,
   records: false,
   analytics: false,
   assistant: false
 });
-
-const recordFilters = reactive({
-  buildingId: "",
-  limit: 10
+const errors = reactive({
+  overview: "",
+  records: "",
+  analytics: "",
+  assistant: "",
+  export: ""
 });
+const exportState = reactive({
+  loading: false,
+  lastFile: ""
+});
+
+const recordFilters = reactive(createDefaultRecordFilters());
 
 const analytics = reactive({
   timeSummary: [],
@@ -102,7 +133,9 @@ const defaultQuestions = [
   "当前有哪些建筑？",
   "当前样例数据有哪些异常记录？",
   "当前样例数据的平均 COP 是多少？",
-  "当前系统有哪些模块？"
+  "为什么实验楼电耗这么高？",
+  "冷却塔应该多久维护一次？",
+  "这些数据是纯随机生成的吗？"
 ];
 
 const recordColumns = [
@@ -128,9 +161,60 @@ const trendMax = computed(() =>
 );
 const topComparison = computed(() => analytics.buildingComparison.slice(0, 4));
 const visibleFields = computed(() => datasetMeta.value.fields.slice(0, 10));
+const availableTimeRange = computed(() => ({
+  start: toDateTimeLocal(datasetMeta.value.time_range.start),
+  end: toDateTimeLocal(datasetMeta.value.time_range.end)
+}));
+const activeFilterSummary = computed(() => {
+  const parts = [];
+
+  if (recordFilters.buildingId) {
+    const match = buildings.value.find((item) => item.building_id === recordFilters.buildingId);
+    parts.push(`建筑：${match?.building_name || recordFilters.buildingId}`);
+  } else {
+    parts.push("建筑：全部");
+  }
+
+  if (recordFilters.startTime) {
+    parts.push(`开始：${recordFilters.startTime.replace("T", " ")}`);
+  }
+  if (recordFilters.endTime) {
+    parts.push(`结束：${recordFilters.endTime.replace("T", " ")}`);
+  }
+
+  parts.push(`表格展示：${recordFilters.limit} 条`);
+  return parts.join(" · ");
+});
+
+function toDateTimeLocal(value) {
+  if (!value || value === "-") {
+    return "";
+  }
+  return value.replace(" ", "T").slice(0, 16);
+}
+
+function buildFilterParams({ includeLimit = false } = {}) {
+  const params = {};
+
+  if (recordFilters.buildingId) {
+    params.building_id = recordFilters.buildingId;
+  }
+  if (recordFilters.startTime) {
+    params.start_time = recordFilters.startTime;
+  }
+  if (recordFilters.endTime) {
+    params.end_time = recordFilters.endTime;
+  }
+  if (includeLimit) {
+    params.limit = recordFilters.limit;
+  }
+
+  return params;
+}
 
 async function loadOverview() {
   loading.overview = true;
+  errors.overview = "";
   try {
     const [overviewData, metaData, buildingData] = await Promise.all([
       fetchOverview(),
@@ -140,9 +224,15 @@ async function loadOverview() {
     overview.value = overviewData;
     datasetMeta.value = metaData;
     buildings.value = buildingData.items;
-    apiStatus.value = "后端已连接，当前页面展示真实接口数据。";
+    apiStatus.message = "后端已连接，当前页面展示真实接口数据。";
+    apiStatus.type = "success";
   } catch (error) {
-    apiStatus.value = "未检测到后端，当前页面将保留部分静态结构。";
+    apiStatus.message = "未检测到后端，当前页面将保留结构化占位并显示错误状态。";
+    apiStatus.type = "warning";
+    errors.overview = "当前无法加载总览数据，请确认后端服务与样例数据文件可用。";
+    overview.value = createEmptyOverview();
+    datasetMeta.value = createEmptyDatasetMeta();
+    buildings.value = [];
   } finally {
     loading.overview = false;
   }
@@ -150,12 +240,17 @@ async function loadOverview() {
 
 async function loadRecords() {
   loading.records = true;
+  errors.records = "";
   try {
-    const payload = await fetchRecords({
-      building_id: recordFilters.buildingId,
-      limit: recordFilters.limit
-    });
+    const payload = await fetchRecords(buildFilterParams({ includeLimit: true }));
     records.value = payload.items;
+    recordSummary.count = payload.count;
+    recordSummary.totalFilteredCount = payload.total_filtered_count;
+  } catch (error) {
+    records.value = [];
+    recordSummary.count = 0;
+    recordSummary.totalFilteredCount = 0;
+    errors.records = "原始记录加载失败，请检查后端接口或当前筛选条件。";
   } finally {
     loading.records = false;
   }
@@ -163,14 +258,16 @@ async function loadRecords() {
 
 async function loadAnalytics() {
   loading.analytics = true;
+  errors.analytics = "";
   try {
+    const sharedFilters = buildFilterParams();
     const [timeSummary, buildingComparison, copRanking, anomalies, anomalyReasons] =
       await Promise.all([
-        fetchTimeSummary({ freq: "D" }),
-        fetchBuildingComparison(),
-        fetchCopRanking(),
-        fetchAnomalies(),
-        fetchAnomalyReasons()
+        fetchTimeSummary({ ...sharedFilters, freq: "D" }),
+        fetchBuildingComparison(sharedFilters),
+        fetchCopRanking(sharedFilters),
+        fetchAnomalies(sharedFilters),
+        fetchAnomalyReasons(sharedFilters)
       ]);
 
     analytics.timeSummary = timeSummary.items;
@@ -178,6 +275,13 @@ async function loadAnalytics() {
     analytics.copRanking = copRanking.items;
     analytics.anomalies = anomalies.items;
     analytics.anomalyReasons = anomalyReasons.items;
+  } catch (error) {
+    analytics.timeSummary = [];
+    analytics.buildingComparison = [];
+    analytics.copRanking = [];
+    analytics.anomalies = [];
+    analytics.anomalyReasons = [];
+    errors.analytics = "统计分析接口暂时不可用，请先检查后端是否正常运行。";
   } finally {
     loading.analytics = false;
   }
@@ -185,28 +289,50 @@ async function loadAnalytics() {
 
 async function handleAsk(question) {
   loading.assistant = true;
+  errors.assistant = "";
   try {
     assistantReply.value = await queryAssistant(question);
+  } catch (error) {
+    errors.assistant = "智能问答接口暂时不可用，当前展示的是降级提示。";
+    assistantReply.value = {
+      answer: "当前无法连接智能问答接口，请先确认后端服务已启动，再尝试继续提问。",
+      citations: [{ title: "知识库入口", path: "knowledge_base/README.md" }],
+      follow_up: ["先查看数据浏览页", "先查看统计分析页", "确认后端接口状态"]
+    };
   } finally {
     loading.assistant = false;
   }
 }
 
-function handleFilterChange(filters) {
-  recordFilters.buildingId = filters.building_id;
-  recordFilters.limit = filters.limit;
-  loadRecords();
+async function handleFilterApply() {
+  errors.export = "";
+  exportState.lastFile = "";
+  await Promise.all([loadRecords(), loadAnalytics()]);
 }
 
-function resetFilters() {
-  recordFilters.buildingId = "";
-  recordFilters.limit = 10;
-  loadRecords();
+async function handleFilterReset() {
+  Object.assign(recordFilters, createDefaultRecordFilters());
+  errors.export = "";
+  exportState.lastFile = "";
+  await Promise.all([loadRecords(), loadAnalytics()]);
+}
+
+async function handleExport() {
+  exportState.loading = true;
+  errors.export = "";
+  try {
+    exportState.lastFile = await downloadCsvExport(buildFilterParams());
+  } catch (error) {
+    exportState.lastFile = "";
+    errors.export = "导出失败，请确认后端导出接口已经可用。";
+  } finally {
+    exportState.loading = false;
+  }
 }
 
 onMounted(async () => {
   await loadOverview();
-  await Promise.all([loadRecords(), loadAnalytics()]);
+  await Promise.allSettled([loadRecords(), loadAnalytics()]);
 });
 </script>
 
@@ -215,8 +341,8 @@ onMounted(async () => {
     <AppHeader>
       <template #actions>
         <StatusBanner 
-          :status="apiStatus" 
-          :type="apiStatus.includes('已连接') ? 'success' : 'warning'"
+          :status="apiStatus.message" 
+          :type="apiStatus.type"
         />
       </template>
     </AppHeader>
@@ -310,13 +436,52 @@ onMounted(async () => {
       <div class="content-grid content-grid--single">
         <SectionCard eyebrow="Filters" title="数据浏览" description="这里是前端与后端第一次联调时最先要跑通的模块。">
           <FilterToolbar
+            v-model:filters="recordFilters"
             :buildings="buildings"
-            :loading="loading.records"
-            @filterChange="handleFilterChange"
+            :loading="loading.records || loading.analytics"
+            :exporting="exportState.loading"
+            :time-range="availableTimeRange"
+            @apply="handleFilterApply"
+            @reset="handleFilterReset"
+            @export="handleExport"
           />
-          
+
+          <StatusBanner
+            :status="activeFilterSummary"
+            type="info"
+          />
+
+          <div v-if="exportState.lastFile || errors.export" class="inline-banner-list">
+            <StatusBanner
+              v-if="exportState.lastFile"
+              :status="`导出完成：${exportState.lastFile}`"
+              type="success"
+            />
+            <StatusBanner
+              v-if="errors.export"
+              :status="errors.export"
+              type="error"
+            />
+          </div>
+
+          <div v-if="recordSummary.totalFilteredCount && !errors.records" class="inline-banner-list">
+            <StatusBanner
+              :status="`当前筛选共命中 ${recordSummary.totalFilteredCount} 条记录，表格展示前 ${recordSummary.count} 条。`"
+              type="info"
+            />
+          </div>
+
           <div v-if="loading.records" class="data-loading">
             <LoadingSpinner text="正在加载数据..." />
+          </div>
+          <div v-else-if="errors.records" class="data-empty">
+            <EmptyState 
+              icon="⚠️"
+              title="记录加载失败"
+              :description="errors.records"
+              actionText="重新加载"
+              @action="handleFilterApply"
+            />
           </div>
           <div v-else-if="records.length === 0" class="data-empty">
             <EmptyState 
@@ -324,7 +489,7 @@ onMounted(async () => {
               title="暂无数据"
               description="当前筛选条件下没有找到符合条件的记录"
               actionText="重置筛选"
-              @action="resetFilters"
+              @action="handleFilterReset"
             />
           </div>
           <DataTable v-else :columns="recordColumns" :rows="records" empty-text="没有查到符合条件的记录" />
@@ -343,8 +508,31 @@ onMounted(async () => {
 
     <template v-else-if="activeTab === 'analytics'">
       <div class="content-grid">
+        <SectionCard eyebrow="Scope" title="分析筛选范围" description="统计分析与数据浏览共用同一组筛选条件。">
+          <StatusBanner :status="activeFilterSummary" type="info" />
+          <div v-if="errors.analytics" class="analytics-feedback">
+            <EmptyState
+              icon="📉"
+              title="分析数据暂不可用"
+              :description="errors.analytics"
+              actionText="重新加载分析"
+              @action="handleFilterApply"
+            />
+          </div>
+        </SectionCard>
+
         <SectionCard eyebrow="Trend" title="日度能耗趋势" description="目前使用真实接口数据驱动轻量图形占位。">
-          <div class="chart-placeholder">
+          <div v-if="loading.analytics" class="data-loading">
+            <LoadingSpinner text="正在加载趋势数据..." />
+          </div>
+          <div v-else-if="errors.analytics || latestTrendPoints.length === 0" class="data-empty">
+            <EmptyState
+              icon="📈"
+              title="暂无趋势数据"
+              description="当前筛选范围内没有可用的日度趋势结果。"
+            />
+          </div>
+          <div v-else class="chart-placeholder">
             <div class="chart-placeholder__bars chart-placeholder__bars--dense">
               <div v-for="item in latestTrendPoints" :key="item.timestamp" class="trend-bar-wrap">
                 <span
@@ -358,7 +546,17 @@ onMounted(async () => {
         </SectionCard>
 
         <SectionCard eyebrow="Comparison" title="建筑对比" description="适合后续接 ECharts 柱状图或雷达图。">
-          <div class="comparison-list">
+          <div v-if="loading.analytics" class="data-loading">
+            <LoadingSpinner text="正在加载建筑对比..." />
+          </div>
+          <div v-else-if="errors.analytics || topComparison.length === 0" class="data-empty">
+            <EmptyState
+              icon="🏢"
+              title="暂无对比数据"
+              description="请调整筛选条件或检查后端接口。"
+            />
+          </div>
+          <div v-else class="comparison-list">
             <article v-for="item in topComparison" :key="item.building_id" class="comparison-item">
               <div>
                 <strong>{{ item.building_name }}</strong>
@@ -373,23 +571,38 @@ onMounted(async () => {
         </SectionCard>
 
         <SectionCard eyebrow="Ranking" title="COP 排名" description="这里已经是后端真实计算结果。">
-          <ul class="endpoint-list">
+          <ul v-if="analytics.copRanking.length && !errors.analytics" class="endpoint-list">
             <li v-for="item in analytics.copRanking" :key="item.building_id">
               {{ item.building_name }} · COP {{ item.average_cop }}
             </li>
           </ul>
+          <EmptyState
+            v-else
+            icon="🧊"
+            title="暂无 COP 排名"
+            description="当前筛选范围内没有可展示的 COP 结果。"
+          />
         </SectionCard>
 
         <SectionCard eyebrow="Anomaly" title="异常原因分布" description="异常明细和原因计数都已可用。">
-          <ul class="endpoint-list">
+          <ul v-if="analytics.anomalyReasons.length && !errors.analytics" class="endpoint-list">
             <li v-for="item in analytics.anomalyReasons" :key="item.anomaly_reason">
               {{ item.anomaly_reason }} · {{ item.count }} 条
             </li>
           </ul>
+          <EmptyState
+            v-else
+            icon="🚨"
+            title="暂无异常原因统计"
+            description="当前筛选范围内没有异常记录，或分析接口暂不可用。"
+          />
         </SectionCard>
 
         <SectionCard eyebrow="Details" title="异常明细" description="这个表格适合后续补颜色标记、导出和设备详情。">
-          <DataTable :columns="anomalyColumns" :rows="analytics.anomalies.slice(0, 10)" empty-text="暂无异常" />
+          <div v-if="loading.analytics" class="data-loading">
+            <LoadingSpinner text="正在加载异常明细..." />
+          </div>
+          <DataTable v-else :columns="anomalyColumns" :rows="analytics.anomalies.slice(0, 10)" empty-text="暂无异常" />
         </SectionCard>
       </div>
     </template>
@@ -397,6 +610,9 @@ onMounted(async () => {
     <template v-else>
       <div class="content-grid content-grid--assistant">
         <SectionCard eyebrow="Assistant" title="智能问答工作区" description="当前为规则化占位，已经能用于第一次联调和演示。">
+          <div v-if="errors.assistant" class="inline-banner-list">
+            <StatusBanner :status="errors.assistant" type="warning" />
+          </div>
           <AssistantPanel
             :loading="loading.assistant"
             :reply="assistantReply"
@@ -407,10 +623,11 @@ onMounted(async () => {
 
         <SectionCard eyebrow="Knowledge Base" title="知识库准备情况" description="AI 同学后续主要会在这里继续深化。">
           <ul class="bullet-list">
-            <li>knowledge_base/manuals/operation_guide.md</li>
-            <li>knowledge_base/glossary/energy_terms.md</li>
-            <li>knowledge_base/faq/typical_questions.md</li>
-            <li>后续可继续补充 SOP、设备手册、异常规则和 FAQ</li>
+            <li>knowledge_base/manuals/anomaly_diagnosis_guide.md</li>
+            <li>knowledge_base/manuals/equipment_maintenance_playbook.md</li>
+            <li>knowledge_base/manuals/building_type_notes.md</li>
+            <li>knowledge_base/glossary/metrics_and_rules.md</li>
+            <li>knowledge_base/faq/qa_bank_round1.md</li>
           </ul>
         </SectionCard>
       </div>
@@ -453,6 +670,16 @@ onMounted(async () => {
 .data-empty {
   padding: 40px;
   text-align: center;
+}
+
+.inline-banner-list {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.analytics-feedback {
+  margin-top: 18px;
 }
 
 @media (max-width: 768px) {
