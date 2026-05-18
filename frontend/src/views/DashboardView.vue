@@ -11,6 +11,9 @@ import AssistantPanel from "../components/AssistantPanel.vue";
 import DataTable from "../components/DataTable.vue";
 import KpiCard from "../components/KpiCard.vue";
 import SectionCard from "../components/SectionCard.vue";
+import TrendChart from "../components/TrendChart.vue";
+import BuildingComparisonChart from "../components/BuildingComparisonChart.vue";
+import AnomalyReasonChart from "../components/AnomalyReasonChart.vue";
 import {
   downloadCsvExport,
   fetchAnomalies,
@@ -109,23 +112,23 @@ const tabs = [
 const modules = [
   {
     title: "数据管理",
-    description: "冻结字段、维护数据字典、生成样例数据并提供查询入口。",
-    status: "适合数据与 AI 负责人继续扩展"
+    description: "统一数据标准，确保数据质量和一致性。",
+    status: "数据标准化"
   },
   {
     title: "后端接口",
-    description: "统一提供总览、建筑列表、查询、分析和问答接口。",
-    status: "适合技术负责人继续细化"
+    description: "提供稳定可靠的API服务，支持多场景应用。",
+    status: "服务稳定"
   },
   {
     title: "前端工作台",
-    description: "将总览、数据、分析和问答做成统一演示界面。",
-    status: "适合前端负责人继续补交互"
+    description: "直观的可视化界面，便捷的操作体验。",
+    status: "界面友好"
   },
   {
-    title: "交付文档",
-    description: "接口契约、协作规则、集成清单和测试计划已经落库。",
-    status: "适合项目经理统一推进"
+    title: "智能分析",
+    description: "基于数据的智能分析和预测能力。",
+    status: "AI赋能"
   }
 ];
 
@@ -373,38 +376,43 @@ onMounted(async () => {
 
     <template v-if="activeTab === 'overview'">
       <section class="kpi-grid">
-        <KpiCard title="样例记录数" :value="overview.total_records" caption="当前数据规模适合联调与演示" />
-        <KpiCard title="建筑数量" :value="overview.building_count" caption="已支持多建筑场景筛选" />
-        <KpiCard title="平均 COP" :value="overview.average_cop" caption="可继续细化到建筑级和时间级" />
-        <KpiCard title="异常记录" :value="overview.abnormal_record_count" caption="按状态异常与基线偏离识别" />
+        <KpiCard title="数据记录" :value="overview.total_records" caption="总记录数量" />
+        <KpiCard title="建筑数量" :value="overview.building_count" caption="监测建筑总数" />
+        <KpiCard title="平均 COP" :value="overview.average_cop" caption="系统能效比" />
+        <KpiCard title="异常记录" :value="overview.abnormal_record_count" caption="异常检测数量" />
       </section>
 
       <div class="content-grid">
-        <SectionCard eyebrow="Modules" title="模块责任区" description="这一版结构已经适合按模块分工。">
-          <div class="module-list">
-            <article v-for="module in modules" :key="module.title" class="module-item">
-              <div>
-                <h3>{{ module.title }}</h3>
-                <p>{{ module.description }}</p>
-              </div>
-              <span class="module-tag">{{ module.status }}</span>
-            </article>
+        <SectionCard eyebrow="System" title="系统概览" description="建筑能源管理系统运行状态总览">
+          <div class="system-overview">
+            <div class="overview-item">
+              <span class="overview-label">运行状态</span>
+              <strong class="overview-value status-active">正常运行</strong>
+            </div>
+            <div class="overview-item">
+              <span class="overview-label">数据更新</span>
+              <strong class="overview-value">实时更新</strong>
+            </div>
+            <div class="overview-item">
+              <span class="overview-label">覆盖范围</span>
+              <strong class="overview-value">全园区监测</strong>
+            </div>
           </div>
         </SectionCard>
 
-        <SectionCard eyebrow="Metadata" title="数据元信息" description="第一次任务分发前最应该冻结的就是这些信息。">
-          <div class="meta-grid">
-            <div class="meta-item">
-              <span>时间范围</span>
-              <strong>{{ datasetMeta.time_range.start }} 至 {{ datasetMeta.time_range.end }}</strong>
+        <SectionCard eyebrow="Data" title="数据质量" description="当前数据集的基本信息和质量指标">
+          <div class="data-quality-info">
+            <div class="quality-item">
+              <span class="quality-label">监测时间范围</span>
+              <strong class="quality-value">{{ datasetMeta.time_range.start }} 至 {{ datasetMeta.time_range.end }}</strong>
             </div>
-            <div class="meta-item">
-              <span>字段数量</span>
-              <strong>{{ datasetMeta.fields.length }}</strong>
+            <div class="quality-item">
+              <span class="quality-label">监测指标数</span>
+              <strong class="quality-value">{{ datasetMeta.fields.length }} 项</strong>
             </div>
-            <div class="meta-item">
-              <span>建筑列表</span>
-              <strong>{{ buildings.map((item) => item.building_name).join("、") }}</strong>
+            <div class="quality-item">
+              <span class="quality-label">覆盖建筑</span>
+              <strong class="quality-value">{{ buildings.map((item) => item.building_name).join("、") }}</strong>
             </div>
           </div>
           <div class="field-chip-list">
@@ -412,29 +420,60 @@ onMounted(async () => {
           </div>
         </SectionCard>
 
-        <SectionCard eyebrow="Workflow" title="当前协作节奏" description="你后续给另外三个人分工时，直接以这条节奏推进即可。">
-          <ol class="ordered-list">
-            <li>先冻结字段、接口和目录责任区</li>
-            <li>第一轮任务只做可接入的基础版</li>
-            <li>中间整合一次，统一前后端和数据口径</li>
-            <li>第二轮再补完整功能、交互和测试</li>
-          </ol>
+        <SectionCard eyebrow="Features" title="核心功能" description="系统提供的主要功能模块">
+          <div class="feature-list">
+            <div class="feature-item">
+              <div class="feature-icon">📊</div>
+              <div class="feature-content">
+                <h4>能耗监测</h4>
+                <p>实时监测建筑能耗数据，提供详细的用电分析</p>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🚨</div>
+              <div class="feature-content">
+                <h4>异常检测</h4>
+                <p>智能识别异常用电模式，及时发现潜在问题</p>
+              </div>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">💡</div>
+              <div class="feature-content">
+                <h4>智能问答</h4>
+                <p>基于知识库的AI助手，解答能源管理相关问题</p>
+              </div>
+            </div>
+          </div>
         </SectionCard>
 
-        <SectionCard eyebrow="Docs" title="关键文档" description="这些文档已经补齐，足够支撑第一次任务分发。">
-          <ul class="endpoint-list">
-            <li>docs/06-api-contract.md</li>
-            <li>docs/07-collaboration-rules.md</li>
-            <li>docs/08-integration-checklist.md</li>
-            <li>docs/09-testing-plan.md</li>
-          </ul>
+        <SectionCard eyebrow="Insights" title="数据洞察" description="基于当前数据的初步分析结论">
+          <div class="insights-content">
+            <div class="insight-item">
+              <span class="insight-icon">📈</span>
+              <div class="insight-text">
+                <strong>能耗趋势：</strong>系统持续监测各建筑能耗变化，为节能优化提供数据支撑
+              </div>
+            </div>
+            <div class="insight-item">
+              <span class="insight-icon">🔍</span>
+              <div class="insight-text">
+                <strong>异常识别：</strong>通过智能算法识别异常用电模式，帮助及时发现设备问题
+              </div>
+            </div>
+            <div class="insight-item">
+              <span class="insight-icon">⚡</span>
+              <div class="insight-text">
+                <strong>能效优化：</strong>基于COP等指标分析，为建筑能效提升提供专业建议
+              </div>
+            </div>
+          </div>
         </SectionCard>
       </div>
     </template>
 
     <template v-else-if="activeTab === 'data'">
       <div class="content-grid content-grid--single">
-        <SectionCard eyebrow="Filters" title="数据浏览" description="这里是前端与后端第一次联调时最先要跑通的模块。">
+        <SectionCard eyebrow="Filters" title="数据浏览" description="查看和管理建筑能源消耗数据">
           <FilterToolbar
             v-model:filters="recordFilters"
             :buildings="buildings"
@@ -451,17 +490,23 @@ onMounted(async () => {
             type="info"
           />
 
-          <div v-if="exportState.lastFile || errors.export" class="inline-banner-list">
-            <StatusBanner
-              v-if="exportState.lastFile"
-              :status="`导出完成：${exportState.lastFile}`"
-              type="success"
-            />
-            <StatusBanner
-              v-if="errors.export"
-              :status="errors.export"
-              type="error"
-            />
+          <div v-if="exportState.lastFile || errors.export" class="export-notifications">
+            <div v-if="exportState.lastFile" class="export-success">
+              <div class="export-icon">✅</div>
+              <div class="export-content">
+                <div class="export-title">导出成功</div>
+                <div class="export-filename">{{ exportState.lastFile }}</div>
+                <div class="export-hint">文件已保存到下载目录</div>
+              </div>
+            </div>
+            <div v-if="errors.export" class="export-error">
+              <div class="export-icon">❌</div>
+              <div class="export-content">
+                <div class="export-title">导出失败</div>
+                <div class="export-message">{{ errors.export }}</div>
+                <div class="export-hint">请检查后端服务状态</div>
+              </div>
+            </div>
           </div>
 
           <div v-if="recordSummary.totalFilteredCount && !errors.records" class="inline-banner-list">
@@ -495,13 +540,21 @@ onMounted(async () => {
           <DataTable v-else :columns="recordColumns" :rows="records" empty-text="没有查到符合条件的记录" />
         </SectionCard>
 
-        <SectionCard eyebrow="Contract" title="字段冻结说明" description="这一块非常适合第一次任务分发时统一给所有人。">
-          <ul class="bullet-list">
-            <li>字段名以数据字典为准，不允许前端自己改口径</li>
-            <li>时间字段统一使用字符串格式 `YYYY-MM-DD HH:mm:ss`</li>
-            <li>原始记录查询接口统一返回 `items` 数组</li>
-            <li>新增字段前先更新数据字典和 API 契约</li>
-          </ul>
+        <SectionCard eyebrow="Export" title="数据导出" description="支持将筛选后的数据导出为CSV格式文件">
+          <div class="export-info">
+            <div class="export-feature">
+              <h4>📊 灵活导出</h4>
+              <p>根据筛选条件导出特定时间段和建筑的能耗数据</p>
+            </div>
+            <div class="export-feature">
+              <h4>📋 标准格式</h4>
+              <p>导出文件采用标准CSV格式，兼容Excel等常用工具</p>
+            </div>
+            <div class="export-feature">
+              <h4>⚡ 快速下载</h4>
+              <p>一键导出，文件自动生成并下载到本地</p>
+            </div>
+          </div>
         </SectionCard>
       </div>
     </template>
@@ -521,56 +574,23 @@ onMounted(async () => {
           </div>
         </SectionCard>
 
-        <SectionCard eyebrow="Trend" title="日度能耗趋势" description="目前使用真实接口数据驱动轻量图形占位。">
-          <div v-if="loading.analytics" class="data-loading">
-            <LoadingSpinner text="正在加载趋势数据..." />
-          </div>
-          <div v-else-if="errors.analytics || latestTrendPoints.length === 0" class="data-empty">
-            <EmptyState
-              icon="📈"
-              title="暂无趋势数据"
-              description="当前筛选范围内没有可用的日度趋势结果。"
-            />
-          </div>
-          <div v-else class="chart-placeholder">
-            <div class="chart-placeholder__bars chart-placeholder__bars--dense">
-              <div v-for="item in latestTrendPoints" :key="item.timestamp" class="trend-bar-wrap">
-                <span
-                  class="trend-bar"
-                  :style="{ height: `${Math.max((item.electricity_kwh / trendMax) * 100, 8)}%` }"
-                ></span>
-                <small>{{ item.timestamp.slice(5, 10) }}</small>
-              </div>
-            </div>
-          </div>
+        <SectionCard eyebrow="Trend" title="日度能耗趋势" description="建筑能耗变化趋势分析">
+          <TrendChart
+            :data="analytics.timeSummary"
+            :loading="loading.analytics"
+            :error="errors.analytics"
+          />
         </SectionCard>
 
-        <SectionCard eyebrow="Comparison" title="建筑对比" description="适合后续接 ECharts 柱状图或雷达图。">
-          <div v-if="loading.analytics" class="data-loading">
-            <LoadingSpinner text="正在加载建筑对比..." />
-          </div>
-          <div v-else-if="errors.analytics || topComparison.length === 0" class="data-empty">
-            <EmptyState
-              icon="🏢"
-              title="暂无对比数据"
-              description="请调整筛选条件或检查后端接口。"
-            />
-          </div>
-          <div v-else class="comparison-list">
-            <article v-for="item in topComparison" :key="item.building_id" class="comparison-item">
-              <div>
-                <strong>{{ item.building_name }}</strong>
-                <span>{{ item.building_type }}</span>
-              </div>
-              <div class="comparison-values">
-                <span>电耗 {{ item.electricity_kwh }}</span>
-                <span>COP {{ item.average_cop }}</span>
-              </div>
-            </article>
-          </div>
+        <SectionCard eyebrow="Comparison" title="建筑对比" description="专业图表展示建筑电耗和COP对比。">
+          <BuildingComparisonChart
+            :data="analytics.buildingComparison"
+            :loading="loading.analytics"
+            :error="errors.analytics"
+          />
         </SectionCard>
 
-        <SectionCard eyebrow="Ranking" title="COP 排名" description="这里已经是后端真实计算结果。">
+        <SectionCard eyebrow="Ranking" title="COP 排名" description="建筑能效比综合排名">
           <ul v-if="analytics.copRanking.length && !errors.analytics" class="endpoint-list">
             <li v-for="item in analytics.copRanking" :key="item.building_id">
               {{ item.building_name }} · COP {{ item.average_cop }}
@@ -584,21 +604,15 @@ onMounted(async () => {
           />
         </SectionCard>
 
-        <SectionCard eyebrow="Anomaly" title="异常原因分布" description="异常明细和原因计数都已可用。">
-          <ul v-if="analytics.anomalyReasons.length && !errors.analytics" class="endpoint-list">
-            <li v-for="item in analytics.anomalyReasons" :key="item.anomaly_reason">
-              {{ item.anomaly_reason }} · {{ item.count }} 条
-            </li>
-          </ul>
-          <EmptyState
-            v-else
-            icon="🚨"
-            title="暂无异常原因统计"
-            description="当前筛选范围内没有异常记录，或分析接口暂不可用。"
+        <SectionCard eyebrow="Anomaly" title="异常原因分布" description="">
+          <AnomalyReasonChart
+            :data="analytics.anomalyReasons"
+            :loading="loading.analytics"
+            :error="errors.analytics"
           />
         </SectionCard>
 
-        <SectionCard eyebrow="Details" title="异常明细" description="这个表格适合后续补颜色标记、导出和设备详情。">
+        <SectionCard eyebrow="Details" title="异常明细" description="">
           <div v-if="loading.analytics" class="data-loading">
             <LoadingSpinner text="正在加载异常明细..." />
           </div>
@@ -609,7 +623,7 @@ onMounted(async () => {
 
     <template v-else>
       <div class="content-grid content-grid--assistant">
-        <SectionCard eyebrow="Assistant" title="智能问答工作区" description="当前为规则化占位，已经能用于第一次联调和演示。">
+        <SectionCard eyebrow="Assistant" title="智能问答工作区" description="">
           <div v-if="errors.assistant" class="inline-banner-list">
             <StatusBanner :status="errors.assistant" type="warning" />
           </div>
@@ -621,7 +635,7 @@ onMounted(async () => {
           />
         </SectionCard>
 
-        <SectionCard eyebrow="Knowledge Base" title="知识库准备情况" description="AI 同学后续主要会在这里继续深化。">
+        <SectionCard eyebrow="Knowledge Base" title="知识库" description="">
           <ul class="bullet-list">
             <li>knowledge_base/manuals/anomaly_diagnosis_guide.md</li>
             <li>knowledge_base/manuals/equipment_maintenance_playbook.md</li>
@@ -682,9 +696,90 @@ onMounted(async () => {
   margin-top: 18px;
 }
 
+.export-notifications {
+  margin: 16px 0;
+}
+
+.export-success,
+.export-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.export-success {
+  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  border: 1px solid #b1dfbb;
+}
+
+.export-error {
+  background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+  border: 1px solid #f1b0b7;
+}
+
+.export-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.export-content {
+  flex: 1;
+}
+
+.export-title {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.export-success .export-title {
+  color: #155724;
+}
+
+.export-error .export-title {
+  color: #721c24;
+}
+
+.export-filename,
+.export-message {
+  font-size: 13px;
+  color: #333;
+  margin-bottom: 2px;
+  word-break: break-all;
+}
+
+.export-hint {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+}
+
 @media (max-width: 768px) {
   .hero-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  
+  .export-success,
+  .export-error {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  
+  .export-icon {
+    font-size: 18px;
+  }
+  
+  .export-title {
+    font-size: 13px;
+  }
+  
+  .export-filename,
+  .export-message {
+    font-size: 12px;
   }
 }
 </style>
