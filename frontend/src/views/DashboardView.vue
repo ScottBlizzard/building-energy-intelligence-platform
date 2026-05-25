@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, reactive, ref } from "vue";
+import { computed, defineAsyncComponent, onMounted, reactive, ref } from "vue";
 
 import AppHeader from "../components/AppHeader.vue";
 import TabNavigation from "../components/TabNavigation.vue";
@@ -11,9 +11,6 @@ import AssistantPanel from "../components/AssistantPanel.vue";
 import DataTable from "../components/DataTable.vue";
 import KpiCard from "../components/KpiCard.vue";
 import SectionCard from "../components/SectionCard.vue";
-import TrendChart from "../components/TrendChart.vue";
-import BuildingComparisonChart from "../components/BuildingComparisonChart.vue";
-import AnomalyReasonChart from "../components/AnomalyReasonChart.vue";
 import {
   downloadCsvExport,
   fetchAnomalies,
@@ -27,6 +24,14 @@ import {
   fetchTimeSummary,
   queryAssistant
 } from "../lib/api";
+
+const TrendChart = defineAsyncComponent(() => import("../components/TrendChart.vue"));
+const BuildingComparisonChart = defineAsyncComponent(() =>
+  import("../components/BuildingComparisonChart.vue")
+);
+const AnomalyReasonChart = defineAsyncComponent(() =>
+  import("../components/AnomalyReasonChart.vue")
+);
 
 function createEmptyOverview() {
   return {

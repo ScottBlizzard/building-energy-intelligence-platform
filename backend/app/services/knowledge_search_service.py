@@ -6,7 +6,6 @@ an in-memory index of sections for citation-aware retrieval.
 
 import re
 from functools import lru_cache
-from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.core.config import get_settings
@@ -78,9 +77,20 @@ def _parse_sections(content: str, rel_path: str) -> List[KnowledgeSection]:
 
 
 def _tokenize(text: str) -> List[str]:
-    """Simple Chinese+English tokenizer: split on whitespace and punctuation."""
-    tokens = re.findall(r"[一-鿿]+|[a-zA-Z0-9]+", text.lower())
-    return list(set(tokens))
+    """Build lightweight Chinese/English tokens for local retrieval."""
+    raw_tokens = re.findall(r"[\u4e00-\u9fff]+|[a-zA-Z0-9]+", text.lower())
+    tokens = set()
+
+    for token in raw_tokens:
+        if re.fullmatch(r"[\u4e00-\u9fff]+", token):
+            tokens.add(token)
+            for size in (2, 3):
+                if len(token) >= size:
+                    tokens.update(token[idx : idx + size] for idx in range(len(token) - size + 1))
+        else:
+            tokens.add(token)
+
+    return sorted(token for token in tokens if token.strip())
 
 
 def search_knowledge(

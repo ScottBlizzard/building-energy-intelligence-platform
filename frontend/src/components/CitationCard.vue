@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from "vue";
+
 const props = defineProps({
   citation: {
     type: Object,
@@ -27,6 +29,14 @@ const getFileType = (path) => {
 const truncateTitle = (title, maxLength = 30) => {
   return title.length > maxLength ? title.slice(0, maxLength) + "..." : title;
 };
+
+const sourceUrl = computed(() => {
+  const encodedPath = props.citation.path
+    .split("/")
+    .map((part) => encodeURIComponent(part))
+    .join("/");
+  return `https://github.com/ScottBlizzard/building-energy-intelligence-platform/blob/main/${encodedPath}`;
+});
 </script>
 
 <template>
@@ -45,8 +55,9 @@ const truncateTitle = (title, maxLength = 30) => {
     </div>
     <div v-if="!compact" class="citation-actions">
       <a 
-        :href="`/${citation.path}`" 
+        :href="sourceUrl" 
         target="_blank" 
+        rel="noreferrer"
         class="citation-link"
         @click.stop
       >

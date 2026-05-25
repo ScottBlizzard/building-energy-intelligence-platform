@@ -133,6 +133,7 @@ python .\scripts\generate_sample_dataset.py
 - 测试计划：[`docs/09-testing-plan.md`](docs/09-testing-plan.md)
 - 数据源调研：[`docs/10-data-source-research.md`](docs/10-data-source-research.md)
 - 第一次整合总结：[`docs/11-first-integration-summary.md`](docs/11-first-integration-summary.md)
+- 第二次整合总结：[`docs/12-second-integration-summary.md`](docs/12-second-integration-summary.md)
 
 ## 协作建议
 

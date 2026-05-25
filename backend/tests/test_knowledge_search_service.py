@@ -38,6 +38,15 @@ def test_search_knowledge_matches_maintenance():
     )
 
 
+def test_search_knowledge_handles_long_chinese_question():
+    results = search_knowledge("为什么实验楼会出现电耗异常")
+    matched_texts = " ".join(
+        r.section.title + " " + r.section.body for r in results
+    )
+    assert len(results) > 0
+    assert any(kw in matched_texts for kw in ["异常", "电耗", "实验楼"])
+
+
 def test_search_and_format_citations_returns_structure():
     result = search_and_format_citations("COP 排名")
     assert "citations" in result

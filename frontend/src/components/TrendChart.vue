@@ -1,6 +1,7 @@
 <script setup>
-import { computed, watch, ref } from "vue";
-import * as echarts from "echarts";
+import { computed } from "vue";
+
+import { useEcharts } from "../lib/useEcharts";
 
 const props = defineProps({
   data: {
@@ -16,9 +17,6 @@ const props = defineProps({
     default: ""
   }
 });
-
-const chartRef = ref(null);
-let chartInstance = null;
 
 const chartOptions = computed(() => {
   if (!props.data.length) {
@@ -108,24 +106,7 @@ const chartOptions = computed(() => {
   };
 });
 
-watch(() => props.data, () => {
-  if (chartInstance) {
-    chartInstance.setOption(chartOptions.value);
-  }
-}, { deep: true });
-
-watch(chartRef, (newRef) => {
-  if (newRef && !chartInstance) {
-    chartInstance = echarts.init(newRef);
-    chartInstance.setOption(chartOptions.value);
-    
-    // 响应式处理
-    const resizeObserver = new ResizeObserver(() => {
-      chartInstance?.resize();
-    });
-    resizeObserver.observe(newRef);
-  }
-});
+const { chartRef } = useEcharts(chartOptions);
 </script>
 
 <template>
