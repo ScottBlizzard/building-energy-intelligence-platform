@@ -52,11 +52,34 @@
 
 - 后端：FastAPI + Pandas
 - 前端：Vue 3 + Vite
-- 可视化：后续接入 ECharts
-- 智能问答：当前为规则 + 知识文件引用，后续接入 LLM / RAG
+- 可视化：ECharts + 自定义三维楼层风险视图
+- 智能问答：知识库规则回答 + 可选外部大模型增强
 - 数据格式：CSV 为主，后续可扩展数据库
 
 ## 快速启动
+
+### 0. 拉取代码与放置环境变量
+
+同学第一次运行时，先拉取仓库并进入项目根目录：
+
+```powershell
+git clone https://github.com/ScottBlizzard/building-energy-intelligence-platform.git
+cd building-energy-intelligence-platform
+```
+
+如果只演示基础系统，可以直接复制模板：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+如果需要启用页面里的外部大模型选项，由项目负责人单独提供真实 `.env` 文件。同学只需要把这份文件放在仓库根目录，路径应为：
+
+```text
+building-energy-intelligence-platform/.env
+```
+
+不要把真实 `.env` 放到 `backend/` 或 `frontend/`，也不要提交到 GitHub。后端会自动读取根目录 `.env`；前端默认使用 `/api/v1`，开发环境下由 Vite 代理到 `http://127.0.0.1:8000`，通常不需要单独配置 `frontend/.env`。
 
 ### 1. 启动后端
 
@@ -87,11 +110,23 @@ npm run dev
 .\scripts\start-frontend.ps1
 ```
 
+注意：如果使用脚本启动，后端和前端需要分别开两个 PowerShell 窗口运行。
+
 ### 3. 常用访问地址
 
 - 前端开发页：`http://127.0.0.1:5173`
 - 后端文档：`http://127.0.0.1:8000/docs`
 - 健康检查：`http://127.0.0.1:8000/api/v1/health`
+
+### 4. 一键自检
+
+安装完依赖后，可以运行完整检查：
+
+```powershell
+.\scripts\check-project.ps1
+```
+
+该脚本会执行后端测试和前端构建。通过后说明当前环境基本可以完整运行和演示。
 
 ## 已提供接口
 
