@@ -62,14 +62,70 @@ export function fetchAnomalies(params = {}) {
   return request("/analytics/anomalies", {}, params);
 }
 
+export function fetchAnomalyExplanation(recordId) {
+  return request(`/analytics/anomaly-explanations/${encodeURIComponent(recordId)}`);
+}
+
 export function fetchAnomalyReasons(params = {}) {
   return request("/analytics/anomaly-reasons", {}, params);
 }
 
-export function queryAssistant(question) {
+export function fetchFloorSummary(params = {}) {
+  return request("/analytics/floor-summary", {}, params);
+}
+
+export function fetchFloorRegistry(params = {}) {
+  return request("/analytics/floor-registry", {}, params);
+}
+
+export function fetchEquipmentSummary(params = {}) {
+  return request("/analytics/equipment-summary", {}, params);
+}
+
+export function fetchWorkOrders(params = {}) {
+  return request("/analytics/work-orders", {}, params);
+}
+
+export function fetchOptimizationRecommendations(params = {}) {
+  return request("/analytics/optimization-recommendations", {}, params);
+}
+
+export function fetchOperationReport(params = {}) {
+  return request("/analytics/operation-report", {}, params);
+}
+
+export function fetchPersistentWorkOrders() {
+  return request("/work-orders");
+}
+
+export function createPersistentWorkOrder(payload) {
+  return request("/work-orders", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function updatePersistentWorkOrder(workOrderId, payload) {
+  return request(`/work-orders/${encodeURIComponent(workOrderId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchAssistantProviders() {
+  return request("/assistant/providers");
+}
+
+export function queryAssistant(question, modelSelection = null) {
+  const body = { question };
+  if (modelSelection?.provider && modelSelection?.model) {
+    body.provider = modelSelection.provider;
+    body.model = modelSelection.model;
+  }
+
   return request("/assistant/query", {
     method: "POST",
-    body: JSON.stringify({ question })
+    body: JSON.stringify(body)
   });
 }
 

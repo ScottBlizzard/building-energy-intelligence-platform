@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import math
 import random
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -8,6 +9,8 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 OUTPUT_PATH = ROOT_DIR / "data" / "samples" / "energy_records.csv"
+DATA_START = datetime(2026, 3, 1, 0, 0, 0)
+DATA_END = datetime(2026, 6, 1, 0, 0, 0)
 
 
 BUILDINGS = [
@@ -76,41 +79,81 @@ def _clamp(value: float, low: float, high: float) -> float:
 
 def main() -> None:
     random.seed(42)
-    start = datetime(2026, 3, 1, 0, 0, 0)
+    total_days = (DATA_END.date() - DATA_START.date()).days + 1
     rows = []
     record_index = 1
 
-    for day_offset in range(35):
-        current_day = start + timedelta(days=day_offset)
-        seasonal_temp = 16.0 + day_offset * 0.18
+    for day_offset in range(total_days):
+        current_day = DATA_START + timedelta(days=day_offset)
+        season_progress = day_offset / max(total_days - 1, 1)
+        seasonal_temp = 15.8 + 12.8 * season_progress + 1.9 * math.sin(season_progress * math.pi)
+        is_weekend = current_day.weekday() >= 5
 
         for building_index, building in enumerate(BUILDINGS):
             for slot in TIME_SLOTS:
                 timestamp = current_day.replace(hour=slot)
                 peak_factor = 1.22 if slot in {9, 12, 15} else 0.92 if slot in {0, 3, 21} else 1.0
                 workload_factor = 1 + building_index * 0.06
+                cooling_pressure = 1 + max(seasonal_temp + slot * 0.22 - 24, 0) * 0.018
+                if is_weekend and building["building_type"] in {"teaching", "office"}:
+                    schedule_factor = 0.88
+                    occupancy_factor = 0.58
+                elif is_weekend and building["building_type"] == "library":
+                    schedule_factor = 0.98
+                    occupancy_factor = 0.9
+                else:
+                    schedule_factor = 1.0
+                    occupancy_factor = 1.0
                 noise = random.uniform(-0.08, 0.08)
 
                 environment_temp = round(seasonal_temp + slot * 0.22 + random.uniform(-1.2, 1.2), 1)
-                humidity = round(_clamp(58 - day_offset * 0.2 + random.uniform(-7, 7), 32, 88), 1)
+                humidity = round(_clamp(62 - season_progress * 12 + random.uniform(-7, 7), 32, 88), 1)
                 occupancy = round(
                     _clamp(
-                        (20 + slot * 3.5 + building_index * 7 + random.uniform(-8, 10))
+                        ((20 + slot * 3.5 + building_index * 7 + random.uniform(-8, 10)) * occupancy_factor)
                         if slot in {6, 9, 12, 15, 18}
-                        else (5 + building_index * 2 + random.uniform(-2, 3)),
+                        else ((5 + building_index * 2 + random.uniform(-2, 3)) * occupancy_factor),
                         0,
                         95,
                     ),
                     1,
                 )
 
-                hvac = building["base_hvac"] * peak_factor * workload_factor * (1 + noise)
-                electricity = building["base_electricity"] * peak_factor * workload_factor * (1 + noise * 0.9)
-                water = building["base_water"] * (0.85 + peak_factor * 0.2) * (1 + noise * 0.4)
+                hvac = (
+                    building["base_hvac"]
+                    * peak_factor
+                    * workload_factor
+                    * schedule_factor
+                    * cooling_pressure
+                    * (1 + noise)
+                )
+                electricity = (
+                    building["base_electricity"]
+                    * peak_factor
+                    * workload_factor
+                    * schedule_factor
+                    * cooling_pressure
+                    * (1 + noise * 0.9)
+                )
+                water = (
+                    building["base_water"]
+                    * (0.85 + peak_factor * 0.2)
+                    * (0.92 + occupancy_factor * 0.08)
+                    * (1 + noise * 0.4)
+                )
                 cooling_load = hvac * (3.0 + random.uniform(-0.18, 0.24))
 
                 abnormal = (day_offset + slot + building_index) % 23 == 0 or (
                     building["building_id"] == "BLD-D" and slot == 15 and day_offset % 9 == 0
+                )
+                abnormal = abnormal or (
+                    current_day.month == 5 and 24 <= current_day.day <= 28 and slot in {12, 15}
+                )
+                abnormal = abnormal or (
+                    building["building_id"] == "BLD-C" and slot == 21 and day_offset % 17 == 0
+                )
+                abnormal = abnormal or (
+                    building["building_id"] == "BLD-B" and is_weekend and slot in {9, 12} and day_offset % 19 == 0
                 )
                 if abnormal:
                     electricity *= 1.28
@@ -150,4 +193,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

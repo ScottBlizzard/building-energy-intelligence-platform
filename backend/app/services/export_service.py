@@ -5,10 +5,12 @@ from typing import Optional
 import pandas as pd
 
 from app.services.data_loader import get_filtered_dataset
+from app.services.analysis_service import build_display_frame, filter_display_frame_by_floor
 
 
 def build_csv_content(
     building_id: Optional[str] = None,
+    floor_label: Optional[str] = None,
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
 ) -> str:
@@ -20,7 +22,13 @@ def build_csv_content(
     if frame.empty:
         return ""
 
-    export_frame = frame.copy()
+    export_frame = build_display_frame(frame)
+    if floor_label:
+        export_frame = filter_display_frame_by_floor(export_frame, floor_label)
+
+    if export_frame.empty:
+        return ""
+
     if "timestamp" in export_frame.columns:
         export_frame["timestamp"] = export_frame["timestamp"].dt.strftime(
             "%Y-%m-%d %H:%M:%S"
@@ -33,6 +41,7 @@ def build_csv_content(
 
 def build_export_filename(
     building_id: Optional[str] = None,
+    floor_label: Optional[str] = None,
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
 ) -> str:
@@ -41,6 +50,8 @@ def build_export_filename(
 
     if building_id:
         parts.append(building_id)
+    if floor_label:
+        parts.append(floor_label.replace(" ", "-"))
     if start_time is not None:
         parts.append("from-{0}".format(start_time.strftime("%Y%m%d-%H%M")))
     if end_time is not None:

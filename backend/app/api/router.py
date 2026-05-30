@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.routes import analytics, assistant, building_detail, data, export, health
+from app.api.routes import analytics, assistant, building_detail, data, export, health, work_orders
 
 
 api_router = APIRouter()
@@ -10,4 +10,5 @@ api_router.include_router(analytics.router, prefix="/analytics", tags=["analytic
 api_router.include_router(building_detail.router, prefix="/analytics", tags=["analytics"])
 api_router.include_router(assistant.router, prefix="/assistant", tags=["assistant"])
 api_router.include_router(export.router, prefix="/export", tags=["export"])
+api_router.include_router(work_orders.router, prefix="/work-orders", tags=["work-orders"])
 

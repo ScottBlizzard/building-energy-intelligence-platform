@@ -1,6 +1,4 @@
 <script setup>
-import { computed } from 'vue';
-
 const props = defineProps({
   tabs: {
     type: Array,
@@ -14,10 +12,6 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['update:activeTab']);
-
-const activeTabIndex = computed(() => 
-  props.tabs.findIndex(tab => tab.key === props.activeTab)
-);
 
 function selectTab(tabKey) {
   emit('update:activeTab', tabKey);
@@ -38,7 +32,6 @@ function selectTab(tabKey) {
         {{ tab.label }}
       </button>
     </div>
-    <div class="tab-indicator" :style="{ left: `${activeTabIndex * 120}px` }"></div>
   </nav>
 </template>
 
@@ -72,17 +65,6 @@ function selectTab(tabKey) {
   background: rgba(15, 139, 141, 0.12);
   color: var(--accent-deep);
   border-color: rgba(15, 139, 141, 0.18);
-}
-
-.tab-indicator {
-  position: absolute;
-  bottom: 0;
-  height: 3px;
-  width: 100px;
-  background: var(--accent);
-  border-radius: 2px;
-  transition: left 0.3s ease;
-  margin-left: 10px;
 }
 
 @media (max-width: 768px) {

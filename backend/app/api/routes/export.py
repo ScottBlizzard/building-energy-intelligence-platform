@@ -14,13 +14,17 @@ router = APIRouter()
 @router.get("/csv")
 def export_csv(
     building_id: Optional[str] = None,
+    floor_label: Optional[str] = None,
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
 ):
     """Export filtered records as a CSV file download."""
     try:
         csv_content = build_csv_content(
-            building_id=building_id, start_time=start_time, end_time=end_time
+            building_id=building_id,
+            floor_label=floor_label,
+            start_time=start_time,
+            end_time=end_time,
         )
     except (FileNotFoundError, ValueError) as exc:
         raise HTTPException(status_code=500, detail=str(exc))
@@ -30,6 +34,7 @@ def export_csv(
 
     filename = build_export_filename(
         building_id=building_id,
+        floor_label=floor_label,
         start_time=start_time,
         end_time=end_time,
     )

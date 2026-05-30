@@ -59,3 +59,14 @@ def test_export_csv_filename_includes_date_filters():
     disposition = response.headers.get("content-disposition", "")
     assert "from-20260301-0000" in disposition
     assert "to-20260302-0000" in disposition
+
+
+def test_export_csv_with_floor_filter():
+    first = client.get("/api/v1/records", params={"limit": 1}).json()["items"][0]
+    response = client.get(
+        "/api/v1/export/csv", params={"floor_label": first["floor_label"]}
+    )
+    assert response.status_code == 200
+    header = response.text.strip().split("\n")[0]
+    assert "floor_label" in header
+    assert first["floor_label"] in response.text

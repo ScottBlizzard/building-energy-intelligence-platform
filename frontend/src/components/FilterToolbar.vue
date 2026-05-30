@@ -17,6 +17,10 @@ const props = defineProps({
   timeRange: {
     type: Object,
     default: () => ({ start: "", end: "" })
+  },
+  floorOptions: {
+    type: Array,
+    default: () => []
   }
 });
 
@@ -25,6 +29,7 @@ const filters = defineModel("filters", {
   type: Object,
   default: () => ({
     buildingId: "",
+    floorLabel: "",
     startTime: "",
     endTime: "",
     limit: 10
@@ -45,6 +50,7 @@ function applyFilters() {
 function resetFilters() {
   Object.assign(filters.value, {
     buildingId: "",
+    floorLabel: "",
     startTime: "",
     endTime: "",
     limit: 10
@@ -71,6 +77,23 @@ function exportRecords() {
             :value="building.building_id"
           >
             {{ building.building_name }}
+          </option>
+        </select>
+      </label>
+
+      <label class="field-label field-label--floor">
+        <span>楼层筛选</span>
+        <select
+          v-model="filters.floorLabel"
+          :disabled="loading || exporting || !floorOptions.length"
+        >
+          <option value="">全部楼层</option>
+          <option
+            v-for="floor in floorOptions"
+            :key="floor.label"
+            :value="floor.label"
+          >
+            {{ floor.label }} · 异常 {{ floor.anomalyCount }} 条
           </option>
         </select>
       </label>
@@ -166,6 +189,10 @@ function exportRecords() {
 
 .field-label--small {
   min-width: 100px;
+}
+
+.field-label--floor {
+  min-width: 180px;
 }
 
 .field-label span {

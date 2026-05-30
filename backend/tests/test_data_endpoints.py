@@ -75,3 +75,25 @@ def test_records_default_limit():
     assert "total_filtered_count" in payload
     assert "items" in payload
 
+
+def test_records_include_operational_dimensions():
+    response = client.get("/api/v1/records", params={"limit": 1})
+    assert response.status_code == 200
+    item = response.json()["items"][0]
+    assert "floor_label" in item
+    assert "zone_name" in item
+    assert "equipment_type" in item
+    assert "source_equipment_id" in item
+
+
+def test_records_filter_by_floor_label():
+    first = client.get("/api/v1/records", params={"limit": 1}).json()["items"][0]
+    response = client.get(
+        "/api/v1/records",
+        params={"floor_label": first["floor_label"], "limit": 10},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["count"] >= 1
+    assert all(item["floor_label"] == first["floor_label"] for item in payload["items"])
+

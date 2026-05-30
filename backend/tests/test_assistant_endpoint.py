@@ -88,3 +88,31 @@ def test_assistant_query_about_data_sources():
     assert "纯随机" in payload["answer"] or "公开资料" in payload["answer"]
     assert any("data_quality_report_round1.md" in item["path"] for item in payload["citations"])
 
+
+def test_assistant_providers_does_not_expose_keys():
+    response = client.get("/api/v1/assistant/providers")
+    assert response.status_code == 200
+    payload = response.json()
+    assert "options" in payload
+    assert len(payload["options"]) >= 1
+    serialized = str(payload).lower()
+    assert "api_key" not in serialized
+    assert "secret" not in serialized
+
+
+def test_assistant_query_accepts_model_selection_payload():
+    response = client.post(
+        "/api/v1/assistant/query",
+        json={
+            "question": "当前样例数据有哪些异常记录？",
+            "provider": "nvidia",
+            "model": "meta/llama-3.3-70b-instruct",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["answer"]
+    assert "llm_used" in payload
+    assert "llm_provider" in payload
+    assert "llm_model" in payload
+

@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from "vue";
+import { computed, ref } from "vue";
 import CitationCard from "./CitationCard.vue";
 
 const props = defineProps({
@@ -14,11 +14,34 @@ const props = defineProps({
   suggestions: {
     type: Array,
     default: () => []
+  },
+  modelOptions: {
+    type: Array,
+    default: () => []
+  },
+  selectedModelKey: {
+    type: String,
+    default: ""
+  },
+  llmEnabled: {
+    type: Boolean,
+    default: false
   }
 });
 
-const emit = defineEmits(["ask"]);
-const question = ref("当前样例数据有哪些异常记录？");
+const emit = defineEmits(["ask", "update:selectedModelKey"]);
+const question = ref("科研实验楼D哪一层异常最多？");
+const configuredModelOptions = computed(() =>
+  props.modelOptions.filter((item) => item.configured)
+);
+const selectedModelLabel = computed(() => {
+  const match = props.modelOptions.find((item) => modelKey(item) === props.selectedModelKey);
+  return match?.label || "本地规则问答";
+});
+
+function modelKey(option) {
+  return `${option.provider}::${option.model}`;
+}
 
 function submit() {
   if (!question.value.trim()) {
@@ -35,11 +58,37 @@ function useSuggestion(value) {
 function askFollowUp(value) {
   useSuggestion(value);
 }
+
+function updateModel(event) {
+  emit("update:selectedModelKey", event.target.value);
+}
 </script>
 
 <template>
   <div class="assistant-panel">
     <div class="assistant-input">
+      <div class="model-selector-row">
+        <label class="model-selector">
+          <span>问答模型</span>
+          <select
+            :value="selectedModelKey"
+            :disabled="loading || !llmEnabled || !configuredModelOptions.length"
+            @change="updateModel"
+          >
+            <option value="">本地规则问答</option>
+            <option
+              v-for="item in configuredModelOptions"
+              :key="modelKey(item)"
+              :value="modelKey(item)"
+            >
+              {{ item.label }}
+            </option>
+          </select>
+        </label>
+        <span class="model-status" :class="{ 'model-status--online': llmEnabled && configuredModelOptions.length }">
+          {{ llmEnabled && configuredModelOptions.length ? "外部模型可用" : "本地兜底" }}
+        </span>
+      </div>
       <textarea
         v-model="question"
         rows="3"
@@ -63,7 +112,12 @@ function askFollowUp(value) {
     </div>
 
     <div v-if="reply" class="assistant-reply">
-      <h3>系统回答</h3>
+      <div class="reply-header">
+        <h3>系统回答</h3>
+        <span class="reply-model">
+          {{ reply.llm_used ? `外部模型：${selectedModelLabel}` : "本地规则问答" }}
+        </span>
+      </div>
       <p>{{ reply.answer }}</p>
 
       <div v-if="reply.citations?.length" class="citation-section">
@@ -106,6 +160,52 @@ function askFollowUp(value) {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.model-selector-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.model-selector {
+  display: grid;
+  gap: 6px;
+  min-width: min(100%, 320px);
+}
+
+.model-selector span {
+  color: #48606b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.model-selector select {
+  min-height: 38px;
+  border: 1px solid rgba(18, 93, 115, 0.18);
+  border-radius: 6px;
+  color: #183642;
+  background: #fff;
+  padding: 0 10px;
+  font: inherit;
+}
+
+.model-status,
+.reply-model {
+  border: 1px solid rgba(18, 93, 115, 0.14);
+  border-radius: 999px;
+  color: #6b7f86;
+  background: rgba(255, 255, 255, 0.84);
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
+.model-status--online {
+  color: #0f6b4f;
+  background: rgba(226, 246, 237, 0.9);
+  border-color: rgba(15, 107, 79, 0.2);
 }
 
 .assistant-input textarea {
@@ -178,10 +278,23 @@ function askFollowUp(value) {
   border: 1px solid rgba(0, 0, 0, 0.08);
 }
 
+.reply-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
 .assistant-reply h3 {
   margin: 0 0 12px 0;
   color: #2c3e50;
   font-size: 16px;
+}
+
+.reply-header h3 {
+  margin: 0;
 }
 
 .assistant-reply p {
@@ -225,6 +338,10 @@ function askFollowUp(value) {
   
   .primary-button {
     align-self: stretch;
+  }
+
+  .model-selector-row {
+    align-items: stretch;
   }
 }
 </style>

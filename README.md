@@ -104,8 +104,19 @@ npm run dev
 - `GET /api/v1/analytics/building-comparison`
 - `GET /api/v1/analytics/cop-ranking`
 - `GET /api/v1/analytics/anomalies`
+- `GET /api/v1/analytics/anomaly-explanations/{record_id}`
 - `GET /api/v1/analytics/anomaly-reasons`
+- `GET /api/v1/analytics/floor-summary`
+- `GET /api/v1/analytics/floor-registry`
+- `GET /api/v1/analytics/equipment-summary`
+- `GET /api/v1/analytics/work-orders`
+- `GET /api/v1/analytics/optimization-recommendations`
+- `GET /api/v1/analytics/operation-report`
+- `GET /api/v1/work-orders`
+- `POST /api/v1/work-orders`
+- `PATCH /api/v1/work-orders/{work_order_id}`
 - `GET /api/v1/export/csv`
+- `GET /api/v1/assistant/providers`
 - `POST /api/v1/assistant/query`
 
 ## 数据与知识库说明
@@ -114,7 +125,7 @@ npm run dev
 - 数据字典：[`data/dictionaries/energy_records_dictionary.csv`](data/dictionaries/energy_records_dictionary.csv)
 - 知识库入口：[`knowledge_base/README.md`](knowledge_base/README.md)
 
-当前样例数据已经可以用于联调和演示；第一轮数据检查说明和外部来源简表已经放在 `data/processed/`。若要重新生成更大规模的数据，可运行：
+当前样例数据已经扩展为 `2,976` 条记录，覆盖 `2026-03-01 00:00` 至 `2026-06-01 21:00`，可以用于联调、演示和最终答辩。数据检查说明和外部来源简表已经放在 `data/processed/`。若要重新生成同规模数据，可运行：
 
 ```powershell
 python .\scripts\generate_sample_dataset.py
@@ -134,17 +145,17 @@ python .\scripts\generate_sample_dataset.py
 - 数据源调研：[`docs/10-data-source-research.md`](docs/10-data-source-research.md)
 - 第一次整合总结：[`docs/11-first-integration-summary.md`](docs/11-first-integration-summary.md)
 - 第二次整合总结：[`docs/12-second-integration-summary.md`](docs/12-second-integration-summary.md)
+- 外部大模型接入说明：[`docs/13-llm-provider-integration.md`](docs/13-llm-provider-integration.md)
+- 期末项目最终提交清单：[`docs/14-final-submission-checklist.md`](docs/14-final-submission-checklist.md)
 
-## 协作建议
+## 开发说明
 
-在第一次任务分发前，先默认以下内容已经冻结：
+当前项目已经完成主要多人协作阶段，后续修改应优先保持以下内容稳定：
 
 - 数据字段与数据字典
 - `docs/06-api-contract.md` 中的接口路径和主要字段
-- 前端主导航和页面分区
-- 目录归属和两轮集成流程
-
-这样做的目的不是“官僚”，而是把多人开发的冲突留在最前面解决。
+- 前端主导航、筛选条件和页面分区
+- `.env.example` 只保留占位配置，真实 API Key 只放本地 `.env`
 
 ## 常用脚本
 
@@ -153,9 +164,10 @@ python .\scripts\generate_sample_dataset.py
 - 自检项目：[`scripts/check-project.ps1`](scripts/check-project.ps1)
 - 生成样例数据：[`scripts/generate_sample_dataset.py`](scripts/generate_sample_dataset.py)
 
-## 建议下一步
+## 当前阶段
 
-1. 基于当前第一次整合结果，开始第二轮任务分发。
-2. 优先补正式图表、更多异常分析场景和更像样的问答体验。
-3. 继续扩展知识库与数据真实性，逐步向 RAG 方案过渡。
-4. 完成第二轮联调、演示脚本和期末提交材料。
+1. 已完成两轮任务整合后的核心系统打磨，前后端、数据、知识库、外部大模型配置和演示文档已进入可演示状态。
+2. 统计分析不再只停留在建筑级查询，已补充异常解释、楼层设备台账、设备运行监测、异常工单和运营优化建议。
+3. 总览页已加入可拖拽旋转的三维楼宇风险态势图，点击楼层可联动统计分析筛选。
+4. 已新增“工单中心”和“决策报告”导航，用于展示后端持久化工单闭环、能耗预测、节能模拟和一键运营日报。
+5. 下一步主要是最终测试、演示录制和材料整理，不需要再单独分发第三轮开发任务。

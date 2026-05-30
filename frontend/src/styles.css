@@ -511,8 +511,13 @@ a {
   overflow: hidden;
 }
 
+.table-shell {
+  overflow-x: auto;
+}
+
 .data-table {
   width: 100%;
+  min-width: 760px;
   border-collapse: collapse;
 }
 

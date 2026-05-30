@@ -22,4 +22,5 @@ frontend/.env.local
 # AI 对话上下文备忘录（本地用，不提交）
 copilot-context-summary.md
 backend/.env
+data/runtime/
 
