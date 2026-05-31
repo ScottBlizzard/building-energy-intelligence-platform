@@ -198,7 +198,13 @@ python .\scripts\generate_sample_dataset.py
 - 第二次整合总结：[`docs/12-second-integration-summary.md`](docs/12-second-integration-summary.md)
 - 外部大模型接入说明：[`docs/13-llm-provider-integration.md`](docs/13-llm-provider-integration.md)
 - 期末项目最终提交清单：[`docs/14-final-submission-checklist.md`](docs/14-final-submission-checklist.md)
+- 项目验收报告：[`docs/15-project-acceptance-report.md`](docs/15-project-acceptance-report.md)
 - MCP 集成说明：[`docs/16-mcp-integration.md`](docs/16-mcp-integration.md)
+- SRS 软件需求规格说明书：[`docs/17-SRS-software-requirements-specification.md`](docs/17-SRS-software-requirements-specification.md)
+- SDS 软件设计说明书：[`docs/18-SDS-software-design-description.md`](docs/18-SDS-software-design-description.md)
+- SEE 软件经济分析与评价：[`docs/19-SEE-software-economic-evaluation.md`](docs/19-SEE-software-economic-evaluation.md)
+- SEM 软件工程管理说明：[`docs/20-SEM-software-engineering-management.md`](docs/20-SEM-software-engineering-management.md)
+- 最终提交与打包说明：[`docs/21-final-submission-guide.md`](docs/21-final-submission-guide.md)
 
 ## 开发说明
 
@@ -223,4 +229,4 @@ python .\scripts\generate_sample_dataset.py
 2. 统计分析不再只停留在建筑级查询，已补充异常解释、楼层设备台账、设备运行监测、异常工单和运营优化建议。
 3. 总览页已加入可拖拽旋转的三维楼宇风险态势图，点击楼层可联动统计分析筛选。
 4. 已新增“工单中心”和“决策报告”导航，用于展示后端持久化工单闭环、能耗预测、节能模拟和一键运营日报。
-5. 下一步主要是最终测试、演示录制和材料整理，不需要再单独分发第三轮开发任务。
+5. 已补齐 SRS、SDS、SEE、SEM、验收报告和最终提交说明。系统侧进入封版状态，剩余主要是 PPT、演示视频和 Canvas 打包提交。

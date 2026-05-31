@@ -94,4 +94,4 @@
 - 说明文档：`docs/16-mcp-integration.md`
 - 测试：`backend/tests/test_mcp_server.py`、`backend/tests/test_mcp_stdio_integration.py`
 
-该补充没有替换原 REST API，而是形成 REST + MCP 双接口。Web 前端继续调用 REST API；支持 MCP 的 AI 客户端可通过 MCP Tools 调用项目真实数据、统计分析、异常诊断、运营报告和智能问答能力。当前 MCP 专项测试为 `6 passed`，后端完整测试为 `75 passed, 1 warning`。
+该补充没有替换原 REST API，而是形成 REST + MCP 双接口。Web 前端继续调用 REST API；支持 MCP 的 AI 客户端可通过 MCP Tools 调用项目真实数据、统计分析、异常诊断、运营报告和智能问答能力。当前 MCP 专项测试已纳入后端测试，后端完整测试为 `75 passed`。

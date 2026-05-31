@@ -17,6 +17,7 @@
 
 ### 2.1 SRS：软件需求规格说明
 
+- [x] 最终 SRS 已形成：`docs/17-SRS-software-requirements-specification.md`。
 - [x] 项目背景与目标：见 `docs/01-requirements.md`。
 - [x] 用户角色与业务场景：见 `docs/01-requirements.md` 和 `docs/03-user-manual.md`。
 - [x] 功能需求：能耗数据浏览、统计分析、三维楼层风险、异常工单、AI 助手、运营日报。
@@ -26,48 +27,49 @@
 
 ### 2.2 SDS：软件设计说明
 
+- [x] 最终 SDS 已形成：`docs/18-SDS-software-design-description.md`。
 - [x] 技术方案：见 `docs/02-technical-solution.md`。
 - [x] API 契约：见 `docs/06-api-contract.md`。
 - [x] MCP 集成说明：见 `docs/16-mcp-integration.md`。
 - [x] 数据字典与数据源说明：见 `docs/04-data-dictionary-template.md` 和 `docs/10-data-source-research.md`。
 - [x] 外部大模型接入说明：见 `docs/13-llm-provider-integration.md`。
-- [ ] 最终提交前补充部署架构图或运行流程图，便于答辩展示。
+- [x] 最终提交前补充部署架构图或运行流程图，已在 SDS 中用文本架构图说明。
 
 ### 2.3 SEE：软件经济分析与评价
 
-需要单独形成一份经济分析文档，建议命名为 `docs/15-software-economic-evaluation.md`。
+最终经济分析文档已形成：`docs/19-SEE-software-economic-evaluation.md`。
 
-- [ ] 开发成本估算：人员投入、开发周期、工具与环境成本。
-- [ ] 部署与运行成本估算：服务器、存储、网络、外部大模型 API。
-- [ ] 维护成本估算：数据维护、模型配置、故障处理、功能迭代。
-- [ ] 收益分析：节能收益、人工巡检成本节约、异常响应效率提升。
-- [ ] 财务评价：ROI、回收期、成本收益比，必要时可补 NPV 或敏感性分析。
-- [ ] 定价策略：如果作为平台售卖，说明订阅制、项目制或私有化部署报价逻辑。
-- [ ] 资金与融资：说明初期资金来源、后续扩展投入、云资源和 API 费用来源。
+- [x] 开发成本估算：人员投入、开发周期、工具与环境成本。
+- [x] 部署与运行成本估算：服务器、存储、网络、外部大模型 API。
+- [x] 维护成本估算：数据维护、模型配置、故障处理、功能迭代。
+- [x] 收益分析：节能收益、人工巡检成本节约、异常响应效率提升。
+- [x] 财务评价：ROI、回收期、成本收益比和敏感性分析。
+- [x] 定价策略：说明项目制、订阅制和咨询加平台混合模式。
+- [x] 资金与融资：说明课程阶段、试点阶段和商业化阶段资金来源。
 
 ### 2.4 SEM：软件工程管理
 
-需要单独形成一份工程管理文档，建议命名为 `docs/16-software-engineering-management.md`。
+最终工程管理文档已形成：`docs/20-SEM-software-engineering-management.md`。
 
 - [x] 两轮分工与整合记录：见 `第一次任务/`、`第二次任务/`、`docs/11-first-integration-summary.md`、`docs/12-second-integration-summary.md`。
 - [x] 协作规则：见 `docs/07-collaboration-rules.md`。
 - [x] 集成清单：见 `docs/08-integration-checklist.md`。
 - [x] 测试计划：见 `docs/09-testing-plan.md`。
 - [x] MCP 补充集成记录：见 `docs/16-mcp-integration.md` 和 `docs/15-project-acceptance-report.md`。
-- [ ] 项目范围管理：说明哪些功能属于本期范围，哪些作为后续扩展。
-- [ ] 项目计划：说明两轮任务、整合、测试、演示准备的安排。
-- [ ] 软件过程监控与控制：说明 Git、任务文件、测试脚本、集成检查如何控制质量。
-- [ ] 风险管理：说明数据真实性、API 密钥、模型不可用、演示环境、成员提交质量等风险及应对。
+- [x] 项目范围管理：说明哪些功能属于本期范围，哪些作为后续扩展。
+- [x] 项目计划：说明两轮任务、整合、测试、演示准备的安排。
+- [x] 软件过程监控与控制：说明 Git、任务文件、测试脚本、集成检查如何控制质量。
+- [x] 风险管理：说明数据真实性、API 密钥、模型不可用、演示环境、成员提交质量等风险及应对。
 
 ## 3. 源代码与部署验收
 
 - [ ] 后端 FastAPI 能正常启动。
 - [ ] 前端 Vue 页面能正常启动。
 - [ ] MCP Server 能通过 `.\scripts\start-mcp.ps1` 启动。
-- [ ] `.\scripts\check-project.ps1` 能通过。
-- [ ] 后端测试全部通过。
-- [ ] MCP 专项测试全部通过。
-- [ ] 前端构建成功。
+- [x] `.\scripts\check-project.ps1` 能通过。
+- [x] 后端测试全部通过，当前为 `75 passed`。
+- [x] MCP 专项测试已纳入后端测试。
+- [x] 前端构建成功。
 - [ ] `.env` 不进入 Git，真实 API Key 不出现在提交记录和压缩包公开说明中。
 - [ ] `.env.example` 只保留变量名和占位符。
 - [ ] 页面演示路径完整：总览、数据浏览、统计分析、三维楼层、异常工单、决策报告、AI 助手。

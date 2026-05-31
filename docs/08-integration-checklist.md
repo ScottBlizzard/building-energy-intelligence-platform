@@ -36,7 +36,7 @@
 - [x] MCP Resources 覆盖数据集元信息、建筑清单、运营报告和知识库入口
 - [x] 新增 MCP 对象级测试和 stdio 客户端集成测试
 - [x] 更新 MCP 集成说明：`docs/16-mcp-integration.md`
-- [x] 验证结果：MCP 专项测试 `6 passed`，后端完整测试 `75 passed, 1 warning`
+- [x] 验证结果：MCP 专项测试已纳入后端测试，后端完整测试 `75 passed`
 
 ## 提交前清单
 
