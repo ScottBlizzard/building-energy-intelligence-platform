@@ -1,6 +1,6 @@
 # 最终提交与打包说明
 
-本文档用于最后提交前检查和打包，目标是保证老师收到的 zip 包可以清楚看到源码、文档、测试结果和演示材料。
+本文档用于最后提交前检查和打包，目标是保证评审人员收到的 zip 包可以清楚看到源码、文档、测试结果和演示材料。
 
 ## 1. 提交前必须确认
 
@@ -13,7 +13,7 @@
 - [ ] `docs/18-SDS-software-design-description.md` 已完成。
 - [ ] `docs/19-SEE-software-economic-evaluation.md` 已完成。
 - [ ] `docs/20-SEM-software-engineering-management.md` 已完成。
-- [ ] PPT 和演示视频已由对应同学补齐。
+- [ ] PPT 和演示视频已由对应负责人补齐。
 - [ ] zip 包中没有 `.env` 和真实 API Key。
 
 ## 2. 推荐压缩包结构
@@ -66,9 +66,12 @@ building-energy-intelligence-platform-final.zip
 - `__pycache__/`
 - `data/runtime/`
 - 个人无关 PDF 或其他课程实验文件
+- 内部任务分配过程材料：`第一次任务/`
+- 内部任务分配过程材料：`第二次任务/`
+- 非期末项目材料：`实验二/`
 - 真实 API Key、Token、密码
 
-## 5. 给老师的运行说明
+## 5. 面向评审人员的运行说明
 
 可以在 `submission-readme.md` 中写入以下内容：
 
@@ -128,7 +131,7 @@ git status --short
 
 ## 9. 当前剩余事项
 
-系统侧已经完成最终打磨。提交侧仍需由负责 PPT 和视频的同学补齐：
+系统侧已经完成最终打磨。提交侧仍需由 PPT 和视频负责人补齐：
 
 - 最终答辩 PPT。
 - 演示视频或视频链接。

@@ -1,6 +1,6 @@
 # 基于大模型的建筑能源智能管理与运维优化系统
 
-这是课程项目的统一代码仓库。当前版本已经完成第一次整合，不再只是原型骨架，而是一个前后端、数据、知识素材和演示流程都已接回同一仓库的可继续开发版本。
+本仓库为课程期末项目“基于大模型的建筑能源智能管理与运维优化系统”的统一源码与交付材料仓库。当前版本已经完成系统封版，包含可运行 Web 系统、FastAPI 后端、MCP Server、样例数据集、知识库、测试脚本和最终提交文档。
 
 ## 项目目标
 
@@ -14,10 +14,10 @@
 ## 当前仓库包含什么
 
 - `backend/`：FastAPI 后端和 MCP Server，已包含总览、元数据、查询、分析、导出和知识引用型问答接口。
-- `frontend/`：Vue 3 + Vite 前端，已形成“总览 / 数据浏览 / 统计分析 / 智能问答”四区工作台。
+- `frontend/`：Vue 3 + Vite 前端，已形成“总览 / 数据浏览 / 统计分析 / 工单中心 / 决策报告 / AI 助手”工作台。
 - `data/`：样例能耗数据、数据字典、原始/处理后数据目录和数据检查说明。
 - `knowledge_base/`：异常诊断、设备维护、建筑类型、术语规则和结构化问答素材。
-- `docs/`：课程交付文档、接口契约、MCP 集成说明、协作规则、集成清单和测试计划。
+- `docs/`：课程交付文档、SRS、SDS、SEE、SEM、接口契约、MCP 集成说明、验收报告和提交指南。
 - `scripts/`：启动脚本、MCP 启动脚本、检查脚本和样例数据生成脚本。
 
 ## 仓库结构
@@ -60,7 +60,7 @@
 
 ### 0. 拉取代码与放置环境变量
 
-同学第一次运行时，先拉取仓库并进入项目根目录：
+首次运行人员应先拉取仓库并进入项目根目录：
 
 ```powershell
 git clone https://github.com/ScottBlizzard/building-energy-intelligence-platform.git
@@ -73,13 +73,13 @@ cd building-energy-intelligence-platform
 Copy-Item .env.example .env
 ```
 
-如果需要启用页面里的外部大模型选项，由项目负责人单独提供真实 `.env` 文件。同学只需要把这份文件放在仓库根目录，路径应为：
+如果需要启用页面中的外部大模型选项，应由项目负责人单独提供真实 `.env` 文件。运行人员应将该文件放在仓库根目录，路径应为：
 
 ```text
 building-energy-intelligence-platform/.env
 ```
 
-不要把真实 `.env` 放到 `backend/` 或 `frontend/`，也不要提交到 GitHub。后端会自动读取根目录 `.env`；前端默认使用 `/api/v1`，开发环境下由 Vite 代理到 `http://127.0.0.1:8000`，通常不需要单独配置 `frontend/.env`。
+真实 `.env` 不应放到 `backend/` 或 `frontend/`，也不得提交到 GitHub。后端会自动读取根目录 `.env`；前端默认使用 `/api/v1`，开发环境下由 Vite 代理到 `http://127.0.0.1:8000`，通常不需要单独配置 `frontend/.env`。
 
 ### 1. 启动后端
 
@@ -223,7 +223,7 @@ python .\scripts\generate_sample_dataset.py
 - 自检项目：[`scripts/check-project.ps1`](scripts/check-project.ps1)
 - 生成样例数据：[`scripts/generate_sample_dataset.py`](scripts/generate_sample_dataset.py)
 
-## 当前阶段
+## 封版状态
 
 1. 已完成两轮任务整合后的核心系统打磨，前后端、数据、知识库、外部大模型配置和演示文档已进入可演示状态。
 2. 统计分析不再只停留在建筑级查询，已补充异常解释、楼层设备台账、设备运行监测、异常工单和运营优化建议。

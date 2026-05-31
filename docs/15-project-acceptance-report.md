@@ -51,7 +51,7 @@ python -m pytest backend\tests
 测试结果：
 
 ```text
-75 passed in 35.17s
+75 passed in 44.34s
 ```
 
 结论：后端核心逻辑、接口、MCP Server 和 stdio 集成测试均已通过。
@@ -64,7 +64,7 @@ python -m pytest backend\tests
 npm run build
 ```
 
-构建结果：Vite 构建成功，631 个模块完成转换，构建耗时约 11.51 秒。
+构建结果：Vite 构建成功，631 个模块完成转换，构建耗时约 11.22 秒。
 
 结论：前端可正常生产构建，未发现阻断性编译错误。
 
