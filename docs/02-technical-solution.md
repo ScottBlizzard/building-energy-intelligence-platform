@@ -6,6 +6,7 @@
 
 - 前端：Vue 3 + Vite，负责页面展示、交互、后端接口调用。
 - 后端：FastAPI，负责数据读取、查询、分析和问答接口封装。
+- MCP 接入层：基于官方 `mcp` Python SDK，将数据查询、统计分析、异常诊断、运营报告和智能问答封装为 MCP Tools 与 Resources。
 - 数据层：先使用 CSV 样例数据，后续可扩展到数据库。
 - 知识层：先以 Markdown 文档为知识库载体，后续接入向量检索和大模型。
 
@@ -18,6 +19,7 @@
 - `api/routes/analytics.py`：时间汇总、建筑对比、异常分析、楼层区域分析、设备监测、异常工单和优化建议。
 - `api/routes/export.py`：原始记录 CSV 导出。
 - `api/routes/assistant.py`：问答接口。
+- `app/mcp_server.py`：MCP Server 入口，支持 stdio、SSE 和 streamable-http transport。
 - `services/data_loader.py`：读取和过滤数据集。
 - `services/analysis_service.py`：统计分析、派生楼层区域、设备优先级、异常工单和优化建议逻辑。
 - `services/export_service.py`：CSV 导出逻辑。
@@ -81,6 +83,24 @@
 - 若本地 `.env` 开启 `LLM_ENABLED=true`，可调用外部 OpenAI-compatible 模型增强回答
 - 外部模型不可用时保持本地规则问答结果，避免演示被网络和限流影响
 
+### 4.6 MCP 协议接口
+
+- 启动脚本：`scripts/start-mcp.ps1`
+- 默认 transport：`stdio`，适合 Cursor、Claude Desktop 等支持 MCP 的本地客户端
+- HTTP transport：`.\scripts\start-mcp.ps1 -Transport streamable-http -HostAddress 127.0.0.1 -Port 8765`
+- HTTP MCP 路径：`http://127.0.0.1:8765/mcp`
+
+MCP Tools 覆盖：
+
+- 数据接入：`get_dataset_meta`、`list_buildings`
+- 数据查询：`query_energy_records`
+- 统计分析：`get_energy_overview`、`get_time_summary`、`get_building_comparison`、`get_cop_ranking`
+- 异常诊断：`get_anomalies`、`get_anomaly_reasons`、`explain_anomaly`
+- 运维决策：`get_floor_summary`、`get_equipment_summary`、`suggest_anomaly_work_orders`、`get_optimization_recommendations`、`get_operation_report`
+- 智能问答：`search_energy_knowledge`、`ask_energy_assistant`
+
+MCP Resources 覆盖数据集元信息、建筑清单、运营报告和知识库入口。该层与 REST API 复用同一服务层，避免两套业务逻辑不一致。
+
 ## 5. 智能问答演进路径
 
 ### 当前阶段
@@ -92,14 +112,14 @@
 
 ### 下一阶段
 
-- 将 Markdown 文档切分为知识片段
-- 建立向量索引
-- 接入更完整的 LLM/RAG 服务链路
+- 将 Markdown 文档切分为知识片段并建立向量索引
+- 在当前 MCP Tools 之上接入更完整的 LLM/RAG 服务链路
 - 返回来源引用和结构化建议
 
 ## 6. 后续重点扩展
 
 - 补充更多数据导入和清洗脚本
 - 将知识库切分为知识片段并建立向量索引
+- 视课程展示需要，为 MCP HTTP 模式增加更完整的客户端配置示例
 - 增加认证、日志、真实传感器接入和更细粒度异常闭环
 - 持续增加测试覆盖率

@@ -19,6 +19,8 @@
 - 调用 `/api/v1/analytics/floor-summary`，说明系统可以按楼层和区域定位异常
 - 调用 `/api/v1/analytics/work-orders`，说明异常会转换成可执行工单
 - 调用 `/api/v1/analytics/optimization-recommendations`，说明系统能给出节能优化建议
+- 展示 `docs/16-mcp-integration.md`，说明系统除 REST API 外，还通过 MCP Server 暴露数据接入、查询统计、异常诊断、运营报告和智能问答工具
+- 如果需要现场演示 MCP，可运行 `.\scripts\start-mcp.ps1 -Transport streamable-http -HostAddress 127.0.0.1 -Port 8765`，说明 `/mcp` 是 MCP HTTP 协议入口
 
 ## 第三部分：前端分析页展示
 
@@ -50,6 +52,12 @@
 - 有什么节能优化建议？
 - 这个系统后续如何接入知识库？
 
+## 第六部分：MCP 能力说明
+
+- 说明默认 `.\scripts\start-mcp.ps1` 使用 stdio transport，适合 Cursor、Claude Desktop 或其他支持 MCP 的客户端接入
+- 强调 MCP Tools 不是给 PowerShell 人工输入菜单用的，而是给 AI 客户端调用项目真实数据和分析函数
+- 对照原项目要求说明：`query_energy_records` 对应数据接入与查询，`get_time_summary` 对应时段汇总，`get_cop_ranking` 和 `get_energy_overview` 对应 COP 计算，`get_anomalies` 与 `explain_anomaly` 对应异常分析和运维诊断
+
 ## 收尾
 
-强调当前已经完成从项目结构、数据样例、分析接口、楼层/设备/工单业务链路到外部大模型可选调用的演示闭环。后续如果有时间，再继续升级真实传感器接入、RAG 和更完整的运维闭环。
+强调当前已经完成从项目结构、数据样例、REST/MCP 双接口、分析图表、楼层/设备/工单业务链路到外部大模型可选调用的演示闭环。后续如果有时间，再继续升级真实传感器接入、RAG 和更完整的运维闭环。

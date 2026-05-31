@@ -84,3 +84,14 @@
 3. 第二轮数据增强规划已落实为最终样例数据，后续只需保持数据字典和接口字段稳定。
 4. 准备 PPT、演示视频和最终提交材料。
 5. 最终提交前再跑一次后端测试、前端构建和项目自检脚本。
+
+## 6. 封版后 MCP 补充
+
+在第二次整合成果基础上，项目又补充了独立 MCP Server：
+
+- 入口：`backend/app/mcp_server.py`
+- 启动脚本：`scripts/start-mcp.ps1`
+- 说明文档：`docs/16-mcp-integration.md`
+- 测试：`backend/tests/test_mcp_server.py`、`backend/tests/test_mcp_stdio_integration.py`
+
+该补充没有替换原 REST API，而是形成 REST + MCP 双接口。Web 前端继续调用 REST API；支持 MCP 的 AI 客户端可通过 MCP Tools 调用项目真实数据、统计分析、异常诊断、运营报告和智能问答能力。当前 MCP 专项测试为 `6 passed`，后端完整测试为 `75 passed, 1 warning`。

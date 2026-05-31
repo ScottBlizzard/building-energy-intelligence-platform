@@ -13,12 +13,12 @@
 
 ## 当前仓库包含什么
 
-- `backend/`：FastAPI 后端，已包含总览、元数据、查询、分析、导出和知识引用型问答接口。
+- `backend/`：FastAPI 后端和 MCP Server，已包含总览、元数据、查询、分析、导出和知识引用型问答接口。
 - `frontend/`：Vue 3 + Vite 前端，已形成“总览 / 数据浏览 / 统计分析 / 智能问答”四区工作台。
 - `data/`：样例能耗数据、数据字典、原始/处理后数据目录和数据检查说明。
 - `knowledge_base/`：异常诊断、设备维护、建筑类型、术语规则和结构化问答素材。
-- `docs/`：课程交付文档、接口契约、协作规则、集成清单和测试计划。
-- `scripts/`：启动脚本、检查脚本和样例数据生成脚本。
+- `docs/`：课程交付文档、接口契约、MCP 集成说明、协作规则、集成清单和测试计划。
+- `scripts/`：启动脚本、MCP 启动脚本、检查脚本和样例数据生成脚本。
 
 ## 仓库结构
 
@@ -118,7 +118,21 @@ npm run dev
 - 后端文档：`http://127.0.0.1:8000/docs`
 - 健康检查：`http://127.0.0.1:8000/api/v1/health`
 
-### 4. 一键自检
+### 4. 启动 MCP Server
+
+默认 stdio transport，适合支持 MCP 的本地客户端：
+
+```powershell
+.\scripts\start-mcp.ps1
+```
+
+如需 HTTP 方式接入：
+
+```powershell
+.\scripts\start-mcp.ps1 -Transport streamable-http -HostAddress 127.0.0.1 -Port 8765
+```
+
+### 5. 一键自检
 
 安装完依赖后，可以运行完整检查：
 
@@ -154,6 +168,8 @@ npm run dev
 - `GET /api/v1/assistant/providers`
 - `POST /api/v1/assistant/query`
 
+MCP 接入说明见 [`docs/16-mcp-integration.md`](docs/16-mcp-integration.md)。MCP Server 入口为 `backend/app/mcp_server.py`，覆盖数据元信息、建筑清单、能耗记录查询、统计分析、异常解释、运营报告、知识库检索和智能问答。
+
 ## 数据与知识库说明
 
 - 样例数据文件：[`data/samples/energy_records.csv`](data/samples/energy_records.csv)
@@ -182,6 +198,7 @@ python .\scripts\generate_sample_dataset.py
 - 第二次整合总结：[`docs/12-second-integration-summary.md`](docs/12-second-integration-summary.md)
 - 外部大模型接入说明：[`docs/13-llm-provider-integration.md`](docs/13-llm-provider-integration.md)
 - 期末项目最终提交清单：[`docs/14-final-submission-checklist.md`](docs/14-final-submission-checklist.md)
+- MCP 集成说明：[`docs/16-mcp-integration.md`](docs/16-mcp-integration.md)
 
 ## 开发说明
 
@@ -196,6 +213,7 @@ python .\scripts\generate_sample_dataset.py
 
 - 启动后端：[`scripts/start-backend.ps1`](scripts/start-backend.ps1)
 - 启动前端：[`scripts/start-frontend.ps1`](scripts/start-frontend.ps1)
+- 启动 MCP Server：[`scripts/start-mcp.ps1`](scripts/start-mcp.ps1)
 - 自检项目：[`scripts/check-project.ps1`](scripts/check-project.ps1)
 - 生成样例数据：[`scripts/generate_sample_dataset.py`](scripts/generate_sample_dataset.py)
 

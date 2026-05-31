@@ -11,6 +11,11 @@
 
 ## 已冻结接口
 
+本项目对外提供两类接口：
+
+- REST API：服务 Web 前端、浏览器演示和常规 HTTP 调试。
+- MCP Server：服务支持 MCP 的 AI 客户端或智能体，满足原项目“基于 MCP 协议开发数据接入与查询接口”的要求。
+
 ### `GET /api/v1/health`
 
 用途：检查后端是否正常运行
@@ -381,8 +386,63 @@
 }
 ```
 
+## MCP 协议契约
+
+### 启动方式
+
+默认 stdio transport：
+
+```powershell
+.\scripts\start-mcp.ps1
+```
+
+Streamable HTTP transport：
+
+```powershell
+.\scripts\start-mcp.ps1 -Transport streamable-http -HostAddress 127.0.0.1 -Port 8765
+```
+
+HTTP MCP 路径：
+
+```text
+http://127.0.0.1:8765/mcp
+```
+
+### MCP Tools
+
+| Tool | 用途 | 主要参数 |
+| --- | --- | --- |
+| `get_dataset_meta` | 获取字段、建筑、记录数和时间范围 | 无 |
+| `list_buildings` | 获取建筑清单 | 无 |
+| `query_energy_records` | 查询能耗记录 | `building_id`、`floor_label`、`start_time`、`end_time`、`limit` |
+| `get_energy_overview` | 获取总览 KPI、平均 COP 和异常数 | `building_id`、`start_time`、`end_time` |
+| `get_time_summary` | 获取时段汇总 | `building_id`、`floor_label`、`start_time`、`end_time`、`freq`、`limit` |
+| `get_building_comparison` | 获取建筑对比 | `start_time`、`end_time` |
+| `get_cop_ranking` | 获取 COP 排名 | `start_time`、`end_time` |
+| `get_anomalies` | 获取异常记录 | `building_id`、`floor_label`、`start_time`、`end_time`、`limit` |
+| `get_anomaly_reasons` | 获取异常原因统计 | `building_id`、`floor_label`、`start_time`、`end_time` |
+| `explain_anomaly` | 解释单条异常 | `record_id` |
+| `get_floor_summary` | 获取楼层/区域汇总 | `building_id`、`floor_label`、`start_time`、`end_time` |
+| `get_equipment_summary` | 获取设备运行摘要 | `building_id`、`floor_label`、`start_time`、`end_time`、`limit` |
+| `suggest_anomaly_work_orders` | 生成建议工单，不写入持久化文件 | `building_id`、`floor_label`、`start_time`、`end_time`、`limit` |
+| `get_optimization_recommendations` | 获取节能优化建议 | `building_id`、`floor_label`、`start_time`、`end_time` |
+| `get_operation_report` | 生成运营日报摘要 | `building_id`、`floor_label`、`start_time`、`end_time` |
+| `search_energy_knowledge` | 检索本地知识库 | `query`、`top_k` |
+| `ask_energy_assistant` | 智能运维问答 | `question`、`use_external_llm` |
+
+### MCP Resources
+
+| Resource URI | 用途 |
+| --- | --- |
+| `energy://dataset/meta` | 数据集元信息 |
+| `energy://buildings` | 建筑清单 |
+| `energy://operation/report` | 当前全量运营报告 |
+| `energy://knowledge/readme` | 知识库入口文档 |
+
+说明：MCP Tools 与 REST API 复用后端服务层，返回口径与 Web 页面一致。`stdio` 模式下 PowerShell 终端保持等待是正常现象，stdout 用于 MCP JSON-RPC 协议消息；手动停止可按 `Ctrl+C`。
+
 ## 协作规则
 
 - 前端同学不要自行改返回字段名。
 - 后端同学不要在未同步的情况下改接口路径。
-- 若必须改契约，先改此文档，再统一通知组内。
+- 若必须改 REST 或 MCP 契约，先改此文档，再统一通知组内。

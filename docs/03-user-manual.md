@@ -23,7 +23,23 @@ npm install
 npm run dev
 ```
 
-## 4. 推荐演示路径
+## 4. 启动 MCP Server
+
+默认 stdio transport，适合支持 MCP 的本地客户端：
+
+```powershell
+.\scripts\start-mcp.ps1
+```
+
+如果希望看到类似后端服务的启动日志，可使用 HTTP transport：
+
+```powershell
+.\scripts\start-mcp.ps1 -Transport streamable-http -HostAddress 127.0.0.1 -Port 8765
+```
+
+stdio 模式下 PowerShell 终端保持等待是正常现象，表示 MCP Server 正在等待客户端发送协议消息。手动停止可按 `Ctrl+C`。
+
+## 5. 推荐演示路径
 
 1. 打开首页，说明系统面向建筑能源管理与运维支持场景。
 2. 展示 KPI 卡片、模块分区和数据元信息，说明当前样例数据范围。
@@ -35,8 +51,9 @@ npm run dev
 8. 进入“工单中心”页，从异常记录中选择一个问题，分配管理员，生成“处理中”工单，再点击完成工单；工单状态和备注会保存到后端 JSON 文件，刷新后仍可保留。
 9. 进入“决策报告”页，演示未来 7 天能耗预测、节能策略模拟和“一键生成今日运营日报”。
 10. 进入“智能问答”页，演示楼层异常、设备优先维护、异常处置建议、节能优化建议和建筑类型差异相关问题。
+11. 如需展示 MCP 能力，说明 MCP Server 已把数据查询、统计分析、异常诊断、运营报告和智能问答封装为可被 AI 客户端调用的 Tools 与 Resources。
 
-## 5. 常见问题
+## 6. 常见问题
 
 ### 页面显示为静态骨架
 
@@ -53,3 +70,7 @@ npm run dev
 ### 问答回答较简单或没有使用外部大模型
 
 先确认后端 `.env` 中 `LLM_ENABLED=true`，并且至少配置了一个供应商 API Key。若外部模型调用失败，系统会自动回退到本地规则问答，保证课堂演示不断掉。
+
+### 启动 MCP 后 PowerShell 没有菜单或明显输出
+
+这是 stdio transport 的正常表现。MCP Server 不是人工命令菜单，而是给 MCP 客户端调用的协议服务。若要验证它是否可用，可运行后端测试中的 MCP 测试，或使用 `-Transport streamable-http` 查看 HTTP 服务启动日志。
