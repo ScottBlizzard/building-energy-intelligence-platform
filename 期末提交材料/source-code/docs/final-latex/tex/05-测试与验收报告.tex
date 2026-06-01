@@ -1,0 +1,336 @@
+
+\documentclass[12pt,a4paper]{ctexart}
+
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{etoolbox}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+
+\hypersetup{hidelinks}
+\urlstyle{same}
+\setlist{nosep}
+\captionsetup{font=small}
+\renewcommand{\arraystretch}{1.25}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.3em}
+\setlength{\tabcolsep}{4pt}
+\emergencystretch=3em
+\sloppy
+\makeatletter
+\g@addto@macro{\UrlBreaks}{\do\/\do\-\do\_\do\.\do\:}
+\makeatother
+\AtBeginEnvironment{longtable}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabularx}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabular}{\small\setlength{\tabcolsep}{3pt}}
+
+\newcommand{\studentname}{许奕}
+\newcommand{\studentid}{2351441}
+\newcommand{\teamname}{许奕、王天一、马源胜、周由}
+\newcommand{\coursename}{软件工程管理与经济}
+\newcommand{\projectname}{基于大模型的建筑能源智能管理与运维优化系统}
+\newcommand{\docversion}{V2.0}
+\newcommand{\docdate}{2026年5月31日}
+\newcommand{\code}[1]{{\footnotesize\nolinkurl{#1}}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\tikzset{
+  box/.style={rectangle, rounded corners, draw=cyan!55!black, fill=cyan!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  process/.style={rectangle, rounded corners, draw=teal!55!black, fill=teal!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  data/.style={cylinder, shape border rotate=90, aspect=0.25, draw=orange!70!black, fill=orange!10, thick, minimum height=12mm, align=center, inner sep=5pt},
+  risk/.style={diamond, draw=red!60!black, fill=red!8, thick, aspect=2, align=center, inner sep=2pt},
+  arrow/.style={-{Stealth[length=2.4mm]}, thick, draw=gray!70!black},
+  note/.style={rectangle, draw=gray!60, fill=gray!6, rounded corners, align=left, inner sep=6pt}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\coursename}
+\fancyhead[R]{\reporttitle}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{15pt}
+
+\title{
+    \vspace{-2em}
+    \heiti \zihao{2} \reporttitle \\
+    \vspace{1em}
+    \zihao{4} 课程期末项目正式交付文档
+}
+\author{
+    \songti \zihao{4}
+    项目名称：\projectname \\
+    项目组成员：\teamname \\
+    负责人：\studentname \quad 学号：\studentid
+}
+\date{\docdate}
+
+\newcommand{\reporttitle}{测试与验收报告}
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+
+\begin{abstract}
+本文档为《\projectname》的测试与验收报告，说明测试目标、测试环境、测试范围、自动化测试、人工验收场景、缺陷处理、验收矩阵和最终结论。报告用于证明系统不仅完成代码实现，而且具备可运行、可测试、可演示和可提交的质量状态。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{测试目标}
+测试目标包括：验证后端接口正确性，验证分析服务和异常规则稳定性，验证前端构建可通过，验证三维楼层、工单持久化、智能问答和 MCP 接入能够完成演示，验证最终提交材料不包含敏感文件。
+
+\section{测试环境}
+\begin{table}[H]
+\centering
+\caption{测试环境}
+\begin{tabularx}{\textwidth}{p{4cm}Y}
+\toprule
+项目 & 环境 \\
+\midrule
+操作系统 & Windows 10/11，PowerShell \\
+后端 & Python 3.11，FastAPI，Pandas，pytest \\
+前端 & Node.js，Vue 3，Vite，ECharts \\
+浏览器 & Microsoft Edge 或 Chrome \\
+数据 & \code{data/samples/energy_records.csv}，2,976 条记录 \\
+检查脚本 & \code{scripts/check-project.ps1} \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{测试范围}
+\begin{longtable}{p{3.2cm}p{6cm}p{4.6cm}}
+\caption{测试范围}\\
+\toprule
+测试类别 & 覆盖内容 & 证据位置 \\
+\midrule
+\endfirsthead
+\toprule
+测试类别 & 覆盖内容 & 证据位置 \\
+\midrule
+\endhead
+后端接口测试 & health、data、analytics、export、assistant、work-orders & \code{backend/tests/} \\
+服务层测试 & 数据加载、知识库检索、LLM 客户端、分析逻辑 & \code{backend/tests/} \\
+MCP 测试 & MCP Server 工具注册、stdio 集成、工具调用 & \code{test_mcp_server.py} \\
+前端构建测试 & Vue 生产构建和资源打包 & \code{npm run build} \\
+人工功能验收 & 浏览器页面、筛选、3D、工单、报告、问答 & 本报告验收场景 \\
+安全检查 & \code{.env} 排除、密钥不进入提交材料 & 最终提交清单 \\
+\bottomrule
+\end{longtable}
+
+\section{自动化测试}
+\subsection{后端测试}
+后端测试覆盖接口返回、参数筛选、异常解释、导出、问答、工单持久化、MCP Server 和 LLM 客户端封装。当前基线为 75 passed。后端测试的价值在于防止后期页面和文档优化过程中破坏已有接口。
+
+\subsection{前端构建}
+前端构建使用 \code{npm run build}。构建通过说明 Vue 文件、组件导入、Vite 配置和生产打包流程无明显错误。由于课程演示使用开发服务器，构建测试同时提供提交质量证据。
+
+\subsection{一键检查}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=9mm and 12mm]
+\node[process] (start) {运行\\check-project.ps1};
+\node[process, right=of start] (py) {Python\\语法检查};
+\node[process, right=of py] (pytest) {pytest\\后端测试};
+\node[process, below=of pytest] (npm) {npm run build\\前端构建};
+\node[process, left=of npm] (result) {输出结果\\失败即退出};
+\draw[arrow] (start) -- (py);
+\draw[arrow] (py) -- (pytest);
+\draw[arrow] (pytest) -- (npm);
+\draw[arrow] (npm) -- (result);
+\end{tikzpicture}
+\caption{一键检查流程}
+\end{figure}
+
+\section{人工验收场景}
+\begin{longtable}{p{2cm}p{4.2cm}p{5.2cm}p{2.4cm}}
+\caption{人工验收用例}\\
+\toprule
+编号 & 场景 & 操作步骤 & 预期结果 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 场景 & 操作步骤 & 预期结果 \\
+\midrule
+\endhead
+AT-01 & 启动系统 & 启动后端、启动前端、访问首页 & 页面加载，健康状态正常 \\
+AT-02 & 查看总览 & 进入总览页 & KPI、趋势和 3D 楼宇显示 \\
+AT-03 & 拖拽三维视图 & 鼠标拖动建筑群 & 视图旋转，楼层颜色保持 \\
+AT-04 & 点击异常楼层 & 点击红色楼层 & 跳转统计分析并锁定建筑楼层 \\
+AT-05 & 点击健康楼层 & 点击绿色楼层 & 展示健康提示，不展示空分析模块 \\
+AT-06 & 数据浏览查询 & 设置建筑、楼层、时间和数量 & 表格记录与筛选条件一致 \\
+AT-07 & 导出数据 & 点击导出 CSV & 下载文件可打开 \\
+AT-08 & 统计分析 & 选择建筑/楼层刷新分析 & 异常明细、图表、楼层设备数据更新 \\
+AT-09 & 异常解释 & 点击某条异常解释 & 显示触发规则、指标和建议 \\
+AT-10 & 创建工单 & 选择异常和负责人后创建 & 生成处理中工单并置顶 \\
+AT-11 & 完成工单 & 点击完成并刷新页面 & 工单保持已完成状态 \\
+AT-12 & 决策报告 & 进入报告页生成报告 & 展示摘要、风险、建议和收益模拟 \\
+AT-13 & 智能问答 & 提问当前异常风险 & 返回知识库引用和项目数据相关回答 \\
+AT-14 & MCP 启动 & 运行 MCP 启动脚本 & MCP Server 可被客户端接入 \\
+\bottomrule
+\end{longtable}
+
+\section{验收矩阵}
+\begin{longtable}{p{4cm}p{3.5cm}p{3.5cm}p{2.2cm}}
+\caption{需求验收矩阵}\\
+\toprule
+验收项 & 对应需求 & 验收方式 & 状态 \\
+\midrule
+\endfirsthead
+\toprule
+验收项 & 对应需求 & 验收方式 & 状态 \\
+\midrule
+\endhead
+数据集与字典 & FR-01 & 文件检查、接口检查 & 通过 \\
+查询与导出 & FR-02 至 FR-05 & 页面操作、接口测试 & 通过 \\
+统计分析 & FR-06 至 FR-14 & 页面操作、接口测试 & 通过 \\
+三维楼层联动 & FR-15 & 浏览器人工验收 & 通过 \\
+工单闭环 & FR-16 & 创建、完成、刷新验证 & 通过 \\
+决策报告 & FR-17 & 页面生成、接口返回 & 通过 \\
+智能问答 & FR-18 至 FR-19 & 本地知识库与可选 LLM 测试 & 通过 \\
+MCP 接入 & FR-20 & MCP 测试与启动脚本 & 通过 \\
+最终提交材料 & 课程要求 & 文件清单检查 & 通过 \\
+\bottomrule
+\end{longtable}
+
+\section{缺陷处理记录}
+最终封版前已处理的关键问题包括：数据量过少、统计筛选数量不一致、健康楼层显示空模块、工单刷新后状态丢失、工单创建控件拥挤、3D 楼层点击无反应、外部模型不可用时演示中断风险、文档口吻不正式、Markdown PDF 不够规范等。上述问题均已通过系统优化或正式文档重写处理。
+
+\section{验收结论}
+系统已满足课程项目的软件实现、测试验证和文档交付要求。后端测试、前端构建、人工演示路径和最终材料整理均具备验收条件。剩余工作主要是 PPT 与演示视频制作，不影响软件系统本身的验收结论。
+
+\clearpage
+\section{补充测试用例}
+\subsection{功能测试用例}
+以下测试用例覆盖最终系统的主要页面、接口和业务闭环。它们既可作为自动化测试的补充，也可作为人工验收时逐项执行的清单。
+\begin{longtable}{L{1.6cm}L{3.0cm}L{5.6cm}L{4.8cm}}
+\caption{功能测试用例清单}\\
+\toprule
+编号 & 测试点 & 测试步骤 & 预期结果 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 测试点 & 测试步骤 & 预期结果 \\
+\midrule
+\endhead
+TC-01 & 健康检查 & 启动后端并访问 \code{/api/v1/health}。 & 返回正常状态。 \\
+TC-02 & 元信息 & 访问数据元信息接口。 & 返回记录数、字段、建筑和时间范围。 \\
+TC-03 & 建筑清单 & 请求建筑列表。 & 返回 4 栋建筑及其标识。 \\
+TC-04 & 记录查询 & 按建筑和数量限制查询。 & 记录建筑一致且数量不超过限制。 \\
+TC-05 & 楼层查询 & 按建筑和楼层查询。 & 记录只包含目标楼层。 \\
+TC-06 & 时间筛选 & 设置开始和结束时间。 & 记录时间均在范围内。 \\
+TC-07 & CSV 导出 & 按当前筛选导出 CSV。 & 文件表头完整并可打开。 \\
+TC-08 & 总览指标 & 访问总览接口。 & KPI 与数据集计算口径一致。 \\
+TC-09 & 时间汇总 & 分别按日和月请求趋势。 & 粒度不同但指标字段一致。 \\
+TC-10 & 建筑对比 & 访问建筑对比接口。 & 每栋建筑有总能耗和平均 COP。 \\
+TC-11 & COP 排名 & 访问 COP 排名接口。 & 按 COP 排序且数值合理。 \\
+TC-12 & 异常列表 & 访问异常接口。 & 返回异常编号、原因、严重度和楼层。 \\
+TC-13 & 异常原因统计 & 请求原因统计。 & 原因数量合计等于异常明细数。 \\
+TC-14 & 异常解释 & 选择一条异常请求解释。 & 返回触发规则、证据和建议。 \\
+TC-15 & 楼层汇总 & 请求楼层汇总。 & 每个楼层有健康状态和异常数。 \\
+TC-16 & 设备汇总 & 请求设备汇总。 & 返回设备类型、状态和维护提示。 \\
+TC-17 & 运营报告 & 访问运营报告接口。 & 返回风险摘要、工单状态和建议。 \\
+TC-18 & 工单创建 & 选择异常并提交负责人。 & 创建处理中工单。 \\
+TC-19 & 工单完成 & 对处理中工单执行完成。 & 状态变为已完成。 \\
+TC-20 & 工单刷新 & 刷新页面或重新请求列表。 & 之前工单仍存在。 \\
+TC-21 & 3D 旋转 & 拖拽三维楼宇。 & 视图角度变化。 \\
+TC-22 & 3D 异常楼层 & 点击红色楼层。 & 跳转统计分析并锁定楼层。 \\
+TC-23 & 3D 健康楼层 & 点击绿色楼层。 & 只显示健康提示。 \\
+TC-24 & AI 本地问答 & 关闭外部模型后提问异常规则。 & 返回本地知识库答案。 \\
+TC-25 & 模型列表 & 访问模型选项接口。 & 返回可选提供商和模型名称。 \\
+TC-26 & 模型回退 & 配置错误 Key 后提问。 & 返回回退答案和错误提示。 \\
+TC-27 & MCP 工具列表 & 启动 MCP Server 并列出工具。 & 工具可被发现。 \\
+TC-28 & MCP 资源 & 读取项目数据资源。 & 返回元信息或报告资源。 \\
+TC-29 & 空筛选 & 选择无数据时间范围。 & 页面显示空状态。 \\
+TC-30 & 错误提示 & 停止后端后刷新前端。 & 页面显示接口错误而非白屏。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{验收测试场景}
+\begin{longtable}{L{1.6cm}L{3.2cm}L{6.0cm}L{4.2cm}}
+\caption{验收测试场景}\\
+\toprule
+编号 & 场景 & 验收步骤 & 通过标准 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 场景 & 验收步骤 & 通过标准 \\
+\midrule
+\endhead
+AT-01 & 完整启动 & 按 README 配置环境、启动后端和前端。 & 浏览器可访问首页。 \\
+AT-02 & 总览演示 & 展示 KPI、三维楼宇和异常楼层颜色。 & 教师能理解系统状态。 \\
+AT-03 & 数据查询 & 筛选建筑、楼层和时间。 & 表格结果准确。 \\
+AT-04 & 异常分析 & 查看异常明细并打开解释。 & 解释具有证据链。 \\
+AT-05 & 工单闭环 & 创建工单并完成。 & 状态变化可见且持久化。 \\
+AT-06 & 决策报告 & 展示运营日报。 & 包含经济和管理建议。 \\
+AT-07 & 智能问答 & 询问当前系统如何判断异常。 & 回答结合项目数据或知识库。 \\
+AT-08 & MCP 说明 & 展示 MCP 工具和资源文档。 & 说明 AI 客户端可调用能力。 \\
+AT-09 & 测试结果 & 展示检查脚本输出。 & 后端测试和前端构建通过。 \\
+AT-10 & 提交材料 & 打开正式 PDF 和源码目录。 & 材料结构符合教师要求。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{回归测试清单}
+回归测试用于每次最终文档或系统调整后快速确认核心能力未被破坏。
+\begin{longtable}{L{1.8cm}L{3.2cm}L{6.4cm}L{4.0cm}}
+\caption{回归测试清单}\\
+\toprule
+编号 & 回归项 & 检查动作 & 通过标准 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 回归项 & 检查动作 & 通过标准 \\
+\midrule
+\endhead
+RT-01 & 后端启动 & 执行与“后端启动”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-02 & 前端启动 & 执行与“前端启动”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-03 & 健康检查 & 执行与“健康检查”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-04 & 数据元信息 & 执行与“数据元信息”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-05 & 建筑清单 & 执行与“建筑清单”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-06 & 记录查询 & 执行与“记录查询”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-07 & 楼层筛选 & 执行与“楼层筛选”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-08 & 时间筛选 & 执行与“时间筛选”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-09 & CSV 导出 & 执行与“CSV 导出”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-10 & 总览 KPI & 执行与“总览 KPI”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-11 & 趋势图 & 执行与“趋势图”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-12 & 建筑对比 & 执行与“建筑对比”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-13 & COP 排名 & 执行与“COP 排名”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-14 & 异常明细 & 执行与“异常明细”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-15 & 异常原因 & 执行与“异常原因”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-16 & 异常解释 & 执行与“异常解释”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-17 & 楼层汇总 & 执行与“楼层汇总”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-18 & 设备汇总 & 执行与“设备汇总”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-19 & 三维旋转 & 执行与“三维旋转”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-20 & 三维点击 & 执行与“三维点击”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-21 & 健康楼层 & 执行与“健康楼层”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-22 & 工单创建 & 执行与“工单创建”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-23 & 工单完成 & 执行与“工单完成”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-24 & 工单刷新 & 执行与“工单刷新”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-25 & 运营日报 & 执行与“运营日报”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-26 & 知识库问答 & 执行与“知识库问答”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-27 & 模型列表 & 执行与“模型列表”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-28 & 模型回退 & 执行与“模型回退”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-29 & MCP 工具 & 执行与“MCP 工具”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-30 & MCP 资源 & 执行与“MCP 资源”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-31 & 空数据 & 执行与“空数据”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-32 & 接口错误 & 执行与“接口错误”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-33 & 密钥缺失 & 执行与“密钥缺失”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-34 & 构建测试 & 执行与“构建测试”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+RT-35 & 最终打包 & 执行与“最终打包”相关的页面操作、接口请求或脚本检查，记录是否出现错误。 & 结果与正式文档说明一致。 \\
+\bottomrule
+\end{longtable}
+
+\end{document}

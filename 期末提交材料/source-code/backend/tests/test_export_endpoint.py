@@ -1,0 +1,72 @@
+from fastapi.testclient import TestClient
+
+from app.main import app
+
+
+client = TestClient(app)
+
+
+def test_export_csv_returns_csv_file():
+    response = client.get("/api/v1/export/csv")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/csv; charset=utf-8"
+
+
+def test_export_csv_has_content_disposition():
+    response = client.get("/api/v1/export/csv")
+    disposition = response.headers.get("content-disposition", "")
+    assert "attachment" in disposition
+    assert "energy_records" in disposition
+
+
+def test_export_csv_contains_header_row():
+    response = client.get("/api/v1/export/csv")
+    first_line = response.text.strip().split("\n")[0]
+    assert "record_id" in first_line
+    assert "building_id" in first_line
+    assert "electricity_kwh" in first_line
+
+
+def test_export_csv_with_building_filter():
+    buildings = client.get("/api/v1/buildings").json()["items"]
+    building_id = buildings[0]["building_id"]
+    response = client.get("/api/v1/export/csv", params={"building_id": building_id})
+    assert response.status_code == 200
+    lines = response.text.strip().split("\n")
+    # All data rows should belong to the filtered building
+    for line in lines[1:]:
+        if line.strip():
+            assert building_id in line
+
+
+def test_export_csv_filename_includes_building_id():
+    buildings = client.get("/api/v1/buildings").json()["items"]
+    building_id = buildings[0]["building_id"]
+    response = client.get("/api/v1/export/csv", params={"building_id": building_id})
+    disposition = response.headers.get("content-disposition", "")
+    assert building_id in disposition
+
+
+def test_export_csv_filename_includes_date_filters():
+    response = client.get(
+        "/api/v1/export/csv",
+        params={
+            "start_time": "2026-03-01T00:00:00",
+            "end_time": "2026-03-02T00:00:00",
+        },
+    )
+    assert response.status_code == 200
+    disposition = response.headers.get("content-disposition", "")
+    assert "from-20260301-0000" in disposition
+    assert "to-20260302-0000" in disposition
+
+
+def test_export_csv_with_floor_filter():
+    first = client.get("/api/v1/records", params={"limit": 1}).json()["items"][0]
+    response = client.get(
+        "/api/v1/export/csv", params={"floor_label": first["floor_label"]}
+    )
+    assert response.status_code == 200
+    header = response.text.strip().split("\n")[0]
+    assert "floor_label" in header
+    assert first["floor_label"] in response.text

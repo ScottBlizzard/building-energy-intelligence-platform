@@ -1,0 +1,18 @@
+field_name,data_type,required,description,example
+record_id,string,yes,记录唯一编号,R0001
+building_id,string,yes,建筑唯一编号,BLD-A
+building_name,string,yes,建筑名称,综合教学楼A
+building_type,string,yes,建筑类型,teaching
+timestamp,datetime,yes,监测时间戳,2026-04-01 08:00:00
+electricity_kwh,float,yes,时间粒度下的用电量,285.0
+water_m3,float,no,时间粒度下的用水量,14.5
+hvac_kwh,float,yes,空调系统电耗,96.0
+cooling_load_kwh,float,yes,制冷负荷折算值,302.0
+chilled_water_supply_temp_c,float,no,空调系统出水温度,7.1
+chilled_water_return_temp_c,float,no,空调系统回水温度,12.6
+environment_temp_c,float,no,环境温度,18.2
+humidity_rh,float,no,相对湿度,62.0
+occupancy_density_per_100m2,float,no,每百平方米人员密度,38.0
+equipment_id,string,yes,主要设备编号,AHU-A-01
+equipment_status,string,yes,设备运行状态,normal
+

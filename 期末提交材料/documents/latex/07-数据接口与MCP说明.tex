@@ -1,0 +1,307 @@
+
+\documentclass[12pt,a4paper]{ctexart}
+
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{etoolbox}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+
+\hypersetup{hidelinks}
+\urlstyle{same}
+\setlist{nosep}
+\captionsetup{font=small}
+\renewcommand{\arraystretch}{1.25}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.3em}
+\setlength{\tabcolsep}{4pt}
+\emergencystretch=3em
+\sloppy
+\makeatletter
+\g@addto@macro{\UrlBreaks}{\do\/\do\-\do\_\do\.\do\:}
+\makeatother
+\AtBeginEnvironment{longtable}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabularx}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabular}{\small\setlength{\tabcolsep}{3pt}}
+
+\newcommand{\studentname}{许奕}
+\newcommand{\studentid}{2351441}
+\newcommand{\teamname}{许奕、王天一、马源胜、周由}
+\newcommand{\coursename}{软件工程管理与经济}
+\newcommand{\projectname}{基于大模型的建筑能源智能管理与运维优化系统}
+\newcommand{\docversion}{V2.0}
+\newcommand{\docdate}{2026年5月31日}
+\newcommand{\code}[1]{{\footnotesize\nolinkurl{#1}}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\tikzset{
+  box/.style={rectangle, rounded corners, draw=cyan!55!black, fill=cyan!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  process/.style={rectangle, rounded corners, draw=teal!55!black, fill=teal!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  data/.style={cylinder, shape border rotate=90, aspect=0.25, draw=orange!70!black, fill=orange!10, thick, minimum height=12mm, align=center, inner sep=5pt},
+  risk/.style={diamond, draw=red!60!black, fill=red!8, thick, aspect=2, align=center, inner sep=2pt},
+  arrow/.style={-{Stealth[length=2.4mm]}, thick, draw=gray!70!black},
+  note/.style={rectangle, draw=gray!60, fill=gray!6, rounded corners, align=left, inner sep=6pt}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\coursename}
+\fancyhead[R]{\reporttitle}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{15pt}
+
+\title{
+    \vspace{-2em}
+    \heiti \zihao{2} \reporttitle \\
+    \vspace{1em}
+    \zihao{4} 课程期末项目正式交付文档
+}
+\author{
+    \songti \zihao{4}
+    项目名称：\projectname \\
+    项目组成员：\teamname \\
+    负责人：\studentname \quad 学号：\studentid
+}
+\date{\docdate}
+
+\newcommand{\reporttitle}{数据、接口与 MCP 说明}
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+
+\begin{abstract}
+本文档为《\projectname》的数据、接口与 MCP 说明，集中描述样例数据来源思路、数据字段、派生指标、异常规则、REST API、MCP Tools/Resources、知识库和外部模型配置。该文档用于支撑系统开发、联调、验收和后续扩展。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{数据来源与构造原则}
+本项目数据用于课程演示，不直接声称来自真实校园传感器。数据构造参考建筑能耗管理常见字段和公开资料中的指标口径，重点模拟多建筑、多时段、多设备、多环境变量和异常状态。这样既能满足课程演示，又避免使用未经授权的真实运行数据。
+
+\section{数据文件}
+\begin{longtable}{p{4cm}p{5.5cm}p{4.5cm}}
+\caption{数据文件说明}\\
+\toprule
+文件 & 内容 & 用途 \\
+\midrule
+\endfirsthead
+\toprule
+文件 & 内容 & 用途 \\
+\midrule
+\endhead
+\code{data/samples/energy_records.csv} & 2,976 条能耗样例记录 & 查询、统计、异常分析、图表展示 \\
+\code{data/dictionaries/energy_records_dictionary.csv} & 字段名、类型、是否必填、说明和示例 & 数据解释与文档引用 \\
+\code{data/processed/data_quality_report_round1.md} & 数据质量检查说明 & 数据质量追溯 \\
+\code{data/processed/external_source_shortlist_round1.md} & 外部数据资料调研简表 & 说明数据设计参考来源 \\
+\code{data/runtime/work_orders.json} & 运行期工单状态 & 本地生成，不提交 \\
+\bottomrule
+\end{longtable}
+
+\section{字段与派生指标}
+原始字段包括建筑、时间、电耗、水耗、空调电耗、制冷量、冷冻水温度、环境温湿度、人员密度、设备编号和设备状态。派生字段包括楼层、区域、设备类型、小时、建筑均值、动态阈值、COP、低 COP 标记、夜间高负荷标记、异常标记和异常原因。
+
+\section{REST API 汇总}
+\begin{longtable}{p{5cm}p{2cm}p{6.8cm}}
+\caption{REST API 汇总}\\
+\toprule
+接口 & 方法 & 说明 \\
+\midrule
+\endfirsthead
+\toprule
+接口 & 方法 & 说明 \\
+\midrule
+\endhead
+\code{/api/v1/health} & GET & 健康检查 \\
+\code{/api/v1/overview} & GET & 总览指标 \\
+\code{/api/v1/dataset-meta} & GET & 数据集元信息 \\
+\code{/api/v1/buildings} & GET & 建筑选项 \\
+\code{/api/v1/records} & GET & 能耗记录查询 \\
+\code{/api/v1/export/csv} & GET & CSV 导出 \\
+\code{/api/v1/analytics/time-summary} & GET & 时间序列汇总 \\
+\code{/api/v1/analytics/building-comparison} & GET & 建筑对比 \\
+\code{/api/v1/analytics/cop-ranking} & GET & COP 排名 \\
+\code{/api/v1/analytics/anomalies} & GET & 异常明细 \\
+\code{/api/v1/analytics/anomaly-explanations/\{record_id\}} & GET & 异常解释 \\
+\code{/api/v1/analytics/anomaly-reasons} & GET & 异常原因统计 \\
+\code{/api/v1/analytics/floor-summary} & GET & 楼层汇总 \\
+\code{/api/v1/analytics/floor-registry} & GET & 楼层注册表 \\
+\code{/api/v1/analytics/equipment-summary} & GET & 设备汇总 \\
+\code{/api/v1/analytics/work-orders} & GET & 异常工单建议 \\
+\code{/api/v1/analytics/optimization-recommendations} & GET & 优化建议 \\
+\code{/api/v1/analytics/operation-report} & GET & 运营报告 \\
+\code{/api/v1/work-orders} & \shortstack{GET\\POST} & 持久化工单查询和创建 \\
+\code{/api/v1/work-orders/\{id\}} & PATCH & 工单状态更新 \\
+\code{/api/v1/assistant/providers} & GET & 模型供应商选项 \\
+\code{/api/v1/assistant/query} & POST & 智能问答 \\
+\bottomrule
+\end{longtable}
+
+\section{MCP 设计}
+\subsection{MCP Tools}
+\begin{longtable}{p{4cm}p{9.8cm}}
+\caption{MCP Tools}\\
+\toprule
+类别 & 工具 \\
+\midrule
+\endfirsthead
+\toprule
+类别 & 工具 \\
+\midrule
+\endhead
+数据查询 & \code{get_dataset_meta}、\code{list_buildings}、\code{query_energy_records} \\
+统计分析 & \code{get_energy_overview}、\code{get_time_summary}、\code{get_building_comparison}、\code{get_cop_ranking} \\
+异常诊断 & \code{get_anomalies}、\code{get_anomaly_reasons}、\code{explain_anomaly} \\
+楼层设备 & \code{get_floor_summary}、\code{get_equipment_summary} \\
+运维决策 & \code{suggest_anomaly_work_orders}、\code{get_optimization_recommendations}、\code{get_operation_report} \\
+知识问答 & \code{search_energy_knowledge}、\code{ask_energy_assistant} \\
+\bottomrule
+\end{longtable}
+
+\subsection{MCP Resources 与 Prompt}
+MCP Resources 包括 \code{energy://dataset/meta}、\code{energy://buildings}、\code{energy://operation/report} 和 \code{energy://knowledge/readme}。系统还提供 \code{energy_operation_prompt}，用于引导 AI 客户端先使用 MCP 工具检查数据、异常、报告和知识库引用，再回答用户问题。
+
+\section{接口一致性原则}
+REST API、MCP Tools 和前端页面必须复用同一分析服务层。任何新指标应优先添加到 \code{analysis_service.py}，再由 REST 和 MCP 暴露，最后由前端展示。这样可以避免不同入口出现不同统计口径。
+
+\section{密钥与模型配置}
+外部模型配置只允许存在于本地 \code{.env}。文档、源码和提交材料中不得出现真实 API Key。\code{.env.example} 只保留变量名和占位值。模型不可用时，系统必须回退到本地知识库回答，保证课程演示不受外部服务影响。
+
+\clearpage
+\section{补充数据与接口说明}
+\subsection{REST API 详细契约}
+以下表格补充每个接口的参数、返回和使用场景，便于前端、MCP 和文档保持一致。
+\begin{longtable}{L{4.0cm}L{1.8cm}L{4.5cm}L{4.8cm}}
+\caption{REST API 详细契约}\\
+\toprule
+路径 & 方法 & 参数 & 返回内容 \\
+\midrule
+\endfirsthead
+\toprule
+路径 & 方法 & 参数 & 返回内容 \\
+\midrule
+\endhead
+\code{/health} & GET & 无 & 系统健康状态。 \\
+\code{/dataset-meta} & GET & 无 & 字段、记录数、建筑数、时间范围。 \\
+\code{/buildings} & GET & 无 & 建筑编号、名称和类型。 \\
+\code{/records} & GET & building、floor、start、end、limit & 能耗记录列表。 \\
+\code{/export/csv} & GET & 同记录查询 & CSV 文件下载。 \\
+\code{/overview} & GET & 无 & 总览 KPI 和核心摘要。 \\
+\code{/analytics/time-summary} & GET & building、floor、grain、start、end & 时间序列统计。 \\
+\code{/analytics/building-comparison} & GET & start、end & 建筑对比结果。 \\
+\code{/analytics/cop-ranking} & GET & start、end & COP 排名。 \\
+\code{/analytics/anomalies} & GET & building、floor、start、end & 异常明细。 \\
+\code{/analytics/anomaly-reasons} & GET & building、floor、start、end & 异常原因统计。 \\
+\code{/analytics/anomaly-explanations/\{id\}} & GET & record id & 单条异常解释。 \\
+\code{/analytics/floor-summary} & GET & building、start、end & 楼层健康汇总。 \\
+\code{/analytics/equipment-summary} & GET & building、floor & 设备点位汇总。 \\
+\code{/analytics/operation-report} & GET & building、floor、start、end & 运营日报。 \\
+\code{/assistant/providers} & GET & 无 & 可用模型提供商。 \\
+\code{/assistant/query} & POST & question、provider、model & 问答结果。 \\
+\code{/work-orders} & GET & status 可选 & 工单列表。 \\
+\code{/work-orders} & POST & record id、assignee、note & 新建工单。 \\
+\code{/work-orders/\{id\}} & PATCH & status、note & 更新后工单。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{MCP Tools 详细说明}
+\begin{longtable}{L{4.0cm}L{5.4cm}L{5.0cm}}
+\caption{MCP Tools 详细说明}\\
+\toprule
+工具 & 用途 & 与 REST API 的关系 \\
+\midrule
+\endfirsthead
+\toprule
+工具 & 用途 & 与 REST API 的关系 \\
+\midrule
+\endhead
+\code{get_dataset_meta} & 获取数据集规模、字段和时间范围。 & 对应数据元信息接口。 \\
+\code{list_buildings} & 列出建筑选项。 & 对应建筑清单接口。 \\
+\code{query_records} & 按条件查询记录。 & 对应记录查询接口。 \\
+\code{get_overview} & 获取总览指标。 & 对应总览接口。 \\
+\code{get_time_summary} & 获取时间序列统计。 & 对应时间汇总接口。 \\
+\code{get_building_comparison} & 获取建筑对比。 & 对应建筑对比接口。 \\
+\code{get_cop_ranking} & 获取 COP 排名。 & 对应 COP 接口。 \\
+\code{get_anomalies} & 查询异常明细。 & 对应异常接口。 \\
+\code{explain_anomaly} & 解释单条异常。 & 对应异常解释接口。 \\
+\code{get_floor_summary} & 获取楼层健康状态。 & 对应楼层接口。 \\
+\code{get_equipment_summary} & 获取设备状态。 & 对应设备接口。 \\
+\code{suggest_work_orders} & 根据异常建议工单。 & 复用工单和异常服务。 \\
+\code{get_operation_report} & 生成运营报告。 & 对应日报接口。 \\
+\code{search_knowledge} & 检索本地知识库。 & 复用知识库检索服务。 \\
+\code{ask_energy_assistant} & 面向 AI 客户端的问答入口。 & 复用问答服务。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{字段契约与派生口径}
+字段契约用于保证数据浏览、统计分析、MCP 和文档说明使用同一套口径。
+\begin{longtable}{L{4.2cm}L{3.0cm}L{7.4cm}}
+\caption{字段契约与派生口径}\\
+\toprule
+字段 & 含义 & 使用说明 \\
+\midrule
+\endfirsthead
+\toprule
+字段 & 含义 & 使用说明 \\
+\midrule
+\endhead
+\code{record_id} & 记录编号 & 唯一标识一条能耗记录。 \\
+\code{building_id} & 建筑编号 & 用于接口筛选和建筑对比。 \\
+\code{building_name} & 建筑名称 & 用于页面展示。 \\
+\code{building_type} & 建筑类型 & 用于解释不同建筑业务场景。 \\
+\code{timestamp} & 采集时间 & 用于时间筛选和趋势汇总。 \\
+\code{electricity_kwh} & 电耗 & 用于总览、趋势和异常判断。 \\
+\code{water_m3} & 水耗 & 用于建筑综合对比。 \\
+\code{hvac_kwh} & 空调电耗 & 用于 COP 和空调效率分析。 \\
+\code{cooling_load_kwh} & 制冷量 & 用于计算平均 COP。 \\
+\code{environment_temp_c} & 环境温度 & 用于解释负荷变化。 \\
+\code{humidity_rh} & 相对湿度 & 用于辅助解释空调负荷。 \\
+\code{occupancy_density_per_100m2} & 人员密度 & 用于解释建筑使用强度。 \\
+\code{equipment_id} & 设备编号 & 用于设备维度分析。 \\
+\code{equipment_status} & 设备状态 & 用于异常规则。 \\
+\code{floor_label} & 楼层标签 & 运行时派生，用于楼层分析和 3D 联动。 \\
+\code{area_name} & 区域名称 & 运行时派生，用于业务解释。 \\
+\code{equipment_type} & 设备类型 & 运行时派生，用于维护建议。 \\
+\code{average_cop} & 平均 COP & 运行时计算，用于能效评价。 \\
+\code{is_anomaly} & 异常标记 & 运行时计算，用于统计分析。 \\
+\code{anomaly_reason} & 异常原因 & 运行时生成，用于解释和工单。 \\
+\bottomrule
+\end{longtable}
+\begin{longtable}{L{2.0cm}L{4.2cm}L{5.0cm}L{3.4cm}}
+\caption{接口错误处理约定}\\
+\toprule
+编号 & 错误场景 & 后端处理 & 前端表现 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 错误场景 & 后端处理 & 前端表现 \\
+\midrule
+\endhead
+E-01 & 参数类型错误 & 返回参数校验错误。 & 提示筛选条件错误。 \\
+E-02 & 建筑不存在 & 返回空结果或错误提示。 & 显示空状态。 \\
+E-03 & 楼层不存在 & 返回空结果。 & 显示健康或无数据提示。 \\
+E-04 & 时间范围无效 & 拒绝请求或返回空结果。 & 提示时间范围错误。 \\
+E-05 & 记录编号不存在 & 返回 404。 & 提示记录不存在。 \\
+E-06 & 工单编号不存在 & 返回 404。 & 提示工单不存在。 \\
+E-07 & 工单写入失败 & 返回保存失败信息。 & 提示稍后重试。 \\
+E-08 & 模型配置缺失 & 回退本地知识库。 & 显示回退答案。 \\
+E-09 & MCP 工具异常 & 返回工具调用错误。 & AI 客户端可读取错误。 \\
+E-10 & 数据文件缺失 & 返回服务错误并记录日志。 & 页面显示数据加载失败。 \\
+\bottomrule
+\end{longtable}
+
+\end{document}

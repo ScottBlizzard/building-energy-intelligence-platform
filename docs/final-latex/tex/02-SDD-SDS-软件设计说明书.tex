@@ -1,0 +1,667 @@
+
+\documentclass[12pt,a4paper]{ctexart}
+
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{etoolbox}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+
+\hypersetup{hidelinks}
+\urlstyle{same}
+\setlist{nosep}
+\captionsetup{font=small}
+\renewcommand{\arraystretch}{1.25}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.3em}
+\setlength{\tabcolsep}{4pt}
+\emergencystretch=3em
+\sloppy
+\makeatletter
+\g@addto@macro{\UrlBreaks}{\do\/\do\-\do\_\do\.\do\:}
+\makeatother
+\AtBeginEnvironment{longtable}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabularx}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabular}{\small\setlength{\tabcolsep}{3pt}}
+
+\newcommand{\studentname}{许奕}
+\newcommand{\studentid}{2351441}
+\newcommand{\teamname}{许奕、王天一、马源胜、周由}
+\newcommand{\coursename}{软件工程管理与经济}
+\newcommand{\projectname}{基于大模型的建筑能源智能管理与运维优化系统}
+\newcommand{\docversion}{V2.0}
+\newcommand{\docdate}{2026年5月31日}
+\newcommand{\code}[1]{{\footnotesize\nolinkurl{#1}}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\tikzset{
+  box/.style={rectangle, rounded corners, draw=cyan!55!black, fill=cyan!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  process/.style={rectangle, rounded corners, draw=teal!55!black, fill=teal!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  data/.style={cylinder, shape border rotate=90, aspect=0.25, draw=orange!70!black, fill=orange!10, thick, minimum height=12mm, align=center, inner sep=5pt},
+  risk/.style={diamond, draw=red!60!black, fill=red!8, thick, aspect=2, align=center, inner sep=2pt},
+  arrow/.style={-{Stealth[length=2.4mm]}, thick, draw=gray!70!black},
+  note/.style={rectangle, draw=gray!60, fill=gray!6, rounded corners, align=left, inner sep=6pt}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\coursename}
+\fancyhead[R]{\reporttitle}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{15pt}
+
+\title{
+    \vspace{-2em}
+    \heiti \zihao{2} \reporttitle \\
+    \vspace{1em}
+    \zihao{4} 课程期末项目正式交付文档
+}
+\author{
+    \songti \zihao{4}
+    项目名称：\projectname \\
+    项目组成员：\teamname \\
+    负责人：\studentname \quad 学号：\studentid
+}
+\date{\docdate}
+
+\newcommand{\reporttitle}{SDD/SDS 软件设计说明书}
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+
+\begin{abstract}
+本文档为《\projectname》的软件设计说明书（SDD/SDS），说明系统的总体架构、模块划分、数据设计、接口设计、异常算法、工单状态机、三维交互设计、大模型接入设计、MCP Server 设计、部署方案和关键设计取舍。文档以最终可运行代码为依据，重点说明系统如何从需求落地到可维护、可测试、可演示的工程结构。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{文档控制}
+\begin{longtable}{p{4cm}p{10.5cm}}
+\toprule
+项目 & 内容 \\
+\midrule
+文档名称 & SDD/SDS 软件设计说明书 \\
+文档版本 & \docversion \\
+设计对象 & 建筑能源智能管理 Web 系统、REST API、MCP Server、数据与知识库 \\
+主要代码范围 & \code{backend/}、\code{frontend/}、\code{data/}、\code{knowledge_base/}、\code{scripts/} \\
+设计原则 & 前后端分离、服务层复用、可解释分析、本地可运行、密钥不入库、演示优先且保留扩展性 \\
+\bottomrule
+\end{longtable}
+
+\section{总体设计}
+\subsection{架构风格}
+系统采用前后端分离架构，并在后端旁路提供 MCP Server。前端负责交互、图表、三维楼层和用户操作；后端负责数据读取、统计分析、异常解释、工单持久化、知识库检索和大模型调用编排；MCP Server 复用后端服务层，使 AI 客户端可以调用同一套项目能力。
+
+\subsection{总体架构图}
+\begin{figure}[H]
+\centering
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[node distance=10mm and 12mm]
+\node[box, minimum width=31mm] (browser) {浏览器用户\\Vue 工作台};
+\node[process, right=of browser, minimum width=34mm] (vite) {Vite Dev Server\\代理 /api/v1};
+\node[process, right=of vite, minimum width=34mm] (fastapi) {FastAPI\\REST API};
+\node[process, below=of fastapi, minimum width=40mm] (services) {服务层\\分析/工单/问答/导出};
+\node[data, right=of services, minimum width=30mm] (csv) {CSV\\能耗数据};
+\node[data, below=of csv, minimum width=30mm] (json) {JSON\\工单状态};
+\node[data, above=of csv, minimum width=30mm] (kb) {Markdown\\知识库};
+\node[box, below=of browser, minimum width=31mm] (mcpclient) {MCP 客户端\\AI Agent};
+\node[process, right=of mcpclient, minimum width=34mm] (mcp) {MCP Server\\Tools/Resources};
+\node[box, below=of services, minimum width=34mm] (llm) {外部 LLM\\可选接入};
+\draw[arrow] (browser) -- (vite);
+\draw[arrow] (vite) -- (fastapi);
+\draw[arrow] (fastapi) -- (services);
+\draw[arrow] (services) -- (csv);
+\draw[arrow] (services) -- (json);
+\draw[arrow] (services) -- (kb);
+\draw[arrow] (mcpclient) -- (mcp);
+\draw[arrow] (mcp) -- (services);
+\draw[arrow] (services) -- (llm);
+\end{tikzpicture}
+}
+\caption{系统总体架构}
+\end{figure}
+
+\subsection{逻辑组件图}
+\begin{figure}[H]
+\centering
+\resizebox{0.98\textwidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm,every node/.style={font=\scriptsize}]
+\node[process, minimum width=2.7cm, minimum height=0.8cm] (view) at (0,0) {DashboardView\\页面编排};
+\node[process, minimum width=2.5cm, minimum height=0.8cm] (api) at (3.2,0) {api.js\\接口封装};
+\node[process, minimum width=2.8cm, minimum height=0.8cm] (routes) at (6.4,0) {FastAPI Routes\\HTTP 边界};
+\node[process, minimum width=2.8cm, minimum height=0.8cm] (schemas) at (9.7,0) {Schemas\\参数与响应};
+
+\node[process, minimum width=2.9cm, minimum height=0.8cm] (analysis) at (1.6,-1.7) {Analysis Service\\统计与异常};
+\node[process, minimum width=2.9cm, minimum height=0.8cm] (work) at (5.0,-1.7) {Work Order Store\\工单持久化};
+\node[process, minimum width=2.9cm, minimum height=0.8cm] (assistant) at (8.4,-1.7) {Assistant Service\\知识库与模型};
+\node[process, minimum width=2.9cm, minimum height=0.8cm] (mcp) at (8.4,-3.1) {MCP Server\\Tools/Resources};
+
+\node[data, minimum width=2.4cm, minimum height=0.8cm] (csv) at (1.6,-4.7) {CSV\\能耗数据};
+\node[data, minimum width=2.4cm, minimum height=0.8cm] (json) at (5.0,-4.7) {JSON\\工单状态};
+\node[data, minimum width=2.4cm, minimum height=0.8cm] (kb) at (8.4,-4.7) {Markdown\\知识库};
+\node[box, minimum width=2.4cm, minimum height=0.8cm] (llm) at (11.3,-1.7) {LLM Provider};
+
+\draw[arrow] (view) -- (api);
+\draw[arrow] (api) -- (routes);
+\draw[arrow] (routes) -- (schemas);
+\draw[arrow] (routes.south) -- ++(0,-0.45) -| (analysis.north);
+\draw[arrow] (routes.south) -- ++(0,-0.45) -| (work.north);
+\draw[arrow] (routes.south) -- ++(0,-0.45) -| (assistant.north);
+\draw[arrow] (mcp.north) -- (assistant.south);
+\draw[arrow] (analysis) -- (csv);
+\draw[arrow] (work) -- (json);
+\draw[arrow] (assistant) -- (kb);
+\draw[arrow] (assistant) -- (llm);
+\end{tikzpicture}
+}
+\caption{系统逻辑组件图}
+\end{figure}
+
+\subsection{分层职责}
+\begin{longtable}{L{2.8cm}L{4.5cm}L{6.7cm}}
+\caption{分层职责说明}\\
+\toprule
+层次 & 组成 & 职责说明 \\
+\midrule
+\endfirsthead
+\toprule
+层次 & 组成 & 职责说明 \\
+\midrule
+\endhead
+表现层 & Vue 页面、组件、图表、3D 楼层 & 接收用户操作，展示 KPI、表格、图表、三维楼层、工单和问答结果。 \\
+接口层 & FastAPI Routes、Pydantic Schema & 负责参数接收、校验、HTTP 响应、异常转换和前后端契约稳定。 \\
+业务服务层 & 分析服务、问答服务、工单服务、导出服务 & 承载统计分析、异常解释、工单状态、报告生成和知识库检索等核心业务。 \\
+协议扩展层 & MCP Server & 将同一套业务服务暴露给支持 MCP 的 AI 客户端，避免重复实现。 \\
+数据层 & CSV、JSON、Markdown、环境变量 & 保存样例能耗数据、运行期工单、知识库和本地模型配置。 \\
+\bottomrule
+\end{longtable}
+
+\section{模块分解}
+\subsection{后端模块}
+\begin{longtable}{p{4.4cm}p{4cm}p{5.8cm}}
+\caption{后端模块设计}\\
+\toprule
+模块 & 主要文件 & 设计职责 \\
+\midrule
+\endfirsthead
+\toprule
+模块 & 主要文件 & 设计职责 \\
+\midrule
+\endhead
+应用入口 & \code{backend/app/main.py} & 创建 FastAPI 应用、配置中间件和挂载路由 \\
+路由聚合 & \code{backend/app/api/router.py} & 将 health、data、analytics、assistant、export、work-orders 路由统一挂载 \\
+数据路由 & \code{routes/data.py} & 提供概览、元信息、建筑清单和记录查询接口 \\
+分析路由 & \code{routes/analytics.py} & 提供时间汇总、建筑对比、COP、异常、楼层、设备和报告接口 \\
+工单路由 & \code{routes/work_orders.py} & 提供持久化工单查询、创建和状态更新 \\
+问答路由 & \code{routes/assistant.py} & 提供智能问答和模型选项接口 \\
+数据加载服务 & \code{data_loader.py} & 校验 CSV 字段、缓存数据、按建筑和时间筛选 \\
+分析服务 & \code{analysis_service.py} & 派生楼层、设备、COP、异常、解释、建议和运营报告 \\
+工单存储服务 & \code{work_order_store.py} & 使用 JSON 文件保存工单，避免刷新丢失 \\
+LLM 客户端 & \code{llm_client.py} & 封装 OpenAI-compatible 外部模型调用 \\
+MCP Server & \code{mcp_server.py} & 暴露项目 Tools、Resources 和 Prompt \\
+\bottomrule
+\end{longtable}
+
+\subsection{前端模块}
+\begin{longtable}{p{4.4cm}p{4cm}p{5.8cm}}
+\caption{前端模块设计}\\
+\toprule
+模块 & 主要文件 & 设计职责 \\
+\midrule
+\endfirsthead
+\toprule
+模块 & 主要文件 & 设计职责 \\
+\midrule
+\endhead
+应用入口 & \code{frontend/src/main.js} & 挂载 Vue 应用 \\
+主工作台 & \code{DashboardView.vue} & 管理导航、筛选、数据加载、状态和页面编排 \\
+API 封装 & \code{frontend/src/lib/api.js} & 统一封装 REST API 调用和错误处理 \\
+三维视图 & \code{BuildingRiskScene.vue} & 构建立体楼宇、拖拽旋转、楼层点击联动 \\
+图表组件 & \code{TrendChart.vue} 等 & 展示趋势、建筑对比和异常原因 \\
+通用组件 & \code{KpiCard.vue}、\code{SectionCard.vue} 等 & 统一页面布局和状态展示 \\
+样式系统 & \code{frontend/src/styles.css} & 定义整体视觉、响应式布局和交互状态 \\
+\bottomrule
+\end{longtable}
+
+\section{数据设计}
+\subsection{数据流设计}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=9mm and 8mm]
+\node[data] (raw) {原始 CSV\\16 字段};
+\node[process, right=of raw] (validate) {字段校验\\时间转换};
+\node[process, right=of validate] (derive) {派生维度\\楼层/区域/设备};
+\node[process, below=of derive] (metric) {指标计算\\COP/基线/阈值};
+\node[process, left=of metric] (anom) {异常识别\\原因分类};
+\node[process, left=of anom] (api) {REST/MCP\\序列化输出};
+\node[data, below=of api] (wo) {工单 JSON\\状态持久化};
+\draw[arrow] (raw) -- (validate);
+\draw[arrow] (validate) -- (derive);
+\draw[arrow] (derive) -- (metric);
+\draw[arrow] (metric) -- (anom);
+\draw[arrow] (anom) -- (api);
+\draw[arrow] (api) -- (wo);
+\end{tikzpicture}
+\caption{数据处理与分析流}
+\end{figure}
+
+\subsection{数据实体关系}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=10mm and 12mm, every node/.style={font=\scriptsize}]
+\node[data, minimum width=27mm] (building) {Building\\建筑};
+\node[data, right=of building, minimum width=30mm] (record) {EnergyRecord\\能耗记录};
+\node[data, right=of record, minimum width=27mm] (equipment) {Equipment\\设备点位};
+\node[data, below=of record, minimum width=30mm] (anomaly) {Anomaly\\异常解释};
+\node[data, below=of equipment, minimum width=28mm] (order) {WorkOrder\\工单};
+\node[data, below=of building, minimum width=28mm] (kb) {KnowledgeCard\\知识卡片};
+\draw[arrow] (building) -- node[above]{1..n} (record);
+\draw[arrow] (equipment) -- node[above]{1..n} (record);
+\draw[arrow] (record) -- node[right]{触发} (anomaly);
+\draw[arrow] (anomaly) -- node[above]{生成} (order);
+\draw[arrow] (kb) -- node[below, sloped]{支撑解释} (anomaly);
+\end{tikzpicture}
+\caption{核心数据实体关系}
+\end{figure}
+
+\subsection{运行时派生字段}
+原始 CSV 不直接存放楼层和异常标记，系统在服务层根据建筑、设备、时段和指标动态派生。这种设计保持原始数据轻量，同时允许在不重写数据文件的情况下扩展分析维度。关键派生逻辑包括：
+\begin{enumerate}
+    \item 根据建筑类型和设备代码推断设备所处楼层，例如冷水机组映射到 B1 机房，冷却塔映射到 RF 屋顶。
+    \item 根据建筑业务场景推断区域名称，例如教学楼映射为教室区、公共走廊、教师办公区等。
+    \item 根据制冷量与空调电耗计算平均 COP，用于能效分析。
+    \item 按建筑计算电耗均值和标准差，形成动态上界。
+    \item 根据设备状态、动态上界、COP 阈值和夜间负荷规则判断异常。
+\end{enumerate}
+
+\section{异常分析算法设计}
+\subsection{规则组合}
+系统采用可解释规则而非黑箱模型。当前规则如下：
+\begin{longtable}{p{3.2cm}p{5.2cm}p{5.5cm}}
+\caption{异常识别规则}\\
+\toprule
+规则 & 判定条件 & 输出说明 \\
+\midrule
+\endfirsthead
+\toprule
+规则 & 判定条件 & 输出说明 \\
+\midrule
+\endhead
+设备状态异常 & \code{equipment_status} 非 normal & 优先输出“设备状态异常”，说明设备需要现场确认 \\
+高于建筑动态阈值 & 当前电耗高于同建筑均值加一倍标准差 & 输出“电耗高于同建筑基线”，说明负荷显著偏高 \\
+COP 低于阈值 & 平均 COP 小于 2.20 & 输出“COP低于告警阈值”，说明制冷效率偏低 \\
+夜间负荷偏高 & 0 点至 6 点或 22 点后负荷高于建筑基线 1.1 倍 & 输出“夜间负荷偏高”，提示关停策略或值班负荷异常 \\
+\bottomrule
+\end{longtable}
+
+\subsection{异常解释生成}
+异常解释并不只返回“异常”两个字，而是返回可被运维人员理解的结构化对象：记录编号、建筑、楼层、区域、设备、设备类型、时间、严重程度、异常原因、结论、关键指标、触发规则和建议动作。这样前端可以在弹窗或详情区域展示证据链，MCP 客户端也可以直接把解释作为回答依据。
+
+\subsection{异常分析时序图}
+\begin{figure}[H]
+\centering
+\resizebox{0.98\textwidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm,every node/.style={font=\scriptsize}]
+\node[box, minimum width=2.1cm, minimum height=0.85cm] (s1) at (0,0) {1 用户\\选择范围};
+\node[process, minimum width=2.5cm, minimum height=0.85cm] (s2) at (2.9,0) {2 前端\\组织参数};
+\node[process, minimum width=2.8cm, minimum height=0.85cm] (s3) at (6.0,0) {3 Analytics Route\\接收请求};
+\node[process, minimum width=2.8cm, minimum height=0.85cm] (s4) at (9.2,0) {4 Analysis Service\\计算异常};
+\node[data, minimum width=2.2cm, minimum height=0.85cm] (s5) at (12.2,0) {5 CSV\\筛选记录};
+\node[process, minimum width=3.0cm, minimum height=0.85cm] (s6) at (9.2,-1.7) {6 汇总返回\\明细/原因/建议};
+\node[box, minimum width=2.6cm, minimum height=0.85cm] (s7) at (2.9,-1.7) {7 前端展示\\表格与图表};
+\draw[arrow] (s1) -- (s2);
+\draw[arrow] (s2) -- (s3);
+\draw[arrow] (s3) -- (s4);
+\draw[arrow] (s4) -- (s5);
+\draw[arrow] (s5.south) |- (s6.east);
+\draw[arrow] (s6) -- (s7);
+\draw[arrow] (s7.west) -- ++(-2.0,0) |- (s1.south);
+\end{tikzpicture}
+}
+\caption{异常分析请求时序}
+\end{figure}
+
+\subsection{工单处理时序图}
+\begin{figure}[H]
+\centering
+\resizebox{0.98\textwidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm,every node/.style={font=\scriptsize}]
+\node[box, minimum width=2.1cm, minimum height=0.85cm] (w1) at (0,0) {1 运维人员\\选择异常};
+\node[process, minimum width=2.6cm, minimum height=0.85cm] (w2) at (3.0,0) {2 工单中心\\负责人/备注};
+\node[process, minimum width=2.7cm, minimum height=0.85cm] (w3) at (6.2,0) {3 Work Order API\\创建请求};
+\node[process, minimum width=2.8cm, minimum height=0.85cm] (w4) at (9.5,0) {4 Store\\编号与状态};
+\node[data, minimum width=2.4cm, minimum height=0.85cm] (w5) at (12.7,0) {5 JSON\\持久化};
+\node[process, minimum width=2.9cm, minimum height=0.85cm] (w6) at (9.5,-1.7) {6 返回处理中\\置顶黄色};
+\node[box, minimum width=2.6cm, minimum height=0.85cm] (w7) at (3.0,-1.7) {7 页面刷新\\状态保留};
+\draw[arrow] (w1) -- (w2);
+\draw[arrow] (w2) -- (w3);
+\draw[arrow] (w3) -- (w4);
+\draw[arrow] (w4) -- (w5);
+\draw[arrow] (w5.south) |- (w6.east);
+\draw[arrow] (w6) -- (w7);
+\draw[arrow] (w7.west) -- ++(-2.0,0) |- (w1.south);
+\end{tikzpicture}
+}
+\caption{工单创建与持久化时序}
+\end{figure}
+
+\section{工单状态机设计}
+\begin{figure}[H]
+\centering
+\resizebox{0.9\textwidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm,every node/.style={font=\small}]
+\node[process, minimum width=2.7cm, minimum height=0.9cm] (create) at (0,0) {选择异常\\创建工单};
+\node[process, minimum width=2.7cm, minimum height=0.9cm] (doing) at (3.8,0) {处理中\\置顶黄色};
+\node[process, minimum width=2.7cm, minimum height=0.9cm] (done) at (7.6,0) {已完成\\绿色靠后};
+\draw[arrow] (create) -- node[above, fill=white, inner sep=1pt]{生成} (doing);
+\draw[arrow] (doing) -- node[above, fill=white, inner sep=1pt]{完成} (done);
+\node[font=\footnotesize, text=gray!70] at (3.8,-1.15)
+{说明：课程演示中不保留“待处理”中间态，创建成功即进入处理中。};
+\end{tikzpicture}
+}
+\caption{异常工单状态机}
+\end{figure}
+
+工单中心将“待处理”简化为“创建后即处理中”，避免课程演示中出现无实际操作意义的状态。状态排序规则为：处理中工单优先显示，已完成工单显示在后部。工单写入 \code{data/runtime/work_orders.json}，该目录被 Git 忽略，保证演示刷新后状态保留，但不会污染代码仓库。
+
+\section{三维楼层交互设计}
+三维楼层视图位于总览页，用颜色表达建筑楼层健康状态。绿色代表健康，红色代表异常风险，点击楼层后跳转到统计分析页并自动填入建筑和楼层筛选。三维视图使用前端 CSS 3D 和交互逻辑完成，不依赖大型 3D 引擎，从而降低安装成本并保持课程演示稳定。
+
+\begin{table}[H]
+\centering
+\caption{三维楼层交互规则}
+\begin{tabularx}{\textwidth}{p{4cm}Y}
+\toprule
+交互 & 系统行为 \\
+\midrule
+拖拽视图 & 改变整体旋转角度，支持 360 度观察建筑群 \\
+点击异常楼层 & 切换到统计分析页，锁定对应建筑和楼层，展示异常明细 \\
+点击健康楼层 & 切换到统计分析页，仅展示健康提示块，不展示无意义的空图表 \\
+切换筛选范围 & 统计分析按建筑、楼层、时间重新加载，数据浏览不被联动污染 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{智能问答与外部模型设计}
+\subsection{本地知识库优先}
+系统的问答设计以本地知识库为基础，确保在没有外部 API Key 或网络不可用的情况下仍能回答典型问题。本地知识库包括异常诊断、设备维护、指标解释、演示问题、RAG 检索卡片等内容。
+
+\subsection{外部模型可选增强}
+外部模型通过 OpenAI-compatible 接口统一接入，支持 NVIDIA、Groq、OpenRouter、SiliconFlow 等提供商。前端展示模型选项，用户可以选择模型；后端在模型不可用时自动回退本地回答。真实密钥只能来自根目录 \code{.env}，不得写入代码或文档。
+
+\section{MCP Server 设计}
+MCP Server 与 REST API 共享服务层，其设计目的不是另写一套后端，而是让支持 MCP 的 AI 客户端可以直接调用项目能力。MCP 工具划分如下：
+\begin{longtable}{p{4.5cm}p{9.2cm}}
+\caption{MCP Tools 设计}\\
+\toprule
+工具类别 & 工具名称 \\
+\midrule
+\endfirsthead
+\toprule
+工具类别 & 工具名称 \\
+\midrule
+\endhead
+数据访问 & \code{get_dataset_meta}、\code{list_buildings}、\code{query_energy_records} \\
+总体统计 & \code{get_energy_overview}、\code{get_time_summary}、\code{get_building_comparison}、\code{get_cop_ranking} \\
+异常诊断 & \code{get_anomalies}、\code{get_anomaly_reasons}、\code{explain_anomaly} \\
+楼层设备 & \code{get_floor_summary}、\code{get_equipment_summary} \\
+运维报告 & \code{suggest_anomaly_work_orders}、\code{get_optimization_recommendations}、\code{get_operation_report} \\
+知识与问答 & \code{search_energy_knowledge}、\code{ask_energy_assistant} \\
+\bottomrule
+\end{longtable}
+
+\section{部署设计}
+\subsection{本地开发部署}
+系统部署采用轻量本地方式，适合课程验收：
+\begin{enumerate}
+    \item 根目录创建 Python 虚拟环境并安装 \code{backend/requirements.txt}。
+    \item 使用 \code{scripts/start-backend.ps1} 启动 FastAPI，默认端口 8000。
+    \item 进入 \code{frontend/} 安装 npm 依赖，使用 \code{npm run dev} 或脚本启动 Vite。
+    \item 浏览器访问 \code{http://127.0.0.1:5173}。
+    \item 如需 MCP，运行 \code{scripts/start-mcp.ps1}。
+\end{enumerate}
+
+\subsection{部署图}
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=10mm and 12mm]
+\node[box, minimum width=35mm] (pc) {演示电脑\\Windows + PowerShell};
+\node[process, below left=of pc, minimum width=35mm] (py) {Python 3.11\\FastAPI 8000};
+\node[process, below right=of pc, minimum width=35mm] (node) {Node.js\\Vite 5173};
+\node[process, below=of py, minimum width=35mm] (mcp) {MCP Server\\stdio/8765};
+\node[data, below=of node, minimum width=35mm] (files) {CSV/JSON/Markdown\\本地文件};
+\draw[arrow] (pc) -- (py);
+\draw[arrow] (pc) -- (node);
+\draw[arrow] (py) -- (files);
+\draw[arrow] (node) -- (py);
+\draw[arrow] (mcp) -- (py);
+\draw[arrow] (mcp) -- (files);
+\end{tikzpicture}
+\caption{本地演示部署结构}
+\end{figure}
+
+\section{关键设计取舍}
+\begin{longtable}{p{3.4cm}p{3.4cm}p{7cm}}
+\caption{设计取舍}\\
+\toprule
+问题 & 当前选择 & 原因 \\
+\midrule
+\endfirsthead
+\toprule
+问题 & 当前选择 & 原因 \\
+\midrule
+\endhead
+数据库还是 CSV & CSV + JSON & 课程演示部署轻量，数据规模可控，便于提交和复现 \\
+机器学习还是规则 & 可解释规则 & 无需训练数据，结果稳定，可清晰向评审说明 \\
+单一 Web 还是 Web + MCP & Web + MCP & 同时满足人工演示和 AI 客户端接入要求 \\
+外部模型强依赖还是可选 & 可选增强 & 防止 Key、网络或额度影响系统基本演示 \\
+工单状态是否复杂 & 简化状态机 & 课程项目突出闭环，不引入复杂审批流 \\
+3D 引擎还是轻量 CSS 3D & 轻量 3D & 减少依赖，保证同学拉取后容易运行 \\
+\bottomrule
+\end{longtable}
+
+\clearpage
+\section{补充详细设计}
+\subsection{模块内部职责细化}
+为避免设计说明停留在架构图层面，本节进一步说明主要模块的输入、输出、状态和失败处理。该表也可以作为代码审查时的检查清单。
+\begin{longtable}{L{3.4cm}L{3.8cm}L{4.8cm}L{3.1cm}}
+\caption{模块内部职责与设计边界}\\
+\toprule
+模块 & 输入 & 处理职责 & 输出 \\
+\midrule
+\endfirsthead
+\toprule
+模块 & 输入 & 处理职责 & 输出 \\
+\midrule
+\endhead
+数据加载服务 & CSV 路径、筛选条件 & 校验字段、解析时间、缓存 DataFrame、派生基础字段。 & 标准化记录集 \\
+概览服务 & 标准化记录集 & 计算总记录数、建筑数、时间范围、平均 COP、异常总数和总能耗。 & 总览 JSON \\
+时间汇总服务 & 记录集、粒度 & 按小时、日、周、月分组，聚合能耗、水耗、空调电耗和 COP。 & 趋势数组 \\
+建筑对比服务 & 记录集 & 按建筑聚合总能耗、平均 COP、异常数和排序指标。 & 建筑对比表 \\
+楼层派生服务 & 建筑、设备、场景字段 & 根据设备和建筑场景推断楼层、区域和设备类型。 & 楼层化记录 \\
+异常识别服务 & 楼层化记录 & 执行设备状态、动态阈值、COP 和夜间负荷规则。 & 异常标记与原因 \\
+异常解释服务 & 异常记录编号 & 构造触发规则、指标证据、严重程度和建议动作。 & 解释对象 \\
+设备汇总服务 & 楼层化记录 & 统计设备点位、状态、类型、最近出现时间和维护提示。 & 设备表 \\
+工单存储服务 & 创建或更新请求 & 生成编号、写入 JSON、排序状态、处理缺失文件。 & 工单列表 \\
+日报服务 & 概览、异常、工单、建议 & 生成风险摘要、优先级、节能动作和收益模拟。 & 运营报告 \\
+知识库检索服务 & 用户问题 & 从 Markdown 知识卡片中匹配项目背景、指标和演示问题。 & 本地回答素材 \\
+LLM 客户端 & 模型配置、提示词 & 按 OpenAI-compatible 协议调用外部模型并处理失败。 & 模型回答或回退 \\
+MCP Server & AI 客户端工具调用 & 复用分析服务，暴露 Tools、Resources 和 Prompt。 & MCP 响应 \\
+前端 API 封装 & 页面参数 & 拼接查询参数、捕获错误、统一响应结构。 & 页面数据 \\
+三维楼层组件 & 楼层健康状态 & 构建立体楼宇、处理拖拽旋转、点击楼层联动。 & 交互事件 \\
+图表组件 & 趋势或聚合数据 & 渲染折线、柱状、排名和原因统计图。 & 可视化视图 \\
+工单中心组件 & 异常和工单数据 & 创建工单、完成工单、排序和颜色状态。 & 工单交互界面 \\
+AI 助手组件 & 问题、模型选择 & 显示模型列表、提交问题、展示回答和回退状态。 & 问答结果 \\
+\bottomrule
+\end{longtable}
+
+\subsection{关键设计决策}
+以下决策体现了项目从课程原型到可演示系统之间的工程取舍，重点考虑可运行性、可维护性和评审可解释性。
+\begin{longtable}{L{3.2cm}L{4.3cm}L{4.8cm}L{3.0cm}}
+\caption{关键设计决策与取舍}\\
+\toprule
+决策点 & 采用方案 & 理由 & 备选方案 \\
+\midrule
+\endfirsthead
+\toprule
+决策点 & 采用方案 & 理由 & 备选方案 \\
+\midrule
+\endhead
+数据存储 & CSV 加运行期 JSON & 课程项目部署简单，便于查看原始数据，同时工单状态可持久化。 & SQLite 或 MySQL \\
+异常算法 & 规则组合 & 规则可解释，适合答辩说明，避免黑箱模型难以验证。 & 机器学习模型 \\
+前端框架 & Vue 加 Vite & 启动快、结构轻、适合课程演示和组件化页面。 & React 或纯 HTML \\
+3D 实现 & CSS 3D & 不增加大型依赖，浏览器兼容性较好。 & Three.js \\
+问答能力 & 本地知识库优先 & 无密钥时仍能演示，外部模型作为增强。 & 完全依赖外部 LLM \\
+MCP 设计 & 复用后端服务层 & REST API 与 MCP 口径一致，减少重复实现。 & MCP 单独实现 \\
+文档生成 & LaTeX 统一模板 & 版面正式，适合提交 PDF，图表可控。 & Markdown 直接转 PDF \\
+测试策略 & pytest 加前端构建 & 覆盖接口和服务层，前端至少保证生产构建可通过。 & 纯人工测试 \\
+工单状态 & 创建即处理中 & 课程演示中减少无意义待处理状态，更贴合用户要求。 & 待处理到处理中 \\
+密钥管理 & .env 本地配置 & 避免真实 API Key 入库，符合安全要求。 & 写在配置文件中 \\
+时间范围 & 样例覆盖 2026-03-01 至 2026-06-01 & 数据量足够支撑趋势和筛选演示。 & 单日样例 \\
+提交材料 & 源码与正式 PDF 分离 & 评审可快速找到正式文档，同时保留源码可运行。 & 只提交仓库链接 \\
+\bottomrule
+\end{longtable}
+
+\subsection{异常与降级设计}
+系统需要在演示环境中保持稳定，因此必须明确各类异常的处理方式。
+\begin{longtable}{L{3.0cm}L{4.4cm}L{5.0cm}L{2.9cm}}
+\caption{异常处理与降级策略}\\
+\toprule
+异常类型 & 触发条件 & 处理策略 & 用户感知 \\
+\midrule
+\endfirsthead
+\toprule
+异常类型 & 触发条件 & 处理策略 & 用户感知 \\
+\midrule
+\endhead
+数据文件缺失 & CSV 路径不存在或文件为空 & 后端启动或接口调用时返回明确错误。 & 显示数据错误 \\
+字段缺失 & CSV 不包含必要字段 & 数据加载层阻断并说明缺失字段。 & 接口错误提示 \\
+时间解析失败 & 时间格式无法转换 & 记录被拒绝或整体加载失败，避免错误统计。 & 日志可定位 \\
+筛选无数据 & 建筑、楼层、时间组合没有记录 & 返回空数组和空状态说明。 & 页面空状态 \\
+异常记录不存在 & 解释接口找不到编号 & 返回 404 或空解释对象。 & 提示记录不存在 \\
+工单文件不存在 & 首次启动没有运行期 JSON & 自动创建空状态或返回空列表。 & 无感知 \\
+工单写入失败 & 目录权限不足 & 返回错误并保留前端输入。 & 提示保存失败 \\
+模型未配置 & LLM 启用但缺少 Key & 自动回退本地知识库回答。 & 显示回退说明 \\
+模型接口失败 & 网络、额度或提供商错误 & 捕获异常，返回本地回答和失败原因。 & 不阻断问答 \\
+MCP 启动失败 & transport 或依赖配置错误 & 命令行输出错误，README 提供排查步骤。 & 运维可排查 \\
+前端请求失败 & 后端未启动或端口错误 & API 封装捕获错误并显示提示。 & 页面错误提示 \\
+图表数据为空 & 健康楼层或空筛选 & 隐藏无意义图表，仅展示健康或空状态。 & 页面简洁 \\
+\bottomrule
+\end{longtable}
+
+\subsection{设计检查清单}
+设计检查清单用于从工程角度确认系统结构是否完整、边界是否清晰、后续维护是否可行。
+\begin{longtable}{L{1.7cm}L{3.2cm}L{6.4cm}L{4.0cm}}
+\caption{设计检查清单}\\
+\toprule
+编号 & 设计项 & 检查说明 & 设计证据 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 设计项 & 检查说明 & 设计证据 \\
+\midrule
+\endhead
+SD-01 & 前后端职责 & 确认“前后端职责”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-02 & 路由聚合 & 确认“路由聚合”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-03 & 服务层复用 & 确认“服务层复用”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-04 & 数据加载 & 确认“数据加载”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-05 & 字段校验 & 确认“字段校验”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-06 & 楼层派生 & 确认“楼层派生”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-07 & 设备派生 & 确认“设备派生”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-08 & COP 计算 & 确认“COP 计算”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-09 & 动态阈值 & 确认“动态阈值”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-10 & 异常优先级 & 确认“异常优先级”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-11 & 异常解释结构 & 确认“异常解释结构”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-12 & 楼层健康状态 & 确认“楼层健康状态”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-13 & 设备维护提示 & 确认“设备维护提示”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-14 & 工单编号 & 确认“工单编号”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-15 & 工单排序 & 确认“工单排序”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-16 & 工单持久化 & 确认“工单持久化”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-17 & 日报生成 & 确认“日报生成”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-18 & 知识库检索 & 确认“知识库检索”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-19 & 模型回退 & 确认“模型回退”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-20 & 提供商配置 & 确认“提供商配置”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-21 & MCP 工具复用 & 确认“MCP 工具复用”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-22 & MCP 资源输出 & 确认“MCP 资源输出”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-23 & 前端状态管理 & 确认“前端状态管理”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-24 & 三维拖拽 & 确认“三维拖拽”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-25 & 三维点击联动 & 确认“三维点击联动”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-26 & 图表空状态 & 确认“图表空状态”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-27 & 错误提示 & 确认“错误提示”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-28 & CSV 导出 & 确认“CSV 导出”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-29 & 测试隔离 & 确认“测试隔离”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-30 & 运行期目录 & 确认“运行期目录”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-31 & 环境变量读取 & 确认“环境变量读取”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-32 & 日志定位 & 确认“日志定位”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-33 & 响应模型 & 确认“响应模型”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-34 & 接口兼容 & 确认“接口兼容”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-35 & 性能边界 & 确认“性能边界”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-36 & 未来数据库替换 & 确认“未来数据库替换”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-37 & 权限扩展 & 确认“权限扩展”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-38 & 真实设备接入 & 确认“真实设备接入”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-39 & 部署扩展 & 确认“部署扩展”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+SD-40 & 文档生成 & 确认“文档生成”在设计中有明确位置、输入输出和失败处理，避免模块之间职责模糊。 & 可在 SDD、代码结构或接口契约中追踪。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{设计审计记录}
+设计审计记录用于从端到端链路检查系统设计是否闭合。每条记录都要求能够从前端操作追踪到后端服务和数据输出。
+\begin{longtable}{L{1.7cm}L{4.0cm}L{6.2cm}L{3.6cm}}
+\caption{设计审计记录}\\
+\toprule
+编号 & 审计主题 & 审计要点 & 设计证据 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 审计主题 & 审计要点 & 设计证据 \\
+\midrule
+\endhead
+DA-01 & 总览页数据链路 & 检查“总览页数据链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-02 & 数据浏览链路 & 检查“数据浏览链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-03 & 统计分析链路 & 检查“统计分析链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-04 & 异常解释链路 & 检查“异常解释链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-05 & 三维点击链路 & 检查“三维点击链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-06 & 工单创建链路 & 检查“工单创建链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-07 & 工单完成链路 & 检查“工单完成链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-08 & 运营日报链路 & 检查“运营日报链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-09 & AI 问答链路 & 检查“AI 问答链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-10 & MCP 调用链路 & 检查“MCP 调用链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-11 & CSV 导出链路 & 检查“CSV 导出链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-12 & 环境变量链路 & 检查“环境变量链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-13 & 模型回退链路 & 检查“模型回退链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-14 & 错误处理链路 & 检查“错误处理链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-15 & 空状态链路 & 检查“空状态链路”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-16 & 数据缓存策略 & 检查“数据缓存策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-17 & 服务复用策略 & 检查“服务复用策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-18 & 字段命名策略 & 检查“字段命名策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-19 & Schema 校验策略 & 检查“Schema 校验策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-20 & 接口前缀策略 & 检查“接口前缀策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-21 & 运行期文件策略 & 检查“运行期文件策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-22 & 测试数据隔离策略 & 检查“测试数据隔离策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-23 & 前端导航策略 & 检查“前端导航策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-24 & 组件拆分策略 & 检查“组件拆分策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-25 & 图表加载策略 & 检查“图表加载策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-26 & 3D 状态同步策略 & 检查“3D 状态同步策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-27 & 工单排序策略 & 检查“工单排序策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-28 & 报告生成策略 & 检查“报告生成策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-29 & 文档生成策略 & 检查“文档生成策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+DA-30 & 提交包同步策略 & 检查“提交包同步策略”从界面入口、接口调用、服务处理到返回展示是否有明确设计，避免只实现单点功能。 & SDD 图、模块表或源码路径。 \\
+\bottomrule
+\end{longtable}
+
+\end{document}

@@ -1,0 +1,181 @@
+
+\documentclass[12pt,a4paper]{ctexart}
+
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{etoolbox}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+
+\hypersetup{hidelinks}
+\urlstyle{same}
+\setlist{nosep}
+\captionsetup{font=small}
+\renewcommand{\arraystretch}{1.25}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.3em}
+\setlength{\tabcolsep}{4pt}
+\emergencystretch=3em
+\sloppy
+\makeatletter
+\g@addto@macro{\UrlBreaks}{\do\/\do\-\do\_\do\.\do\:}
+\makeatother
+\AtBeginEnvironment{longtable}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabularx}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabular}{\small\setlength{\tabcolsep}{3pt}}
+
+\newcommand{\studentname}{许奕}
+\newcommand{\studentid}{2351441}
+\newcommand{\teamname}{许奕、王天一、马源胜、周由}
+\newcommand{\coursename}{软件工程管理与经济}
+\newcommand{\projectname}{基于大模型的建筑能源智能管理与运维优化系统}
+\newcommand{\docversion}{V2.0}
+\newcommand{\docdate}{2026年5月31日}
+\newcommand{\code}[1]{{\footnotesize\nolinkurl{#1}}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\tikzset{
+  box/.style={rectangle, rounded corners, draw=cyan!55!black, fill=cyan!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  process/.style={rectangle, rounded corners, draw=teal!55!black, fill=teal!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  data/.style={cylinder, shape border rotate=90, aspect=0.25, draw=orange!70!black, fill=orange!10, thick, minimum height=12mm, align=center, inner sep=5pt},
+  risk/.style={diamond, draw=red!60!black, fill=red!8, thick, aspect=2, align=center, inner sep=2pt},
+  arrow/.style={-{Stealth[length=2.4mm]}, thick, draw=gray!70!black},
+  note/.style={rectangle, draw=gray!60, fill=gray!6, rounded corners, align=left, inner sep=6pt}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\coursename}
+\fancyhead[R]{\reporttitle}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{15pt}
+
+\title{
+    \vspace{-2em}
+    \heiti \zihao{2} \reporttitle \\
+    \vspace{1em}
+    \zihao{4} 课程期末项目正式交付文档
+}
+\author{
+    \songti \zihao{4}
+    项目名称：\projectname \\
+    项目组成员：\teamname \\
+    负责人：\studentname \quad 学号：\studentid
+}
+\date{\docdate}
+
+\newcommand{\reporttitle}{最终提交说明}
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+
+\begin{abstract}
+本文档为《\projectname》的最终提交说明，按照课程期末要求列出应提交的源码、SRS\&SDS、SEE\&SEM、测试与验收材料、演示材料和打包排除项。本文档用于最终检查，确保提交给教师的材料完整、正式、可运行且不泄露敏感信息。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{教师要求对照}
+\begin{longtable}{p{5cm}p{5.2cm}p{3.2cm}}
+\caption{教师要求与项目材料对应关系}\\
+\toprule
+教师要求 & 对应材料 & 状态 \\
+\midrule
+\endfirsthead
+\toprule
+教师要求 & 对应材料 & 状态 \\
+\midrule
+\endhead
+Complete financial analysis for course project & SEE 软件经济分析与评价 & 已完成 \\
+Design, implement and deploy course project & 源码、README、用户手册与部署说明 & 已完成 \\
+Project scope and planning & SEM 软件工程管理说明 & 已完成 \\
+Software process monitor and control & SEM 软件工程管理说明 & 已完成 \\
+Risk management & SEM 风险管理章节 & 已完成 \\
+Cost of development and maintenance & SEE 成本估算与维护成本章节 & 已完成 \\
+Pricing strategy & SEE 定价策略章节 & 已完成 \\
+Funding and financing & SEE 资金与融资章节 & 已完成 \\
+Financial analysis and evaluation & SEE 财务评价、ROI、敏感性分析 & 已完成 \\
+SRS\&SDS & SRS 软件需求规格说明书、SDD/SDS 软件设计说明书 & 已完成 \\
+SEE\&SEM & SEE 软件经济分析与评价、SEM 软件工程管理说明 & 已完成 \\
+Source code developed and deployed & \code{source-code/}、README、启动脚本 & 已完成 \\
+\bottomrule
+\end{longtable}
+
+\section{推荐提交目录}
+\begin{verbatim}
+期末提交材料/
+|-- source-code/
+|-- documents/
+|   |-- latex/
+|   |-- pdf-latex/
+|   `-- markdown/
+|-- demo/
+`-- submission-readme.md
+\end{verbatim}
+
+\section{正式 PDF 清单}
+正式 PDF 以 LaTeX 编译版为准：
+\begin{enumerate}
+    \item SRS 软件需求规格说明书。
+    \item SDD/SDS 软件设计说明书。
+    \item SEE 软件经济分析与评价。
+    \item SEM 软件工程管理说明。
+    \item 测试与验收报告。
+    \item 用户手册与部署说明。
+    \item 数据、接口与 MCP 说明。
+    \item 最终提交说明。
+\end{enumerate}
+
+\section{源码提交要求}
+源码应包含 \code{backend/}、\code{frontend/}、\code{data/}、\code{knowledge_base/}、\code{scripts/}、\code{README.md}、\code{.env.example} 和 \code{.gitignore}。源码应能够按 README 启动并运行完整演示。
+
+\section{必须排除的内容}
+\begin{longtable}{p{4cm}p{9.8cm}}
+\caption{提交排除项}\\
+\toprule
+排除项 & 原因 \\
+\midrule
+\endfirsthead
+\toprule
+排除项 & 原因 \\
+\midrule
+\endhead
+\code{.env} & 可能包含真实 API Key，严禁提交 \\
+\code{frontend/node_modules/} & 依赖体积大，可通过 npm install 还原 \\
+\code{frontend/dist/} & 构建产物可重新生成 \\
+\code{data/runtime/} & 本地演示工单状态，不属于基线数据 \\
+\code{.pytest_cache/} & 测试缓存，无提交价值 \\
+个人无关实验文件 & 与期末项目无关，避免干扰评审 \\
+真实 API Key 或截图 & 存在安全风险 \\
+\bottomrule
+\end{longtable}
+
+\section{提交前检查}
+\begin{enumerate}
+    \item 运行 \code{scripts/check-project.ps1}，确认后端测试和前端构建通过。
+    \item 检查最终目录中不存在 \code{.env} 和真实 API Key。
+    \item 打开 LaTeX PDF，确认封面、目录、图表、页码和中文显示正常。
+    \item 按用户手册启动系统，走一遍演示路径。
+    \item 检查 PPT 和演示视频是否与当前系统一致。
+    \item 将材料打包为一个 zip 文件并提交到 Canvas。
+\end{enumerate}
+
+\section{最终结论}
+项目已经形成可运行源码、正式需求与设计文档、经济分析与工程管理文档、测试验收材料、用户部署说明和最终提交清单。软件侧已经具备最终提交条件，课程提交时只需补齐 PPT、演示视频并按本说明打包。
+
+\end{document}

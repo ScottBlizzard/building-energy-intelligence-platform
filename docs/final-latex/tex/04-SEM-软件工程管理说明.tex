@@ -1,0 +1,498 @@
+
+\documentclass[12pt,a4paper]{ctexart}
+
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{etoolbox}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+
+\hypersetup{hidelinks}
+\urlstyle{same}
+\setlist{nosep}
+\captionsetup{font=small}
+\renewcommand{\arraystretch}{1.25}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.3em}
+\setlength{\tabcolsep}{4pt}
+\emergencystretch=3em
+\sloppy
+\makeatletter
+\g@addto@macro{\UrlBreaks}{\do\/\do\-\do\_\do\.\do\:}
+\makeatother
+\AtBeginEnvironment{longtable}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabularx}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabular}{\small\setlength{\tabcolsep}{3pt}}
+
+\newcommand{\studentname}{许奕}
+\newcommand{\studentid}{2351441}
+\newcommand{\teamname}{许奕、王天一、马源胜、周由}
+\newcommand{\coursename}{软件工程管理与经济}
+\newcommand{\projectname}{基于大模型的建筑能源智能管理与运维优化系统}
+\newcommand{\docversion}{V2.0}
+\newcommand{\docdate}{2026年5月31日}
+\newcommand{\code}[1]{{\footnotesize\nolinkurl{#1}}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\tikzset{
+  box/.style={rectangle, rounded corners, draw=cyan!55!black, fill=cyan!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  process/.style={rectangle, rounded corners, draw=teal!55!black, fill=teal!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  data/.style={cylinder, shape border rotate=90, aspect=0.25, draw=orange!70!black, fill=orange!10, thick, minimum height=12mm, align=center, inner sep=5pt},
+  risk/.style={diamond, draw=red!60!black, fill=red!8, thick, aspect=2, align=center, inner sep=2pt},
+  arrow/.style={-{Stealth[length=2.4mm]}, thick, draw=gray!70!black},
+  note/.style={rectangle, draw=gray!60, fill=gray!6, rounded corners, align=left, inner sep=6pt}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\coursename}
+\fancyhead[R]{\reporttitle}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{15pt}
+
+\title{
+    \vspace{-2em}
+    \heiti \zihao{2} \reporttitle \\
+    \vspace{1em}
+    \zihao{4} 课程期末项目正式交付文档
+}
+\author{
+    \songti \zihao{4}
+    项目名称：\projectname \\
+    项目组成员：\teamname \\
+    负责人：\studentname \quad 学号：\studentid
+}
+\date{\docdate}
+
+\newcommand{\reporttitle}{SEM 软件工程管理说明}
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+
+\begin{abstract}
+本文档为《\projectname》的软件工程管理说明（SEM），覆盖项目范围、计划、组织分工、软件过程监控与控制、质量保证、配置管理、风险管理、沟通管理、变更管理和最终交付管理。文档从工程管理角度说明项目如何由初始骨架、两轮分工、两次整合发展为最终可运行、可测试、可提交的系统。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{文档控制}
+\begin{longtable}{p{4cm}p{10.5cm}}
+\toprule
+项目 & 内容 \\
+\midrule
+文档名称 & SEM 软件工程管理说明 \\
+文档版本 & \docversion \\
+管理范围 & 范围、计划、组织、过程控制、质量、风险、配置、沟通、交付 \\
+项目组织 & 四人课程项目小组 \\
+管理模式 & 文档先行、目录分工、两轮任务、集中整合、最终封版 \\
+\bottomrule
+\end{longtable}
+
+\section{项目范围管理}
+\subsection{本期范围}
+本期范围包括：建筑能耗样例数据、数据字典、FastAPI 后端、Vue 前端、三维楼层态势、统计分析、异常解释、工单闭环、决策报告、智能问答、外部模型配置、MCP Server、自动化测试、运行脚本和最终文档。
+
+\subsection{范围排除}
+不纳入本期范围的内容包括：真实传感器接入、企业级登录权限、生产数据库、高可用部署、移动端 App、长期真实节能审计和商业合同实施。范围排除的目的不是降低质量，而是在课程周期内保证核心系统闭环可以稳定完成。
+
+\section{组织与职责}
+\begin{longtable}{p{2.5cm}p{4.2cm}p{4.2cm}p{3.4cm}}
+\caption{团队分工与交付物}\\
+\toprule
+成员 & 主要职责 & 核心交付物 & 集成边界 \\
+\midrule
+\endfirsthead
+\toprule
+成员 & 主要职责 & 核心交付物 & 集成边界 \\
+\midrule
+\endhead
+许奕 & 项目规划、整合、测试、文档、最终封版 & README、任务说明、整合总结、最终文档、测试检查 & 统一接口、统一文档、最终质量控制 \\
+王天一 & 后端与架构 & REST API、分析服务、MCP Server、后端测试 & 保持 API 契约稳定 \\
+马源胜 & 数据与 AI & 样例数据、数据源调研、知识库、模型配置 & 数据字段与知识库口径稳定 \\
+周由 & 前端与集成 & Vue 页面、图表、3D 风险、前后端联调 & 通过 \code{api.js} 调用接口 \\
+\bottomrule
+\end{longtable}
+
+\subsection{RACI 职责矩阵}
+\begin{longtable}{L{3.4cm}C{1.7cm}C{1.7cm}C{1.7cm}C{1.7cm}L{3.2cm}}
+\caption{RACI 职责矩阵}\\
+\toprule
+活动 & 许奕 & 王天一 & 马源胜 & 周由 & 说明 \\
+\midrule
+\endfirsthead
+\toprule
+活动 & 许奕 & 王天一 & 马源胜 & 周由 & 说明 \\
+\midrule
+\endhead
+需求与范围 & A/R & C & C & C & 负责人统一范围和验收口径 \\
+后端接口 & C & A/R & C & C & 后端负责实现与测试 \\
+数据与知识库 & C & C & A/R & C & 数据负责人保证字段和知识库质量 \\
+前端页面 & C & C & C & A/R & 前端负责页面和交互 \\
+系统整合 & A/R & C & C & C & 集中整合减少冲突 \\
+测试验收 & A/R & R & C & R & 自动化与人工验收结合 \\
+最终文档 & A/R & C & C & C & 正式文档由负责人统一封版 \\
+\bottomrule
+\end{longtable}
+
+其中 A 表示最终负责，R 表示执行负责，C 表示参与咨询。该矩阵的作用是把“谁最终负责”和“谁具体执行”分开，避免多人协作中出现职责空白。
+
+\section{项目计划}
+\subsection{阶段划分}
+\begin{figure}[H]
+\centering
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[node distance=7mm and 6mm]
+\node[process] (init) {初始化\\骨架与 README};
+\node[process, right=of init] (r1) {第一次任务\\三方独立开发};
+\node[process, right=of r1] (i1) {第一次整合\\补齐基础闭环};
+\node[process, right=of i1] (r2) {第二次任务\\强化演示能力};
+\node[process, below=of r2] (i2) {第二次整合\\系统主线完成};
+\node[process, left=of i2] (polish) {封版优化\\3D/工单/LLM/MCP};
+\node[process, left=of polish] (docs) {最终文档\\SRS/SDD/SEE/SEM};
+\node[process, left=of docs] (submit) {提交准备\\PDF/源码/演示};
+\draw[arrow] (init) -- (r1);
+\draw[arrow] (r1) -- (i1);
+\draw[arrow] (i1) -- (r2);
+\draw[arrow] (r2) -- (i2);
+\draw[arrow] (i2) -- (polish);
+\draw[arrow] (polish) -- (docs);
+\draw[arrow] (docs) -- (submit);
+\end{tikzpicture}
+}
+\caption{项目阶段路径}
+\end{figure}
+
+\subsection{里程碑}
+\begin{longtable}{p{3cm}p{5.4cm}p{5.5cm}}
+\caption{主要里程碑}\\
+\toprule
+里程碑 & 完成标准 & 证据 \\
+\midrule
+\endfirsthead
+\toprule
+里程碑 & 完成标准 & 证据 \\
+\midrule
+\endhead
+M1 仓库初始化 & 目录结构、README、环境模板、基础文档完成 & 根目录、\code{docs/}、\code{.env.example} \\
+M2 第一次整合 & 后端、前端、数据 AI 初步连通 & \code{docs/11-first-integration-summary.md} \\
+M3 第二次整合 & 主要页面和接口可运行，功能闭环形成 & \code{docs/12-second-integration-summary.md} \\
+M4 封版优化 & 数据扩展、3D 联动、工单持久化、统计分析优化 & 前端页面和后端测试 \\
+M5 文档封版 & SRS、SDD、SEE、SEM 等正式文档生成 PDF & \code{docs/final-latex/pdf/} \\
+M6 最终提交 & 源码、文档、演示材料按要求整理 & \code{期末提交材料/} \\
+\bottomrule
+\end{longtable}
+
+\section{软件过程监控与控制}
+\subsection{Git 控制}
+项目使用 GitHub 作为统一仓库。关键控制规则如下：真实 \code{.env} 不提交；每次整合前先拉取远程；整合后运行检查脚本；功能稳定后再提交；提交信息应能表达变化内容；最终提交材料排除缓存、依赖目录和个人无关作业文件。
+
+\subsection{接口控制}
+REST API 契约以 \code{docs/06-api-contract.md} 为基础，前端只通过 \code{frontend/src/lib/api.js} 调用接口，MCP Server 复用后端服务层。这样可以降低多人协作中“前端字段名”和“后端字段名”不一致的风险。
+
+\subsection{自检控制}
+项目提供 \code{scripts/check-project.ps1} 作为最终质量闸门，检查内容包括 Python 语法、后端 pytest 和前端构建。脚本失败即退出，避免出现测试失败但仍显示成功的误判。
+
+\subsection{过程监控闭环}
+\begin{figure}[H]
+\centering
+\resizebox{0.86\textwidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm,every node/.style={font=\small}]
+\node[process, minimum width=2.7cm, minimum height=0.9cm] (plan) at (0,1.6) {1 计划\\任务边界};
+\node[process, minimum width=2.7cm, minimum height=0.9cm] (do) at (3.8,1.6) {2 执行\\分模块开发};
+\node[process, minimum width=2.7cm, minimum height=0.9cm] (check) at (7.6,1.6) {3 检查\\测试与评审};
+\node[process, minimum width=2.7cm, minimum height=0.9cm] (act) at (7.6,-0.4) {4 纠偏\\修复与整合};
+\node[process, minimum width=2.7cm, minimum height=0.9cm] (base) at (3.8,-0.4) {5 基线\\提交与文档};
+\draw[arrow] (plan) -- (do);
+\draw[arrow] (do) -- (check);
+\draw[arrow] (check) -- (act);
+\draw[arrow] (act) -- (base);
+\draw[arrow] (base.west) -- ++(-3.8,0) -- (plan.south);
+\end{tikzpicture}
+}
+\caption{软件过程监控与控制闭环}
+\end{figure}
+每轮整合均以测试通过、文档同步和安全检查作为进入下一轮的条件。该闭环强调先冻结任务边界，再执行开发、测试评审、修复整合和基线归档，避免后期反复增加范围导致提交质量失控。
+
+\section{质量管理}
+\subsection{质量目标}
+\begin{enumerate}
+    \item 系统能够按 README 在普通 Windows 环境复现运行。
+    \item 后端接口测试、服务测试、MCP 测试和 LLM 封装测试通过。
+    \item 前端生产构建通过，核心页面无阻断错误。
+    \item 演示路径覆盖项目亮点，并能应对刷新、筛选、点击、导出和问答。
+    \item 最终文档使用正式口吻，面向教师评审，不包含对话式说明。
+    \item 最终材料不泄露真实 API Key。
+\end{enumerate}
+
+\subsection{质量保证矩阵}
+\begin{longtable}{p{3.2cm}p{4.8cm}p{5.5cm}}
+\caption{质量保证矩阵}\\
+\toprule
+质量活动 & 检查内容 & 输出证据 \\
+\midrule
+\endfirsthead
+\toprule
+质量活动 & 检查内容 & 输出证据 \\
+\midrule
+\endhead
+需求审查 & 功能是否覆盖老师要求和演示路径 & SRS、验收报告 \\
+设计审查 & 架构是否清晰、接口是否一致、数据是否可追溯 & SDD、API 文档 \\
+代码检查 & 路由、服务、前端页面、脚本是否能运行 & 源码目录、构建结果 \\
+自动化测试 & 后端接口、服务、MCP、LLM 封装 & pytest 结果 \\
+人工验收 & 浏览器操作、3D 联动、工单持久化、报告生成 & 测试与验收报告 \\
+安全检查 & \code{.env}、API Key、运行期数据是否被排除 & \code{.gitignore}、提交清单 \\
+\bottomrule
+\end{longtable}
+
+\section{风险管理}
+\begin{longtable}{p{3.2cm}p{1.6cm}p{1.6cm}p{5.2cm}p{2.3cm}}
+\caption{风险登记表}\\
+\toprule
+风险 & 概率 & 影响 & 应对措施 & 当前状态 \\
+\midrule
+\endfirsthead
+\toprule
+风险 & 概率 & 影响 & 应对措施 & 当前状态 \\
+\midrule
+\endhead
+成员提交质量不一致 & 中 & 高 & 分工文件写清边界，整合阶段统一补齐 & 已控制 \\
+多人合并冲突 & 中 & 中 & 按目录和模块分工，减少同时改同一文件 & 已控制 \\
+数据量不足导致演示单薄 & 中 & 高 & 扩展至 2,976 条、3 月至 6 月、派生楼层设备维度 & 已控制 \\
+系统像写死数据 & 中 & 高 & 增加筛选、楼层分析、工单持久化、报告和 MCP 调用 & 已控制 \\
+外部模型 Key 泄露 & 中 & 高 & 真实 Key 仅放本地 \code{.env}，提交前扫描 & 已控制 \\
+外部模型不可用 & 中 & 中 & 本地知识库兜底，LLM 可配置关闭 & 已控制 \\
+MCP 依赖影响运行 & 低 & 中 & requirements 声明依赖，提供单独启动脚本和测试 & 已控制 \\
+PPT/视频未完成 & 中 & 中 & 软件侧完成，最终提交说明列为材料项 & 待补充 \\
+\bottomrule
+\end{longtable}
+
+\section{配置管理}
+\subsection{配置项}
+\begin{longtable}{p{3.5cm}p{5cm}p{5.2cm}}
+\caption{配置项清单}\\
+\toprule
+类别 & 配置项 & 管理规则 \\
+\midrule
+\endfirsthead
+\toprule
+类别 & 配置项 & 管理规则 \\
+\midrule
+\endhead
+源码 & \code{backend/}、\code{frontend/}、\code{scripts/} & 纳入 Git 管理，提交前运行检查 \\
+数据 & \code{data/samples/}、\code{data/dictionaries/} & 样例数据与字典纳入仓库，运行期数据排除 \\
+知识库 & \code{knowledge_base/} & 作为问答和 RAG 素材纳入仓库 \\
+环境模板 & \code{.env.example} & 只存占位变量，不含真实密钥 \\
+真实环境 & \code{.env} & 本地私有文件，不提交、不打包 \\
+运行状态 & \code{data/runtime/} & 本地生成，不提交 \\
+最终材料 & \code{期末提交材料/} & 提交前整理源码、PDF、说明和演示材料 \\
+\bottomrule
+\end{longtable}
+
+\section{变更管理}
+项目后期不再进行第三轮任务分配，而采用集中优化方式。原因是系统主链路已经形成，继续分散开发会增加冲突和回归风险。后期变更原则为：只接受能明显提升演示质量、文档质量或验收通过率的变更；每次变更后检查是否影响 README、API、测试和提交材料；涉及密钥、数据和依赖的变更必须额外检查安全性。
+
+\section{交付管理}
+\subsection{最终交付物}
+最终交付应包含：源码、SRS、SDD/SDS、SEE、SEM、测试与验收报告、用户手册与部署说明、数据与接口说明、最终提交说明、PPT、演示视频或视频链接。
+
+\subsection{排除项}
+最终压缩包必须排除：\code{.env}、\code{frontend/node_modules/}、\code{frontend/dist/}、\code{data/runtime/}、\code{.pytest_cache/}、个人无关实验文件、临时日志和真实 API Key。
+
+\section{管理结论}
+从软件工程管理角度看，本项目已经完成范围定义、计划执行、多人分工、过程控制、质量验证、风险收敛和最终文档化。系统不需要再次分配开发任务，剩余工作集中在 PPT、视频和最终压缩包提交。项目具备最终提交条件。
+
+\clearpage
+\section{补充工程管理说明}
+\subsection{阶段计划与控制点}
+项目采用两轮任务分配加最终整合的方式推进。管理重点不是追求形式上的每日进度，而是保证每个阶段都有明确输入、输出、检查项和纠偏动作。
+\begin{longtable}{L{2.0cm}L{3.2cm}L{5.2cm}L{4.2cm}}
+\caption{阶段计划、产出与控制点}\\
+\toprule
+阶段 & 目标 & 主要产出 & 控制点 \\
+\midrule
+\endfirsthead
+\toprule
+阶段 & 目标 & 主要产出 & 控制点 \\
+\midrule
+\endhead
+S1 & 项目骨架 & README、目录结构、环境示例、基础文档和样例数据。 & 能够说明项目要做什么。 \\
+S2 & 第一次分工 & 后端、数据 AI、前端三个方向的独立任务说明。 & 边界清楚，减少合并冲突。 \\
+S3 & 第一次整合 & 统一接口、补齐测试、修复质量不足、形成第一版系统。 & 运行脚本通过。 \\
+S4 & 第二次分工 & 围绕系统完善、AI、3D、工单、报告和文档继续细化。 & 不再大规模改架构。 \\
+S5 & 第二次整合 & 合并成员提交，统一代码风格，补充缺失逻辑。 & 后端测试和前端构建通过。 \\
+S6 & 最终优化 & 扩充数据、优化 3D、工单持久化、统计分析和文档。 & 演示路径完整。 \\
+S7 & 正式文档 & SRS、SDD、SEE、SEM、测试、用户手册、数据接口和提交说明。 & PDF 可读且无密钥。 \\
+S8 & 最终交付 & 提交材料目录、源码副本、PDF、PPT 和视频。 & 按教师要求打包。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{风险登记册}
+风险管理关注对最终提交影响最大的事项，包括运行风险、文档风险、密钥风险和协作风险。
+\begin{longtable}{L{1.6cm}L{3.0cm}L{4.8cm}L{4.8cm}}
+\caption{风险登记册}\\
+\toprule
+编号 & 风险 & 影响 & 应对措施 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 风险 & 影响 & 应对措施 \\
+\midrule
+\endhead
+R-01 & 成员提交质量不均 & 接口、数据和页面可能无法直接整合。 & 整合者补齐缺口并用测试脚本作为质量闸门。 \\
+R-02 & 合并冲突 & 多人同时改同一文件导致返工。 & 任务边界按文件划分，尽量减少交叉修改。 \\
+R-03 & 数据量过少 & 演示显得像写死数据。 & 扩展到多建筑、多楼层、多时段。 \\
+R-04 & 业务逻辑单薄 & 教师可能认为项目只是查询页面。 & 增加楼层分析、设备分析、异常解释、工单闭环和报告。 \\
+R-05 & 外部模型不可用 & 问答功能演示失败。 & 本地知识库优先，外部模型可选。 \\
+R-06 & 真实密钥泄露 & GitHub 公开后造成安全和费用风险。 & .env 不入库，提交前模式搜索。 \\
+R-07 & 文档版面错误 & PDF 图表重叠或表格出页影响评分。 & 使用 LaTeX 重写并检查 Overfull 日志和页面预览。 \\
+R-08 & 演示刷新丢工单 & 交互逻辑显得不完整。 & 工单写入运行期 JSON。 \\
+R-09 & 前端构建失败 & 最终源码不可复现。 & 提交前运行 Vite build。 \\
+R-10 & 后端测试失败 & 接口口径不可信。 & pytest 作为提交前必须检查项。 \\
+R-11 & PPT 与系统不一致 & 答辩展示和实际功能脱节。 & PPT 以最终系统截图和文档为准。 \\
+R-12 & 压缩包结构混乱 & 教师难以找到正式文档和源码。 & 使用统一提交材料目录。 \\
+R-13 & 运行说明不足 & 同学或教师拉取后无法启动。 & README 和用户手册写明完整步骤。 \\
+R-14 & 系统过度依赖单机状态 & 换机器运行时工单数据缺失。 & 说明运行期数据可自动生成。 \\
+R-15 & 图表含义不清 & 评审无法理解业务价值。 & 文档为每张图补充文字解释。 \\
+R-16 & 时间线不真实 & 课程过程材料可能与实际开发不完全一致。 & 最终文档聚焦工程成果和可验收内容。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{质量检查矩阵}
+\begin{longtable}{L{2.4cm}L{4.0cm}L{4.5cm}L{3.5cm}}
+\caption{质量检查矩阵}\\
+\toprule
+检查对象 & 检查内容 & 通过标准 & 证据 \\
+\midrule
+\endfirsthead
+\toprule
+检查对象 & 检查内容 & 通过标准 & 证据 \\
+\midrule
+\endhead
+README & 环境、启动、测试、密钥说明 & 同学按说明可运行系统。 & 人工复现 \\
+后端 & 语法、接口、服务测试 & pytest 全部通过。 & 75 passed \\
+前端 & 构建、页面加载、交互 & Vite build 成功，页面可演示。 & 构建日志 \\
+数据 & 规模、字段、时间范围 & 覆盖 2026-03-01 至 2026-06-01。 & 数据字典 \\
+3D & 旋转、颜色、点击联动 & 异常楼层跳转统计分析。 & 浏览器验收 \\
+工单 & 创建、完成、排序、持久化 & 刷新后状态保留。 & 接口和人工测试 \\
+AI 问答 & 本地回答、模型选择、回退 & 无 Key 时不阻断演示。 & 问答测试 \\
+MCP & 工具、资源、提示词 & 可通过 MCP 调用项目能力。 & MCP 测试 \\
+SRS & 需求、用例、追踪矩阵 & 可说明系统范围。 & PDF \\
+SDD & 架构、模块、数据、状态机 & 可说明实现方案。 & PDF \\
+SEE & 成本、收益、定价、评价 & 覆盖教师经济分析要求。 & PDF \\
+SEM & 范围、过程、风险、质量 & 覆盖工程管理要求。 & PDF \\
+安全 & .env 和 Key & 最终材料不包含真实密钥。 & 模式搜索 \\
+提交包 & 源码、文档、PPT、视频 & 结构清晰，可直接上传。 & 目录清单 \\
+\bottomrule
+\end{longtable}
+
+\subsection{管理控制项}
+以下控制项覆盖项目过程监控和最终交付管理，是从“能做出来”到“能稳定提交”的管理保证。
+\begin{longtable}{L{1.8cm}L{3.2cm}L{6.4cm}L{4.0cm}}
+\caption{管理控制项}\\
+\toprule
+编号 & 控制项 & 控制说明 & 责任输出 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 控制项 & 控制说明 & 责任输出 \\
+\midrule
+\endhead
+MC-01 & 任务分解 & 对“任务分解”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-02 & 成员边界 & 对“成员边界”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-03 & 第一次整合 & 对“第一次整合”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-04 & 第二次整合 & 对“第二次整合”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-05 & 最终优化 & 对“最终优化”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-06 & 接口控制 & 对“接口控制”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-07 & 数据控制 & 对“数据控制”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-08 & 代码审查 & 对“代码审查”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-09 & 测试闸门 & 对“测试闸门”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-10 & 文档闸门 & 对“文档闸门”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-11 & 安全闸门 & 对“安全闸门”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-12 & 提交闸门 & 对“提交闸门”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-13 & 风险跟踪 & 对“风险跟踪”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-14 & 变更记录 & 对“变更记录”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-15 & 沟通机制 & 对“沟通机制”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-16 & 质量目标 & 对“质量目标”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-17 & 配置管理 & 对“配置管理”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-18 & 版本管理 & 对“版本管理”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-19 & 依赖管理 & 对“依赖管理”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-20 & 运行环境 & 对“运行环境”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-21 & 演示准备 & 对“演示准备”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-22 & PPT 协同 & 对“PPT 协同”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-23 & 视频协同 & 对“视频协同”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-24 & 最终打包 & 对“最终打包”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-25 & 密钥排查 & 对“密钥排查”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-26 & PDF 检查 & 对“PDF 检查”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-27 & 图表检查 & 对“图表检查”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-28 & 表格检查 & 对“表格检查”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-29 & README 检查 & 对“README 检查”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-30 & 部署检查 & 对“部署检查”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-31 & 验收路径 & 对“验收路径”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-32 & 问题记录 & 对“问题记录”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-33 & 纠偏动作 & 对“纠偏动作”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-34 & 经验总结 & 对“经验总结”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+MC-35 & 后续维护 & 对“后续维护”设置明确检查方式，发现问题后由整合者修复或协调相关同学补齐。 & 检查清单、提交记录或最终文档。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{过程证据清单}
+过程证据清单用于证明项目并非只提交最终代码，而是具备需求、设计、开发、测试、经济分析、管理控制和交付整理的完整过程。
+\begin{longtable}{L{1.7cm}L{4.0cm}L{6.2cm}L{3.6cm}}
+\caption{过程证据清单}\\
+\toprule
+编号 & 证据项 & 说明 & 存放位置 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 证据项 & 说明 & 存放位置 \\
+\midrule
+\endhead
+PE-01 & 第一次任务说明 & “第一次任务说明”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-02 & 第二次任务说明 & “第二次任务说明”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-03 & 整合说明 & “整合说明”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-04 & 接口契约 & “接口契约”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-05 & 数据字典 & “数据字典”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-06 & 测试计划 & “测试计划”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-07 & 验收报告 & “验收报告”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-08 & 运行脚本 & “运行脚本”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-09 & 环境示例 & “环境示例”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-10 & Git 忽略规则 & “Git 忽略规则”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-11 & 安全检查 & “安全检查”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-12 & 构建日志 & “构建日志”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-13 & 测试日志 & “测试日志”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-14 & 正式 PDF & “正式 PDF”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-15 & LaTeX 源文件 & “LaTeX 源文件”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-16 & 最终提交说明 & “最终提交说明”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-17 & 演示脚本 & “演示脚本”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-18 & PPT 准备 & “PPT 准备”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-19 & 视频准备 & “视频准备”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-20 & 提交目录 & “提交目录”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-21 & 源码副本 & “源码副本”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-22 & Markdown 过程资料 & “Markdown 过程资料”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-23 & 外部数据调研 & “外部数据调研”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-24 & 大模型接入说明 & “大模型接入说明”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-25 & MCP 说明 & “MCP 说明”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-26 & 最终 README & “最终 README”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-27 & 风险登记册 & “风险登记册”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-28 & 质量矩阵 & “质量矩阵”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-29 & 变更控制 & “变更控制”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+PE-30 & 维护建议 & “维护建议”用于支撑软件工程管理过程，能够说明项目从任务分解到最终提交的演进路径。 & 仓库文档或提交材料目录。 \\
+\bottomrule
+\end{longtable}
+
+\end{document}

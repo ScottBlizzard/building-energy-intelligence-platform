@@ -1,0 +1,324 @@
+
+\documentclass[12pt,a4paper]{ctexart}
+
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{etoolbox}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+
+\hypersetup{hidelinks}
+\urlstyle{same}
+\setlist{nosep}
+\captionsetup{font=small}
+\renewcommand{\arraystretch}{1.25}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.3em}
+\setlength{\tabcolsep}{4pt}
+\emergencystretch=3em
+\sloppy
+\makeatletter
+\g@addto@macro{\UrlBreaks}{\do\/\do\-\do\_\do\.\do\:}
+\makeatother
+\AtBeginEnvironment{longtable}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabularx}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabular}{\small\setlength{\tabcolsep}{3pt}}
+
+\newcommand{\studentname}{许奕}
+\newcommand{\studentid}{2351441}
+\newcommand{\teamname}{许奕、王天一、马源胜、周由}
+\newcommand{\coursename}{软件工程管理与经济}
+\newcommand{\projectname}{基于大模型的建筑能源智能管理与运维优化系统}
+\newcommand{\docversion}{V2.0}
+\newcommand{\docdate}{2026年5月31日}
+\newcommand{\code}[1]{{\footnotesize\nolinkurl{#1}}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\tikzset{
+  box/.style={rectangle, rounded corners, draw=cyan!55!black, fill=cyan!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  process/.style={rectangle, rounded corners, draw=teal!55!black, fill=teal!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  data/.style={cylinder, shape border rotate=90, aspect=0.25, draw=orange!70!black, fill=orange!10, thick, minimum height=12mm, align=center, inner sep=5pt},
+  risk/.style={diamond, draw=red!60!black, fill=red!8, thick, aspect=2, align=center, inner sep=2pt},
+  arrow/.style={-{Stealth[length=2.4mm]}, thick, draw=gray!70!black},
+  note/.style={rectangle, draw=gray!60, fill=gray!6, rounded corners, align=left, inner sep=6pt}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\coursename}
+\fancyhead[R]{\reporttitle}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{15pt}
+
+\title{
+    \vspace{-2em}
+    \heiti \zihao{2} \reporttitle \\
+    \vspace{1em}
+    \zihao{4} 课程期末项目正式交付文档
+}
+\author{
+    \songti \zihao{4}
+    项目名称：\projectname \\
+    项目组成员：\teamname \\
+    负责人：\studentname \quad 学号：\studentid
+}
+\date{\docdate}
+
+\newcommand{\reporttitle}{用户手册与部署说明}
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+
+\begin{abstract}
+本文档为《\projectname》的用户手册与部署说明，面向同学、评审人员和后续维护人员，说明如何获取代码、放置环境变量、安装依赖、启动后端、启动前端、启动 MCP Server、使用主要功能、处理常见问题和准备演示。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{运行前准备}
+\subsection{环境要求}
+\begin{table}[H]
+\centering
+\caption{运行环境要求}
+\begin{tabularx}{\textwidth}{p{4cm}Y}
+\toprule
+类别 & 要求 \\
+\midrule
+操作系统 & Windows 10/11，建议使用 PowerShell \\
+Python & Python 3.11 或兼容版本 \\
+Node.js & 支持 Vite 的 Node.js 版本 \\
+浏览器 & Edge、Chrome 或其他现代浏览器 \\
+网络 & 基础系统不强依赖外网；外部大模型需要网络和有效 API Key \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{代码获取}
+运行人员可从 GitHub 拉取代码：
+\begin{verbatim}
+git clone <GitHub 仓库地址>
+cd building-energy-intelligence-platform
+\end{verbatim}
+
+\subsection{环境变量}
+如果只演示基础系统，可复制模板：
+\begin{verbatim}
+Copy-Item .env.example .env
+\end{verbatim}
+如果需要启用外部大模型，应由项目负责人单独提供真实 \code{.env} 文件，并放在仓库根目录。真实 \code{.env} 不应放入 \code{backend/} 或 \code{frontend/}，不得提交到 GitHub，也不得放进最终 zip。
+
+\section{启动后端}
+\begin{verbatim}
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r backend\requirements.txt
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 `
+  --app-dir backend
+\end{verbatim}
+也可以直接运行脚本：
+\begin{verbatim}
+.\scripts\start-backend.ps1
+\end{verbatim}
+启动后可访问 \code{http://127.0.0.1:8000/docs} 查看接口文档，访问 \code{http://127.0.0.1:8000/api/v1/health} 检查健康状态。
+
+\section{启动前端}
+\begin{verbatim}
+cd frontend
+npm install
+npm run dev
+\end{verbatim}
+也可以在项目根目录运行：
+\begin{verbatim}
+.\scripts\start-frontend.ps1
+\end{verbatim}
+前端默认访问地址为 \code{http://127.0.0.1:5173}。后端和前端通常需要两个 PowerShell 窗口分别运行。
+
+\section{启动 MCP Server}
+默认 stdio 模式：
+\begin{verbatim}
+.\scripts\start-mcp.ps1
+\end{verbatim}
+HTTP 模式：
+\begin{verbatim}
+.\scripts\start-mcp.ps1 -Transport streamable-http `
+  -HostAddress 127.0.0.1 -Port 8765
+\end{verbatim}
+HTTP 模式地址为 \code{http://127.0.0.1:8765/mcp}。
+
+\section{页面功能说明}
+\subsection{总览}
+总览页展示系统 KPI、时间范围、总体指标和三维楼层风险态势。用户可以拖拽三维视图观察不同角度，点击红色楼层进入统计分析。
+
+\subsection{数据浏览}
+数据浏览页用于查询原始和派生后的能耗记录。用户可选择建筑、楼层、开始时间、结束时间和显示数量。该页面用于全量查询，不受三维楼层点击联动影响。
+
+\subsection{统计分析}
+统计分析页是异常诊断工作台。用户可按建筑、楼层和时间范围锁定分析对象。若选中异常楼层，页面优先展示异常明细、异常原因、楼层设备、趋势和建议；若选中健康楼层，页面只展示健康提示。
+
+\subsection{工单中心}
+工单中心支持从异常记录创建工单。用户选择建筑、楼层、异常记录和负责人后，系统生成“处理中”工单。处理中工单显示在顶部，完成后变为绿色并靠后显示。工单状态保存到本地 JSON 文件，刷新页面不会丢失。
+
+\subsection{决策报告}
+决策报告页汇总当前范围内的能耗、异常、工单和优化建议，并提供简单收益模拟。该页面适合答辩时展示系统的管理价值。
+
+\subsection{智能问答}
+智能问答页支持本地知识库问答和可选外部模型增强。若外部模型不可用，系统会回退到本地知识库，保证演示不中断。
+
+\section{推荐演示路径}
+\begin{enumerate}
+    \item 打开总览页，说明数据规模、建筑数量、时间范围和平均 COP。
+    \item 拖拽三维楼宇，点击红色异常楼层，展示页面自动跳转统计分析。
+    \item 在统计分析页查看异常明细，点击异常解释，说明触发规则和指标证据。
+    \item 进入工单中心，从异常创建工单，分配负责人，完成工单并刷新验证持久化。
+    \item 进入决策报告页，展示风险摘要、优化建议和收益模拟。
+    \item 进入智能问答页，提问“当前有哪些异常风险”或“哪些设备优先维护”。
+    \item 简要说明 MCP Server 可让 AI 客户端直接调用项目数据与分析工具。
+\end{enumerate}
+
+\section{常见问题}
+\begin{longtable}{p{4cm}p{9.8cm}}
+\caption{常见问题与处理}\\
+\toprule
+问题 & 处理方式 \\
+\midrule
+\endfirsthead
+\toprule
+问题 & 处理方式 \\
+\midrule
+\endhead
+前端无法连接后端 & 确认后端运行在 8000 端口，Vite 代理配置未改动 \\
+提示找不到数据文件 & 确认根目录存在 \code{data/samples/energy_records.csv}，不要从子目录启动错误脚本 \\
+外部模型无回答 & 检查 \code{.env} 中 API Key、base URL、model 是否有效；也可关闭 LLM 使用本地回答 \\
+工单刷新后丢失 & 检查 \code{data/runtime/work_orders.json} 是否可写 \\
+npm install 慢 & 可更换 npm 镜像，但不要提交 \code{node_modules} \\
+pytest 找不到模块 & 确认使用项目根目录运行检查脚本或正确设置 \code{PYTHONPATH} \\
+\bottomrule
+\end{longtable}
+
+\clearpage
+\section{补充用户操作手册}
+\subsection{页面任务说明}
+本节按用户实际操作任务组织，而不是按代码模块组织，便于第一次接触系统的同学或评审人员快速完成演示。
+\begin{longtable}{L{2.4cm}L{3.2cm}L{5.8cm}L{3.8cm}}
+\caption{用户任务、入口与操作结果}\\
+\toprule
+任务 & 入口 & 操作步骤 & 结果 \\
+\midrule
+\endfirsthead
+\toprule
+任务 & 入口 & 操作步骤 & 结果 \\
+\midrule
+\endhead
+查看系统状态 & 总览页 & 打开首页，等待 KPI 和三维楼宇加载。 & 掌握整体能耗和风险。 \\
+查看建筑风险 & 总览页 & 观察楼宇颜色和风险卡片。 & 发现异常楼层。 \\
+旋转 3D 视图 & 总览页 & 按住鼠标拖拽楼宇区域。 & 从不同角度观察楼群。 \\
+进入楼层分析 & 总览页 & 点击某个红色楼层。 & 跳转统计分析并锁定范围。 \\
+查询原始记录 & 数据浏览 & 选择建筑、楼层、时间和数量后刷新。 & 查看符合条件的记录。 \\
+导出记录 & 数据浏览 & 在筛选后点击导出。 & 下载 CSV 文件。 \\
+查看异常明细 & 统计分析 & 选择建筑、楼层和时间范围。 & 优先看到异常记录。 \\
+查看健康楼层 & 统计分析 & 选择无异常楼层。 & 只显示健康结论。 \\
+查看趋势 & 统计分析 & 选择有异常的范围并查看趋势模块。 & 了解能耗变化。 \\
+查看设备 & 统计分析 & 打开设备分析区域。 & 定位异常相关设备。 \\
+解释异常 & 统计分析 & 点击异常解释或详情。 & 看到规则、证据和建议。 \\
+创建工单 & 工单中心 & 选择建筑、楼层、异常和负责人。 & 生成处理中工单。 \\
+完成工单 & 工单中心 & 点击完成按钮。 & 工单变绿并移动到后部。 \\
+刷新验证 & 工单中心 & 刷新浏览器或重新进入页面。 & 工单状态仍保留。 \\
+查看日报 & 决策报告 & 进入页面并查看风险摘要。 & 获得管理建议和收益模拟。 \\
+使用问答 & AI 助手 & 选择模型或本地回答后输入问题。 & 获得能源运维回答。 \\
+查看模型 & AI 助手 & 打开模型选择下拉框。 & 看到可用模型选项。 \\
+查看 API & 后端 docs & 访问 \code{http://127.0.0.1:8000/docs}。 & 检查接口契约。 \\
+启动 MCP & 命令行 & 执行 MCP 启动脚本。 & 为 AI 客户端提供工具。 \\
+运行自检 & 项目根目录 & 执行 \code{scripts/check-project.ps1}。 & 确认测试和构建通过。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{常见问题排查}
+\begin{longtable}{L{2.8cm}L{4.0cm}L{5.0cm}L{2.0cm}}
+\caption{常见问题与处理方式}\\
+\toprule
+问题 & 可能原因 & 处理方式 & 优先级 \\
+\midrule
+\endfirsthead
+\toprule
+问题 & 可能原因 & 处理方式 & 优先级 \\
+\midrule
+\endhead
+前端打不开 & Vite 服务未启动或端口不是 5173。 & 重新执行前端启动脚本并查看终端输出。 & 高 \\
+接口报错 & 后端未启动或端口不是 8000。 & 启动后端并访问健康检查接口。 & 高 \\
+数据为空 & 筛选条件过窄或时间范围无记录。 & 重置筛选或选择有数据的时间段。 & 中 \\
+图表不显示 & 当前范围为健康楼层或无数据。 & 查看健康提示或扩大范围。 & 中 \\
+工单不保存 & 运行目录无法写入。 & 检查 \code{data/runtime/} 权限。 & 高 \\
+AI 没有外部回答 & 未配置真实 API Key。 & 使用本地知识库回答或补充 \code{.env}。 & 低 \\
+模型请求失败 & 网络、额度或 Key 错误。 & 检查提供商配置并允许系统回退。 & 中 \\
+MCP 启动失败 & 依赖或 transport 参数错误。 & 按数据接口文档检查命令。 & 中 \\
+PDF 乱码 & 未使用 XeLaTeX 或字体环境异常。 & 使用脚本重新编译并确认 MiKTeX 可用。 & 中 \\
+提交包太大 & 包含 \code{node_modules} 或 \code{dist}。 & 按提交说明删除依赖和构建产物。 & 高 \\
+\bottomrule
+\end{longtable}
+
+\subsection{培训与演示任务清单}
+该清单面向第一次运行项目的同学，用于保证其能够独立完成安装、演示和基本排查。
+\begin{longtable}{L{1.8cm}L{3.2cm}L{6.4cm}L{4.0cm}}
+\caption{培训与演示任务清单}\\
+\toprule
+编号 & 任务 & 操作说明 & 完成标志 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 任务 & 操作说明 & 完成标志 \\
+\midrule
+\endhead
+UT-01 & 环境准备 & 按照用户手册完成“环境准备”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-02 & 复制环境变量 & 按照用户手册完成“复制环境变量”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-03 & 安装后端依赖 & 按照用户手册完成“安装后端依赖”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-04 & 安装前端依赖 & 按照用户手册完成“安装前端依赖”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-05 & 启动后端 & 按照用户手册完成“启动后端”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-06 & 启动前端 & 按照用户手册完成“启动前端”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-07 & 打开总览 & 按照用户手册完成“打开总览”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-08 & 理解 KPI & 按照用户手册完成“理解 KPI”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-09 & 旋转楼宇 & 按照用户手册完成“旋转楼宇”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-10 & 点击楼层 & 按照用户手册完成“点击楼层”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-11 & 查询记录 & 按照用户手册完成“查询记录”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-12 & 筛选楼层 & 按照用户手册完成“筛选楼层”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-13 & 导出 CSV & 按照用户手册完成“导出 CSV”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-14 & 查看趋势 & 按照用户手册完成“查看趋势”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-15 & 查看异常 & 按照用户手册完成“查看异常”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-16 & 查看解释 & 按照用户手册完成“查看解释”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-17 & 查看设备 & 按照用户手册完成“查看设备”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-18 & 创建工单 & 按照用户手册完成“创建工单”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-19 & 完成工单 & 按照用户手册完成“完成工单”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-20 & 刷新验证 & 按照用户手册完成“刷新验证”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-21 & 查看日报 & 按照用户手册完成“查看日报”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-22 & 提出问题 & 按照用户手册完成“提出问题”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-23 & 选择模型 & 按照用户手册完成“选择模型”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-24 & 理解回退 & 按照用户手册完成“理解回退”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-25 & 启动 MCP & 按照用户手册完成“启动 MCP”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-26 & 查看 API 文档 & 按照用户手册完成“查看 API 文档”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-27 & 运行测试 & 按照用户手册完成“运行测试”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-28 & 编译文档 & 按照用户手册完成“编译文档”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-29 & 检查密钥 & 按照用户手册完成“检查密钥”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-30 & 整理提交包 & 按照用户手册完成“整理提交包”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-31 & 打开正式 PDF & 按照用户手册完成“打开正式 PDF”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-32 & 准备 PPT & 按照用户手册完成“准备 PPT”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-33 & 录制视频 & 按照用户手册完成“录制视频”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-34 & 答辩演示 & 按照用户手册完成“答辩演示”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+UT-35 & 故障排查 & 按照用户手册完成“故障排查”相关操作，遇到失败时先检查终端输出和常见问题表。 & 能够向他人复述操作目的和结果。 \\
+\bottomrule
+\end{longtable}
+
+\end{document}

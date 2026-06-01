@@ -1,0 +1,766 @@
+
+\documentclass[12pt,a4paper]{ctexart}
+
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{enumitem}
+\usepackage{etoolbox}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+
+\hypersetup{hidelinks}
+\urlstyle{same}
+\setlist{nosep}
+\captionsetup{font=small}
+\renewcommand{\arraystretch}{1.25}
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.3em}
+\setlength{\tabcolsep}{4pt}
+\emergencystretch=3em
+\sloppy
+\makeatletter
+\g@addto@macro{\UrlBreaks}{\do\/\do\-\do\_\do\.\do\:}
+\makeatother
+\AtBeginEnvironment{longtable}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabularx}{\small\setlength{\tabcolsep}{3pt}}
+\AtBeginEnvironment{tabular}{\small\setlength{\tabcolsep}{3pt}}
+
+\newcommand{\studentname}{许奕}
+\newcommand{\studentid}{2351441}
+\newcommand{\teamname}{许奕、王天一、马源胜、周由}
+\newcommand{\coursename}{软件工程管理与经济}
+\newcommand{\projectname}{基于大模型的建筑能源智能管理与运维优化系统}
+\newcommand{\docversion}{V2.0}
+\newcommand{\docdate}{2026年5月31日}
+\newcommand{\code}[1]{{\footnotesize\nolinkurl{#1}}}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+
+\tikzset{
+  box/.style={rectangle, rounded corners, draw=cyan!55!black, fill=cyan!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  process/.style={rectangle, rounded corners, draw=teal!55!black, fill=teal!8, thick, minimum height=8mm, align=center, inner sep=5pt},
+  data/.style={cylinder, shape border rotate=90, aspect=0.25, draw=orange!70!black, fill=orange!10, thick, minimum height=12mm, align=center, inner sep=5pt},
+  risk/.style={diamond, draw=red!60!black, fill=red!8, thick, aspect=2, align=center, inner sep=2pt},
+  arrow/.style={-{Stealth[length=2.4mm]}, thick, draw=gray!70!black},
+  note/.style={rectangle, draw=gray!60, fill=gray!6, rounded corners, align=left, inner sep=6pt}
+}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\coursename}
+\fancyhead[R]{\reporttitle}
+\fancyfoot[C]{\thepage}
+\setlength{\headheight}{15pt}
+
+\title{
+    \vspace{-2em}
+    \heiti \zihao{2} \reporttitle \\
+    \vspace{1em}
+    \zihao{4} 课程期末项目正式交付文档
+}
+\author{
+    \songti \zihao{4}
+    项目名称：\projectname \\
+    项目组成员：\teamname \\
+    负责人：\studentname \quad 学号：\studentid
+}
+\date{\docdate}
+
+\newcommand{\reporttitle}{SRS 软件需求规格说明书}
+\begin{document}
+
+\maketitle
+\thispagestyle{fancy}
+
+\begin{abstract}
+本文档为课程期末项目《\projectname》的软件需求规格说明书，采用正式 SRS 结构描述系统目标、业务背景、用户角色、系统边界、功能需求、非功能需求、数据需求、外部接口和验收标准。本文档的需求基线来自项目最终实现版本：系统已形成 FastAPI 后端、Vue 前端、建筑能耗样例数据、异常分析、三维楼层态势、工单闭环、知识库问答、可选外部大模型和 MCP Server。文档中的功能项与代码仓库、测试脚本和最终演示路径保持一致，可作为评审、验收、答辩和后续维护的需求依据。
+\end{abstract}
+
+\tableofcontents
+\newpage
+
+\section{文档控制}
+\begin{longtable}{p{4cm}p{10.5cm}}
+\toprule
+项目 & 内容 \\
+\midrule
+文档名称 & SRS 软件需求规格说明书 \\
+文档版本 & \docversion \\
+适用阶段 & 期末项目最终提交、系统演示、验收评审、后续维护 \\
+项目范围 & Web 前端、FastAPI 后端、MCP Server、样例数据集、知识库、测试脚本和交付文档 \\
+关联文档 & SDD 软件设计说明书、SEE 软件经济分析与评价、SEM 软件工程管理说明、测试与验收报告、用户手册与部署说明 \\
+参考资料 & IEEE 风格 SRS 文档结构；同类课程项目文档组织方式参考 \url{https://github.com/L-Dramatic/Intelligent-Contract-Management-System} \\
+\bottomrule
+\end{longtable}
+
+\section{引言}
+\subsection{编写目的}
+本文档用于明确本系统的业务问题、用户需求、软件功能、外部接口、数据约束、非功能要求和验收标准。它解决三个问题：第一，系统到底要完成哪些业务任务；第二，哪些功能属于本次课程项目边界，哪些属于后续扩展；第三，评审人员如何根据文档检查系统是否已经满足课程项目要求。
+
+\subsection{项目背景}
+校园建筑能源管理通常存在数据分散、异常发现滞后、设备状态难以追踪、人工巡检依赖经验、节能措施缺少量化依据等问题。传统的表格统计方式能够记录用电、用水和设备运行数据，但很难支撑快速定位“哪栋楼、哪一层、哪类设备、什么时段出现异常”。本项目以校园建筑能源管理为场景，构建一个可运行的智能管理与运维优化平台，将数据查询、统计分析、异常解释、三维风险态势、工单处理、决策报告和智能问答组合成完整业务闭环。
+
+\subsection{系统目标}
+系统目标不是单纯展示几张图表，而是完成从数据到处置的闭环。具体目标如下：
+\begin{enumerate}
+    \item 建立标准化建筑能耗样例数据集，覆盖多建筑、多时段、多设备和多指标。
+    \item 提供按建筑、楼层、时间范围的查询和导出能力，支撑数据追溯。
+    \item 提供总览、趋势、建筑对比、COP 排名、异常原因、楼层分析和设备分析。
+    \item 使用可解释规则定位异常，并输出触发规则、指标证据和处理建议。
+    \item 使用三维楼宇视图展示楼层健康状态，并与统计分析页面联动。
+    \item 建立异常工单闭环，使异常能够被分派、跟踪和完成。
+    \item 提供本地知识库问答和可选外部大模型增强，提升运维解释能力。
+    \item 提供 MCP Server，使 AI 客户端能够通过协议调用项目数据和分析能力。
+\end{enumerate}
+
+\section{产品范围与业务边界}
+\subsection{产品定位}
+本系统定位为课程项目级“建筑能源智能管理与运维优化原型系统”。它不直接接入真实楼宇自控系统，也不承担法定能源审计责任；它面向教学演示、工程管理课程评审和后续原型扩展，重点体现软件工程中的需求、设计、实现、测试、部署、经济分析和项目管理闭环。
+
+\subsection{业务边界}
+\begin{table}[H]
+\centering
+\caption{系统业务边界}
+\begin{tabularx}{\textwidth}{p{3.2cm}YY}
+\toprule
+类别 & 纳入本期范围 & 不纳入本期范围 \\
+\midrule
+数据来源 & 样例 CSV 数据、数据字典、知识库 Markdown、运行期工单 JSON & 实时电表、真实楼宇自控系统、真实收费账单 \\
+业务功能 & 查询、统计、异常、工单、报告、问答、MCP 接入 & 多租户权限、组织审批流、企业级审计 \\
+算法能力 & 可解释规则、COP 计算、建筑基线、楼层聚合 & 大规模模型训练、在线学习、真实预测竞赛模型 \\
+部署形态 & 本地开发部署、课程演示部署、MCP 本地接入 & 高可用生产集群、移动端 App、IoT 边缘网关 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{系统上下文图}
+\begin{figure}[H]
+\centering
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[node distance=12mm and 16mm]
+\node[box, minimum width=29mm] (manager) {能源管理人员};
+\node[box, below=of manager, minimum width=29mm] (worker) {运维人员};
+\node[box, below=of worker, minimum width=29mm] (teacher) {评审人员};
+\node[process, right=32mm of worker, minimum width=42mm, minimum height=24mm] (system) {建筑能源智能\\管理平台};
+\node[data, right=30mm of system, minimum width=32mm] (dataset) {能耗 CSV\\工单 JSON};
+\node[data, above=of dataset, minimum width=32mm] (kb) {知识库\\Markdown};
+\node[box, below=of dataset, minimum width=32mm] (llm) {外部大模型\\可选};
+\node[box, below=of system, minimum width=42mm] (mcp) {支持 MCP 的\\AI 客户端};
+\draw[arrow] (manager) -- node[above, sloped]{查看报表} (system);
+\draw[arrow] (worker) -- node[above, sloped]{处理异常} (system);
+\draw[arrow] (teacher) -- node[above, sloped]{验收演示} (system);
+\draw[arrow] (system) -- node[above]{读写} (dataset);
+\draw[arrow] (system) -- node[right]{检索} (kb);
+\draw[arrow] (system) -- node[right]{增强问答} (llm);
+\draw[arrow] (mcp) -- node[right]{协议调用} (system);
+\end{tikzpicture}
+}
+\caption{系统上下文与外部角色}
+\end{figure}
+
+\section{用户角色与使用场景}
+\begin{longtable}{p{3.2cm}p{4.4cm}p{6.8cm}}
+\caption{用户角色定义}\\
+\toprule
+角色 & 核心诉求 & 典型任务 \\
+\midrule
+\endfirsthead
+\toprule
+角色 & 核心诉求 & 典型任务 \\
+\midrule
+\endhead
+能源管理人员 & 掌握整体能耗、异常趋势和节能空间 & 查看总览 KPI、建筑对比、COP 排名、运营报告和节能建议 \\
+运维人员 & 快速定位异常并形成处理记录 & 查看异常明细、解释异常、创建工单、更新工单状态、确认处理结果 \\
+项目管理者 & 评估系统价值和交付完整性 & 查看经济分析、工程管理、测试报告、最终提交清单 \\
+任课教师与评审人员 & 验证系统是否满足期末项目要求 & 按 README 运行系统，检查 SRS、SDD、SEE、SEM、源码和演示路径 \\
+AI 客户端或智能体 & 通过标准协议调用项目能力 & 使用 MCP Tools 查询数据、获取异常解释、生成运营报告和检索知识库 \\
+\bottomrule
+\end{longtable}
+
+\section{业务流程需求}
+\subsection{核心业务流程}
+\begin{figure}[H]
+\centering
+\resizebox{0.98\textwidth}{!}{%
+\begin{tikzpicture}[x=1cm,y=1cm,every node/.style={font=\small}]
+\node[process, minimum width=2.4cm, minimum height=0.9cm] (data) at (0,0) {1 数据读取\\字段校验};
+\node[process, minimum width=2.7cm, minimum height=0.9cm] (query) at (3.0,0) {2 查询筛选\\建筑/楼层/时间};
+\node[process, minimum width=2.8cm, minimum height=0.9cm] (analysis) at (6.2,0) {3 统计分析\\趋势/COP/对比};
+\node[risk, minimum width=2.3cm, minimum height=1.0cm] (risk) at (9.4,0) {4 异常\\判断};
+\node[process, minimum width=2.7cm, minimum height=0.9cm] (explain) at (9.4,-2.1) {5 异常解释\\证据与建议};
+\node[process, minimum width=2.7cm, minimum height=0.9cm] (order) at (6.2,-2.1) {6 生成工单\\分派负责人};
+\node[process, minimum width=2.7cm, minimum height=0.9cm] (finish) at (3.0,-2.1) {7 处理完成\\状态持久化};
+\node[process, minimum width=2.8cm, minimum height=0.9cm] (report) at (0,-2.1) {8 运营报告\\管理建议};
+
+\draw[arrow] (data) -- (query);
+\draw[arrow] (query) -- (analysis);
+\draw[arrow] (analysis) -- (risk);
+\draw[arrow] (risk) -- node[right, fill=white, inner sep=1pt]{异常} (explain);
+\draw[arrow] (explain) -- (order);
+\draw[arrow] (order) -- (finish);
+\draw[arrow] (finish) -- (report);
+\draw[arrow, dashed] (analysis.south) -- node[right, fill=white, inner sep=1pt]{统计结果} (order.north);
+\end{tikzpicture}
+}
+\caption{从数据到工单的业务闭环}
+\end{figure}
+
+\subsection{用例列表}
+\begin{longtable}{p{2cm}p{3.2cm}p{3cm}p{5.8cm}}
+\caption{主要用例}\\
+\toprule
+编号 & 用例名称 & 主要参与者 & 成功结果 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 用例名称 & 主要参与者 & 成功结果 \\
+\midrule
+\endhead
+UC-01 & 查看系统总览 & 能源管理人员 & 展示记录数、建筑数、平均 COP、异常数量和总能耗 \\
+UC-02 & 浏览能耗记录 & 能源管理人员 & 按建筑、楼层、时间和数量筛选记录，表格字段完整 \\
+UC-03 & 导出查询数据 & 能源管理人员 & 下载当前筛选范围 CSV，文件可被表格软件打开 \\
+UC-04 & 查看统计分析 & 管理人员 & 展示趋势、异常、楼层、设备、推荐和全局对比 \\
+UC-05 & 查看健康楼层 & 管理人员 & 绿色楼层只显示健康结论，不出现无意义空模块 \\
+UC-06 & 点击三维楼层 & 运维人员 & 跳转统计分析并自动锁定对应建筑和楼层 \\
+UC-07 & 解释异常记录 & 运维人员 & 输出触发规则、关键指标、结论和建议动作 \\
+UC-08 & 创建异常工单 & 运维人员 & 选择异常、分配负责人，生成处理中工单 \\
+UC-09 & 完成异常工单 & 运维人员 & 工单变为已完成并持久化，刷新后仍保留 \\
+UC-10 & 生成决策报告 & 管理人员 & 输出风险摘要、工单状态、优化建议和收益测算 \\
+UC-11 & 使用智能问答 & 管理人员 & 基于知识库和项目数据回答能源运维问题 \\
+UC-12 & MCP 查询项目能力 & AI 客户端 & 通过 MCP Tools 获取数据、统计、异常解释和报告 \\
+\bottomrule
+\end{longtable}
+
+\subsection{用例图}
+\begin{figure}[H]
+\centering
+\resizebox{0.98\textwidth}{!}{%
+\begin{tikzpicture}[every node/.style={font=\scriptsize}]
+\tikzstyle{actorbox}=[draw=teal!75!black, rounded corners=3pt, fill=teal!6,
+    minimum width=23mm, minimum height=8mm, align=center]
+\tikzstyle{usecase}=[ellipse, draw=teal!70!black, fill=teal!7,
+    minimum width=27mm, minimum height=8mm, align=center]
+\tikzstyle{riskcase}=[ellipse, draw=red!65!black, fill=red!7,
+    minimum width=27mm, minimum height=8mm, align=center]
+\tikzstyle{workcase}=[ellipse, draw=orange!80!black, fill=orange!9,
+    minimum width=27mm, minimum height=8mm, align=center]
+\tikzstyle{aicase}=[ellipse, draw=cyan!70!black, fill=cyan!7,
+    minimum width=27mm, minimum height=8mm, align=center]
+\tikzstyle{verifycase}=[ellipse, draw=gray!70, fill=gray!8,
+    minimum width=27mm, minimum height=8mm, align=center]
+
+\draw[rounded corners=6pt, draw=gray!60, fill=gray!3] (0,-4.95) rectangle (10.5,2.55);
+\node[font=\small] at (5.25,2.25) {建筑能源智能管理平台};
+
+\node[actorbox] (energy) at (-1.65,0.75) {能源管理\\人员};
+\node[actorbox] (reviewer) at (-1.65,-3.7) {评审人员};
+\node[actorbox] (operator) at (12.15,-0.8) {运维人员};
+\node[actorbox] (agent) at (12.15,-3.3) {AI 客户端};
+
+\node[usecase] (uc01) at (2.0,1.35) {查看总览};
+\node[usecase] (uc02) at (2.0,0.25) {查询与导出};
+\node[usecase] (uc03) at (2.0,-0.85) {统计分析};
+\node[aicase] (uc07) at (2.0,-1.95) {决策报告};
+\node[verifycase] (uc10) at (2.0,-3.7) {测试与验收};
+
+\node[workcase] (uc05) at (7.6,0.65) {三维楼层};
+\node[riskcase] (uc04) at (7.6,-0.55) {异常解释};
+\node[workcase] (uc06) at (7.6,-1.75) {工单闭环};
+\node[aicase] (uc08) at (7.6,-3.0) {智能问答};
+\node[aicase] (uc09) at (7.6,-4.15) {MCP 调用};
+
+\draw[-{Stealth[length=2mm]}, thick] (energy.east) -- (-0.25,0.75) |- (uc01.west);
+\draw[-{Stealth[length=2mm]}, thick] (energy.east) -- (-0.25,0.75) |- (uc02.west);
+\draw[-{Stealth[length=2mm]}, thick] (energy.east) -- (-0.25,0.75) |- (uc03.west);
+\draw[-{Stealth[length=2mm]}, thick] (energy.east) -- (-0.25,0.75) |- (uc07.west);
+\draw[-{Stealth[length=2mm]}, thick] (operator.west) -- (10.75,-0.8) |- (uc05.east);
+\draw[-{Stealth[length=2mm]}, thick] (operator.west) -- (10.75,-0.8) |- (uc04.east);
+\draw[-{Stealth[length=2mm]}, thick] (operator.west) -- (10.75,-0.8) |- (uc06.east);
+\draw[-{Stealth[length=2mm]}, thick] (reviewer.east) -- (-0.25,-3.7) |- (uc10.west);
+\draw[-{Stealth[length=2mm]}, thick] (agent.west) -- (10.75,-3.3) |- (uc08.east);
+\draw[-{Stealth[length=2mm]}, thick] (agent.west) -- (10.75,-3.3) |- (uc09.east);
+
+\draw[-{Stealth[length=2mm]}, dashed] (uc04.south) -- node[right, font=\tiny]{支撑} (uc06.north);
+\node[font=\tiny, align=center, text=gray!70] at (5.25,-4.72)
+{说明：三维楼层联动统计分析；异常解释支撑工单闭环；智能问答可调用 MCP 工具。};
+\end{tikzpicture}
+}
+\caption{系统用例图}
+\end{figure}
+
+\subsection{关键用例详细说明}
+\begin{longtable}{L{1.5cm}L{2.6cm}L{3.4cm}L{3.4cm}L{3.2cm}}
+\caption{关键用例规约}\\
+\toprule
+编号 & 触发条件 & 主成功场景 & 异常或替代场景 & 验收标准 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 触发条件 & 主成功场景 & 异常或替代场景 & 验收标准 \\
+\midrule
+\endhead
+UC-01 & 用户进入总览页 & 系统加载总览、建筑、楼层风险和趋势数据 & 后端未启动时显示接口错误提示 & KPI 与接口返回一致 \\
+UC-02 & 用户设置查询条件 & 系统按建筑、楼层、时间和数量返回记录 & 条件为空时返回默认范围；无数据时显示空状态 & 表格字段完整且数量正确 \\
+UC-03 & 用户点击导出 & 后端按筛选条件生成 CSV 下载 & 无数据时导出空结果或提示无记录 & CSV 可打开且字段一致 \\
+UC-04 & 用户切换统计范围 & 系统刷新异常、趋势、楼层、设备和建议模块 & 健康楼层只显示健康结论 & 异常条数与筛选范围一致 \\
+UC-05 & 用户点击三维楼层 & 系统跳转统计分析并锁定建筑楼层 & 点击健康楼层时不展示空图表 & 页面联动准确 \\
+UC-06 & 用户点击异常解释 & 系统返回触发规则、指标证据和建议动作 & 记录不存在时返回空对象 & 解释内容可支持运维判断 \\
+UC-07 & 用户创建工单 & 系统选择异常、负责人并生成处理中工单 & 重复创建时由用户确认是否继续 & 工单刷新后仍存在 \\
+UC-08 & 用户完成工单 & 系统更新状态、排序和颜色 & 工单不存在时返回 404 & 已完成工单置后且绿色显示 \\
+UC-09 & 用户发起问答 & 系统检索知识库并可选调用外部模型 & 外部模型失败时回退本地回答 & 回答包含项目数据或知识库依据 \\
+UC-10 & AI 客户端调用 MCP & MCP Server 调用同一服务层返回数据或报告 & transport 配置错误时启动失败并提示 & MCP 工具可列出并调用 \\
+\bottomrule
+\end{longtable}
+
+\section{功能需求}
+\subsection{需求优先级定义}
+本项目采用 Must、Should、Could 三档优先级。Must 表示最终演示和验收必须具备；Should 表示对系统完整性有明显帮助，当前版本已实现或基本实现；Could 表示可作为后续扩展。
+
+\begin{longtable}{p{2cm}p{3.5cm}p{1.7cm}p{5.3cm}p{2.2cm}}
+\caption{功能需求清单}\\
+\toprule
+编号 & 功能名称 & 优先级 & 需求描述 & 实现证据 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 功能名称 & 优先级 & 需求描述 & 实现证据 \\
+\midrule
+\endhead
+FR-01 & 数据集与数据字典 & Must & 系统应提供 2,976 条建筑能耗样例数据，字段含义、类型、单位和用途应可追溯。 & \code{data/} \\
+FR-02 & 数据元信息 & Must & 系统应返回字段列表、建筑清单、记录数量、建筑数量和时间范围。 & \code{/dataset-meta} \\
+FR-03 & 数据总览 & Must & 系统应展示总记录数、建筑数、平均 COP、异常记录数、时间范围和能耗合计。 & \code{/overview} \\
+FR-04 & 数据浏览 & Must & 系统应支持按建筑、楼层、开始时间、结束时间和数量上限筛选能耗记录。 & \code{/records} \\
+FR-05 & CSV 导出 & Should & 系统应支持按当前筛选条件导出 CSV 文件。 & \code{/export/csv} \\
+FR-06 & 时间序列统计 & Must & 系统应支持小时、日、周、月粒度汇总电耗、水耗、空调电耗、制冷量和 COP。 & \code{/analytics/time-summary} \\
+FR-07 & 建筑对比 & Must & 系统应比较各建筑总电耗、水耗、空调电耗、制冷量和平均 COP。 & \code{/analytics/building-comparison} \\
+FR-08 & COP 排名 & Must & 系统应按建筑平均 COP 排名，识别制冷效率差异。 & \code{/analytics/cop-ranking} \\
+FR-09 & 异常识别 & Must & 系统应依据设备状态、建筑基线、COP 阈值和夜间负荷规则识别异常。 & \code{analysis_service.py} \\
+FR-10 & 异常明细 & Must & 系统应在选定建筑/楼层/时间范围内优先展示异常记录。 & \code{/analytics/anomalies} \\
+FR-11 & 异常原因统计 & Should & 系统应按异常原因统计数量，用于图表展示和诊断。 & \code{/analytics/anomaly-reasons} \\
+FR-12 & 异常解释 & Must & 系统应对单条异常输出触发规则、指标证据、严重程度和建议动作。 & \code{/anomaly-explanations} \\
+FR-13 & 楼层分析 & Must & 系统应派生楼层标签并统计楼层能耗、COP、异常数量和健康状态。 & \code{/floor-summary} \\
+FR-14 & 设备分析 & Should & 系统应统计设备点位、设备类型、状态、最近出现时间和维护提示。 & \code{/equipment-summary} \\
+FR-15 & 三维风险视图 & Must & 系统应以可拖拽三维楼宇展示楼层健康状态，并支持点击联动统计分析。 & 前端总览页 \\
+FR-16 & 工单闭环 & Must & 系统应支持从异常创建工单、分配负责人、完成工单和持久化状态。 & \code{/work-orders} \\
+FR-17 & 决策报告 & Should & 系统应生成运营日报，汇总风险、工单、优化建议和收益模拟。 & \code{/operation-report} \\
+FR-18 & 智能问答 & Should & 系统应基于本地知识库回答问题，并在配置外部模型时增强回答。 & \code{/assistant/query} \\
+FR-19 & 外部模型选择 & Should & 页面应展示可用模型选项，允许选择不同 OpenAI-compatible 提供商。 & \code{/assistant/providers} \\
+FR-20 & MCP Server & Must & 系统应通过 MCP Tools/Resources 暴露数据、分析、异常解释、知识检索和问答能力。 & \code{mcp_server.py} \\
+\bottomrule
+\end{longtable}
+
+\section{数据需求}
+\subsection{数据规模与时间范围}
+最终数据集位于 \code{data/samples/energy_records.csv}，包含 2,976 条原始记录、16 个原始字段、4 栋建筑，时间范围为 2026-03-01 00:00:00 至 2026-06-01 21:00:00。分析服务会在运行时派生楼层、区域、设备类型、COP、动态阈值、异常标记和异常原因等字段，分析层共形成 30 个字段。
+
+\begin{table}[H]
+\centering
+\caption{数据集关键指标}
+\begin{tabularx}{\textwidth}{p{4cm}Y}
+\toprule
+指标 & 当前取值 \\
+\midrule
+原始记录数 & 2,976 条 \\
+建筑数量 & 4 栋：综合教学楼A、行政办公楼B、图书信息楼C、科研实验楼D \\
+原始字段数 & 16 个 \\
+分析层字段数 & 30 个 \\
+楼层标签 & 1F、2F、3F、4F、5F、B1 机房、RF 屋顶 \\
+建筑-楼层组合 & 14 个 \\
+设备点位 & 28 个派生运维设备点位 \\
+异常记录 & 548 条分析异常 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection{核心字段}
+\begin{longtable}{p{3.7cm}p{2.2cm}p{7.6cm}}
+\caption{核心数据字段}\\
+\toprule
+字段 & 类型 & 说明 \\
+\midrule
+\endfirsthead
+\toprule
+字段 & 类型 & 说明 \\
+\midrule
+\endhead
+\code{record_id} & string & 能耗记录唯一编号 \\
+\code{building_id} & string & 建筑唯一编号，例如 BLD-A \\
+\code{building_name} & string & 建筑展示名称 \\
+\code{building_type} & string & 建筑类型，用于不同业务场景解释 \\
+\code{timestamp} & datetime & 采集时间戳，当前粒度为 3 小时 \\
+\code{electricity_kwh} & float & 当前时间粒度下总电耗 \\
+\code{water_m3} & float & 当前时间粒度下用水量 \\
+\code{hvac_kwh} & float & 空调系统电耗 \\
+\code{cooling_load_kwh} & float & 制冷负荷折算值 \\
+\code{environment_temp_c} & float & 室外环境温度 \\
+\code{humidity_rh} & float & 相对湿度 \\
+\code{occupancy_density_per_100m2} & float & 每百平方米人员密度 \\
+\code{equipment_id} & string & 原始或派生设备编号 \\
+\code{equipment_status} & string & 设备状态，normal 或 abnormal \\
+\code{floor_label} & derived & 运行时派生楼层标签 \\
+\code{average_cop} & derived & 制冷量与空调电耗比值，用于能效判断 \\
+\code{is_anomaly} & derived & 是否触发异常规则 \\
+\code{anomaly_reason} & derived & 异常原因说明 \\
+\bottomrule
+\end{longtable}
+
+\section{外部接口需求}
+\subsection{REST API}
+REST API 前缀为 \code{/api/v1}，前端通过 \code{frontend/src/lib/api.js} 统一调用。接口应返回 JSON，并对无数据、参数错误或文件异常给出明确错误信息。
+
+\begin{longtable}{p{4.2cm}p{2.2cm}p{7.5cm}}
+\caption{REST API 需求}\\
+\toprule
+路径 & 方法 & 功能 \\
+\midrule
+\endfirsthead
+\toprule
+路径 & 方法 & 功能 \\
+\midrule
+\endhead
+\code{/health} & GET & 健康检查 \\
+\code{/overview} & GET & 系统总览指标 \\
+\code{/dataset-meta} & GET & 数据集元信息 \\
+\code{/buildings} & GET & 建筑下拉选项 \\
+\code{/records} & GET & 能耗记录查询 \\
+\code{/analytics/time-summary} & GET & 时间序列汇总 \\
+\code{/analytics/building-comparison} & GET & 建筑对比 \\
+\code{/analytics/cop-ranking} & GET & COP 排名 \\
+\code{/analytics/anomalies} & GET & 异常明细 \\
+\code{/analytics/anomaly-explanations/\{record_id\}} & GET & 单条异常解释 \\
+\code{/analytics/floor-summary} & GET & 楼层汇总 \\
+\code{/analytics/equipment-summary} & GET & 设备汇总 \\
+\code{/analytics/operation-report} & GET & 运营日报 \\
+\code{/work-orders} & GET/POST & 查询和创建持久化工单 \\
+\code{/work-orders/\{id\}} & PATCH & 更新工单状态和备注 \\
+\code{/assistant/query} & POST & 智能问答 \\
+\code{/assistant/providers} & GET & 可用外部模型选项 \\
+\bottomrule
+\end{longtable}
+
+\subsection{MCP 接口}
+MCP Server 应支持 stdio 和 streamable-http 两种启动模式。MCP Tools 应覆盖数据元信息、建筑清单、能耗记录查询、总览、时间汇总、建筑对比、COP 排名、异常、异常解释、楼层汇总、设备汇总、工单建议、优化建议、运营报告、知识库检索和问答。MCP Resources 应至少包括数据集元信息、建筑清单、运营报告和知识库入口。
+
+\subsection{环境变量接口}
+真实 API Key 只能存放在仓库根目录 \code{.env}。提交仓库和最终压缩包时不得包含真实 \code{.env}。系统应提供 \code{.env.example} 作为配置模板，说明 \code{LLM_ENABLED}、\code{LLM_PROVIDER}、\code{LLM_BASE_URL}、\code{LLM_MODEL}、\code{LLM_API_KEY} 等变量。
+
+\section{非功能需求}
+\begin{longtable}{p{2cm}p{3.4cm}p{6.5cm}p{2.6cm}}
+\caption{非功能需求}\\
+\toprule
+编号 & 类别 & 要求 & 验收方式 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 类别 & 要求 & 验收方式 \\
+\midrule
+\endhead
+NFR-01 & 可运行性 & 同学拉取仓库后，应能根据 README 安装依赖、放置 \code{.env}、启动前后端并访问页面。 & README 演示 \\
+NFR-02 & 可测试性 & 后端应提供 pytest 测试，前端应可构建，项目应提供一键检查脚本。 & \code{check-project.ps1} \\
+NFR-03 & 可解释性 & 异常判断应说明触发规则和指标证据，避免黑箱结论。 & 异常解释页 \\
+NFR-04 & 安全性 & 真实 API Key 不得提交；运行期工单数据不污染仓库。 & Git 检查 \\
+NFR-05 & 可维护性 & REST API 和 MCP Server 应复用同一服务层，减少口径不一致。 & 代码检查 \\
+NFR-06 & 性能 & 课程数据规模下，查询和图表刷新应在本地普通电脑上可交互完成。 & 人工测试 \\
+NFR-07 & 可演示性 & 5 至 8 分钟内应能展示总览、查询、分析、3D、工单、报告、问答和文档。 & 演示脚本 \\
+NFR-08 & 可扩展性 & 后续应可替换 CSV 为数据库、增加权限、接入真实设备和扩展模型。 & 设计说明 \\
+\bottomrule
+\end{longtable}
+
+\section{需求追踪矩阵}
+\begin{longtable}{p{2.2cm}p{4.2cm}p{4.2cm}p{3.5cm}}
+\caption{需求追踪矩阵}\\
+\toprule
+需求编号 & 设计/实现位置 & 测试或验收证据 & 用户价值 \\
+\midrule
+\endfirsthead
+\toprule
+需求编号 & 设计/实现位置 & 测试或验收证据 & 用户价值 \\
+\midrule
+\endhead
+FR-01 至 FR-04 & \code{data_loader.py}、\code{data.py}、数据浏览页 & 数据接口测试、页面查询 & 数据可查、可追溯 \\
+FR-05 至 FR-08 & \code{export.py}、\code{analysis_service.py}、图表组件 & 导出测试、统计接口测试 & 管理者掌握能耗结构 \\
+FR-09 至 FR-14 & 异常规则、楼层和设备分析服务 & 异常接口测试、人工验收 & 异常可解释、可定位 \\
+FR-15 & \code{BuildingRiskScene.vue}、总览页联动逻辑 & 浏览器操作验证 & 风险态势直观展示 \\
+FR-16 & \code{work_orders.py}、\code{work_order_store.py} & 工单接口测试、刷新验证 & 运维形成闭环 \\
+FR-17 & \code{build_operation_report}、决策报告页 & 报告接口测试 & 汇报和决策支持 \\
+FR-18 至 FR-19 & \code{assistant_service.py}、\code{llm_client.py} & 问答接口测试、模型配置测试 & 智能问答与模型扩展 \\
+FR-20 & \code{mcp_server.py}、MCP 测试 & MCP 集成测试 & 支持 AI 客户端接入 \\
+\bottomrule
+\end{longtable}
+
+\section{验收标准}
+系统最终验收应满足以下条件：
+\begin{enumerate}
+    \item 后端自动化测试全部通过，当前基线为 75 passed。
+    \item 前端生产构建成功，页面能够访问并完成核心演示路径。
+    \item \code{scripts/check-project.ps1} 能正确执行并在失败时返回失败。
+    \item README 能指导运行人员完成从拉取、配置、启动到访问的完整流程。
+    \item SRS、SDD、SEE、SEM、测试验收、用户部署、数据接口和提交说明均已形成 PDF。
+    \item 最终提交材料不包含真实 \code{.env}、API Key、\code{node_modules}、前端构建缓存和运行期工单状态。
+    \item 系统演示能够覆盖总览、数据浏览、统计分析、三维楼层、工单中心、决策报告、智能问答和 MCP 说明。
+\end{enumerate}
+
+\clearpage
+\section{补充需求规格}
+\subsection{功能需求细化}
+本节对前述功能需求进一步展开，强调每项需求的输入、处理、输出和验收口径。这样做的目的不是重复列功能，而是把课堂演示中的“能看到页面”转化为可检查、可追踪、可测试的软件需求。
+\begin{longtable}{L{1.7cm}L{2.8cm}L{6.2cm}L{4.5cm}}
+\caption{功能需求细化与验收口径}\\
+\toprule
+编号 & 功能 & 详细要求 & 验收口径 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 功能 & 详细要求 & 验收口径 \\
+\midrule
+\endhead
+FR-01 & 数据集与字典 & 系统启动时读取样例 CSV，校验字段、时间、数值和建筑标识，数据字典应解释每个字段的含义、单位、来源和用途。 & 打开数据浏览页，字段显示完整，元信息接口返回记录数、建筑数和时间范围。 \\
+FR-02 & 数据元信息 & 系统应提供建筑清单、字段清单、时间范围和数据规模，便于前端初始化筛选器并向教师说明数据来源。 & 接口返回值与 CSV 内容一致，空数据或路径错误时给出明确提示。 \\
+FR-03 & 系统总览 & 总览应展示记录数、建筑数、平均 COP、异常数、总能耗、三维楼宇状态和全局趋势摘要。 & 刷新页面后总览指标与后端计算口径一致。 \\
+FR-04 & 数据浏览 & 用户可按建筑、楼层、开始时间、结束时间和数量限制查询能耗记录，数据浏览只承担全量查询职责，不被 3D 点击联动污染。 & 筛选后的记录数量、建筑、楼层和时间范围均正确。 \\
+FR-05 & CSV 导出 & 系统应按照当前筛选条件导出 CSV，导出字段保持与数据浏览一致，便于后续报告或表格软件分析。 & 导出文件可打开，表头和筛选结果一致。 \\
+FR-06 & 时间序列统计 & 系统支持小时、日、周、月粒度汇总电耗、水耗、空调电耗、制冷量和 COP，用于趋势分析和报告。 & 切换粒度后图表刷新，空范围返回空数组而非前端错误。 \\
+FR-07 & 建筑对比 & 系统按建筑汇总能耗、水耗、空调电耗、制冷量、平均 COP 和异常数量，用于横向比较。 & 不同建筑的排名和总览指标可交叉验证。 \\
+FR-08 & COP 排名 & 系统按建筑平均 COP 排名，识别制冷效率差异并提示低效建筑。 & COP 数值由制冷量和空调电耗计算，排序稳定。 \\
+FR-09 & 异常识别 & 系统基于设备状态、建筑动态阈值、COP 阈值和夜间负荷规则识别异常，结论应可解释。 & 异常明细中的原因能追溯到具体规则。 \\
+FR-10 & 异常明细 & 统计分析页在选定建筑、楼层和时间范围后优先展示异常记录，健康楼层只显示健康结论。 & 异常条数与筛选器显示一致，健康楼层不出现无意义空图。 \\
+FR-11 & 异常原因统计 & 系统按原因聚合异常数量，用于图表和报告中的风险结构说明。 & 原因统计合计数等于异常明细数。 \\
+FR-12 & 异常解释 & 每条异常应给出触发规则、关键证据、严重程度、原因、结论和建议动作。 & 点击异常解释后内容足够支持运维判断。 \\
+FR-13 & 楼层分析 & 系统派生楼层标签，统计楼层能耗、COP、异常数量、风险状态和设备信息。 & 3D 楼层点击可跳转到相同建筑楼层的统计分析。 \\
+FR-14 & 设备分析 & 系统统计设备点位、设备类型、设备状态、最近出现时间和维护提示。 & 设备明细与异常记录可相互验证。 \\
+FR-15 & 三维风险视图 & 总览页展示可旋转拖动的三维楼宇，异常楼层红色，健康楼层绿色，点击后进入统计分析。 & 拖拽、旋转和点击联动可演示。 \\
+FR-16 & 工单闭环 & 用户可从异常创建工单，分配负责人，工单进入处理中，完成后变为已完成并持久化。 & 刷新后工单状态不丢失，处理中置顶，已完成置后。 \\
+FR-17 & 决策报告 & 系统生成运营日报，汇总风险、工单状态、节能建议、收益模拟和优先级。 & 报告内容可用于答辩展示和管理说明。 \\
+FR-18 & 智能问答 & 系统基于本地知识库回答项目问题，可选调用外部模型增强，外部失败时回退本地回答。 & 无 API Key 时仍能回答基础问题。 \\
+FR-19 & 模型选择 & 页面展示可用模型选项，用户选择后后端按统一 OpenAI-compatible 契约调用。 & 提供商不可用时前端显示回退结果或错误提示。 \\
+FR-20 & MCP Server & MCP Server 暴露数据、统计、异常解释、报告和知识库检索能力，供 AI 客户端调用。 & MCP 工具可列出并返回与 REST API 一致的数据。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{典型业务场景}
+系统的主要价值体现在跨页面业务闭环，而不是单个接口返回数据。以下场景覆盖最终演示和验收时最容易被教师询问的路径。
+\begin{longtable}{L{1.6cm}L{3.0cm}L{6.2cm}L{4.4cm}}
+\caption{典型业务场景与边界条件}\\
+\toprule
+编号 & 场景 & 业务说明 & 预期结果 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 场景 & 业务说明 & 预期结果 \\
+\midrule
+\endhead
+SC-01 & 首次进入总览 & 用户打开前端后系统应自动加载总览、建筑清单、三维楼宇和关键 KPI，若后端未启动则显示接口错误提示。 & 页面不白屏，错误信息可读。 \\
+SC-02 & 查询单栋建筑 & 用户选择综合教学楼 A 后，数据浏览、统计分析和楼层筛选应只使用该建筑范围。 & 表格中不出现其他建筑。 \\
+SC-03 & 锁定楼层异常 & 用户在统计分析中选择 RF 屋顶，应优先显示该楼层异常明细和解释入口。 & 异常条数与楼层下拉展示一致。 \\
+SC-04 & 点击健康楼层 & 用户从 3D 图点击绿色楼层，统计分析只展示健康提示，不展示趋势、异常和推荐模块。 & 页面说明该楼层健康且无空图表。 \\
+SC-05 & 点击异常楼层 & 用户从 3D 图点击红色楼层，系统跳转统计分析并自动填入建筑和楼层。 & 筛选标签显示目标建筑和楼层。 \\
+SC-06 & 创建工单 & 用户选择某条异常并分配给管理员，系统生成处理中工单并置顶展示。 & 工单编号、负责人、异常引用均存在。 \\
+SC-07 & 完成工单 & 用户点击完成按钮后，工单状态变为已完成，颜色变绿并移动到列表后部。 & 刷新页面后状态仍为已完成。 \\
+SC-08 & 导出数据 & 用户在数据浏览页完成筛选后导出 CSV，系统按当前条件生成文件。 & 文件可打开，记录范围正确。 \\
+SC-09 & 生成日报 & 管理人员进入决策报告页，系统按当前数据生成运营日报和节能建议。 & 报告包含风险摘要和优先事项。 \\
+SC-10 & 本地问答 & 无外部模型密钥时，用户询问异常规则或演示路径，系统使用本地知识库回答。 & 回答不依赖网络且包含项目内容。 \\
+SC-11 & 外部模型问答 & 配置外部模型后，用户选择模型并提问，系统把项目上下文作为提示输入。 & 回答更自然，失败时有回退。 \\
+SC-12 & MCP 调用 & 支持 MCP 的客户端调用工具获取建筑清单或异常解释。 & 工具返回 JSON 或文本资源。 \\
+SC-13 & 时间范围为空 & 用户选择没有记录的时间范围，系统显示空状态而不是前端错误。 & 空状态文字明确。 \\
+SC-14 & 异常不存在 & 用户请求不存在的异常解释，后端返回空对象或 404，前端显示提示。 & 系统不崩溃。 \\
+SC-15 & 模型密钥缺失 & 模型提供商被启用但 API Key 未配置，系统提示配置问题并回退。 & 真实密钥不出现在页面或日志。 \\
+SC-16 & 数据文件缺失 & 后端启动时无法找到 CSV，系统应给出明确错误，便于定位部署问题。 & 启动日志或接口错误可追踪。 \\
+SC-17 & 工单文件缺失 & 运行目录没有工单 JSON 时，系统自动创建或返回空列表。 & 不会影响正常演示。 \\
+SC-18 & 重复创建工单 & 用户对同一异常重复创建工单时，系统允许创建但保留异常引用，便于演示多负责人场景。 & 工单编号不冲突。 \\
+SC-19 & 接口响应慢 & 前端应显示加载状态，避免用户误以为页面无反应。 & 加载状态覆盖核心卡片。 \\
+SC-20 & 最终验收 & 评审人员按演示脚本走完整路径，系统应覆盖总览、查询、分析、3D、工单、报告、问答和文档。 & 演示路径闭环完整。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{数据质量与安全约束}
+数据质量约束用于保证分析结果可信，安全约束用于保证仓库提交和课堂演示不会泄露真实密钥。
+\begin{longtable}{L{1.7cm}L{3.0cm}L{6.0cm}L{4.5cm}}
+\caption{数据质量、安全与合规约束}\\
+\toprule
+编号 & 约束项 & 约束说明 & 处理方式 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 约束项 & 约束说明 & 处理方式 \\
+\midrule
+\endhead
+DQ-01 & 字段完整 & CSV 必须包含建筑、时间、能耗、水耗、空调电耗、制冷量、环境温湿度、人员密度和设备状态等核心字段。 & 启动或加载时校验字段，不满足时拒绝继续分析。 \\
+DQ-02 & 时间可解析 & 时间字段必须可解析为统一时间戳，前端筛选必须使用相同时间口径。 & 数据加载层统一转换。 \\
+DQ-03 & 数值非空 & 电耗、水耗、空调电耗、制冷量等指标不能为空，否则会影响 COP 和异常计算。 & 异常值在加载阶段标记或排除。 \\
+DQ-04 & 建筑标识一致 & 同一建筑的编号和名称需要稳定，避免总览、统计和 3D 展示口径不一致。 & 建筑清单由后端统一生成。 \\
+DQ-05 & 楼层派生可解释 & 楼层来自设备和建筑场景推断，必须能说明为什么冷水机组映射到 B1 或屋顶设备映射到 RF。 & SDD 中记录派生规则。 \\
+DQ-06 & 异常原因唯一主因 & 一条记录可触发多条规则，但页面优先展示一个主因并保留证据说明。 & 分析服务按优先级排序。 \\
+DQ-07 & 工单持久化 & 工单状态必须写入运行目录，刷新后不丢失，但不进入 Git 仓库。 & \code{data/runtime/} 加入忽略。 \\
+DQ-08 & 密钥不入库 & 真实 API Key 只能放在本地 \code{.env}，不得写入源码、文档、PDF 或提交材料。 & 提交前执行模式搜索。 \\
+DQ-09 & 外部模型可关闭 & 没有外部模型时系统仍应使用本地知识库回答，避免演示依赖网络。 & 通过 \code{LLM_ENABLED} 控制。 \\
+DQ-10 & 文档正式口吻 & 最终文档应面向教师评审，不应出现对话式说明或写给个人的任务口吻。 & 最终提交前统一审查。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{需求审查清单}
+需求审查清单用于确认需求文档是否能够支撑设计、开发、测试和最终验收。每一项都要求能在系统、代码或文档中找到证据。
+\begin{longtable}{L{1.7cm}L{3.0cm}L{6.2cm}L{4.4cm}}
+\caption{需求审查清单}\\
+\toprule
+编号 & 审查项 & 审查说明 & 通过标准 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 审查项 & 审查说明 & 通过标准 \\
+\midrule
+\endhead
+SR-01 & 项目目标 & 检查“项目目标”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“项目目标”对应证据。 \\
+SR-02 & 用户角色 & 检查“用户角色”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“用户角色”对应证据。 \\
+SR-03 & 业务边界 & 检查“业务边界”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“业务边界”对应证据。 \\
+SR-04 & 数据来源 & 检查“数据来源”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“数据来源”对应证据。 \\
+SR-05 & 字段含义 & 检查“字段含义”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“字段含义”对应证据。 \\
+SR-06 & 建筑范围 & 检查“建筑范围”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“建筑范围”对应证据。 \\
+SR-07 & 楼层范围 & 检查“楼层范围”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“楼层范围”对应证据。 \\
+SR-08 & 时间范围 & 检查“时间范围”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“时间范围”对应证据。 \\
+SR-09 & 查询条件 & 检查“查询条件”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“查询条件”对应证据。 \\
+SR-10 & 导出功能 & 检查“导出功能”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“导出功能”对应证据。 \\
+SR-11 & 总览指标 & 检查“总览指标”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“总览指标”对应证据。 \\
+SR-12 & 趋势统计 & 检查“趋势统计”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“趋势统计”对应证据。 \\
+SR-13 & 建筑对比 & 检查“建筑对比”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“建筑对比”对应证据。 \\
+SR-14 & COP 排名 & 检查“COP 排名”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“COP 排名”对应证据。 \\
+SR-15 & 异常规则 & 检查“异常规则”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“异常规则”对应证据。 \\
+SR-16 & 异常明细 & 检查“异常明细”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“异常明细”对应证据。 \\
+SR-17 & 异常解释 & 检查“异常解释”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“异常解释”对应证据。 \\
+SR-18 & 健康楼层 & 检查“健康楼层”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“健康楼层”对应证据。 \\
+SR-19 & 设备分析 & 检查“设备分析”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“设备分析”对应证据。 \\
+SR-20 & 三维视图 & 检查“三维视图”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“三维视图”对应证据。 \\
+SR-21 & 楼层联动 & 检查“楼层联动”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“楼层联动”对应证据。 \\
+SR-22 & 工单创建 & 检查“工单创建”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“工单创建”对应证据。 \\
+SR-23 & 工单完成 & 检查“工单完成”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“工单完成”对应证据。 \\
+SR-24 & 工单持久化 & 检查“工单持久化”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“工单持久化”对应证据。 \\
+SR-25 & 运营日报 & 检查“运营日报”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“运营日报”对应证据。 \\
+SR-26 & 节能建议 & 检查“节能建议”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“节能建议”对应证据。 \\
+SR-27 & 收益模拟 & 检查“收益模拟”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“收益模拟”对应证据。 \\
+SR-28 & 智能问答 & 检查“智能问答”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“智能问答”对应证据。 \\
+SR-29 & 模型选择 & 检查“模型选择”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“模型选择”对应证据。 \\
+SR-30 & 本地回退 & 检查“本地回退”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“本地回退”对应证据。 \\
+SR-31 & MCP 工具 & 检查“MCP 工具”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“MCP 工具”对应证据。 \\
+SR-32 & MCP 资源 & 检查“MCP 资源”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“MCP 资源”对应证据。 \\
+SR-33 & 接口错误 & 检查“接口错误”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“接口错误”对应证据。 \\
+SR-34 & 空数据状态 & 检查“空数据状态”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“空数据状态”对应证据。 \\
+SR-35 & 权限边界 & 检查“权限边界”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“权限边界”对应证据。 \\
+SR-36 & 密钥安全 & 检查“密钥安全”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“密钥安全”对应证据。 \\
+SR-37 & 部署说明 & 检查“部署说明”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“部署说明”对应证据。 \\
+SR-38 & 测试口径 & 检查“测试口径”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“测试口径”对应证据。 \\
+SR-39 & 验收口径 & 检查“验收口径”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“验收口径”对应证据。 \\
+SR-40 & 演示路径 & 检查“演示路径”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“演示路径”对应证据。 \\
+SR-41 & 性能边界 & 检查“性能边界”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“性能边界”对应证据。 \\
+SR-42 & 扩展方向 & 检查“扩展方向”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“扩展方向”对应证据。 \\
+SR-43 & 维护责任 & 检查“维护责任”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“维护责任”对应证据。 \\
+SR-44 & 提交材料 & 检查“提交材料”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“提交材料”对应证据。 \\
+SR-45 & 文档一致性 & 检查“文档一致性”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“文档一致性”对应证据。 \\
+SR-46 & 风险说明 & 检查“风险说明”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“风险说明”对应证据。 \\
+SR-47 & 配置项 & 检查“配置项”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“配置项”对应证据。 \\
+SR-48 & 日志提示 & 检查“日志提示”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“日志提示”对应证据。 \\
+SR-49 & 最终结论 & 检查“最终结论”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“最终结论”对应证据。 \\
+SR-50 & 教师检查点 & 检查“教师检查点”是否已经在需求、界面、接口或验收说明中被明确描述，避免只停留在口头说明。 & 能够在正式文档或系统页面中找到“教师检查点”对应证据。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{答辩追问准备}
+该表把需求层面最可能被追问的问题提前整理为正式规格说明，目的是让需求文档不仅说明“系统有什么功能”，还说明“为什么需要这些功能”。
+\begin{longtable}{L{1.7cm}L{4.4cm}L{6.0cm}L{3.4cm}}
+\caption{需求层答辩追问准备}\\
+\toprule
+编号 & 追问主题 & 回答要点 & 关联证据 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 追问主题 & 回答要点 & 关联证据 \\
+\midrule
+\endhead
+QA-01 & 为什么选择建筑能源管理场景 & 围绕“为什么选择建筑能源管理场景”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-02 & 为什么需要楼层维度 & 围绕“为什么需要楼层维度”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-03 & 为什么异常优先展示 & 围绕“为什么异常优先展示”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-04 & 为什么健康楼层不展示空图 & 围绕“为什么健康楼层不展示空图”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-05 & 为什么工单创建后直接处理中 & 围绕“为什么工单创建后直接处理中”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-06 & 为什么需要持久化工单 & 围绕“为什么需要持久化工单”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-07 & 为什么数据浏览不和 3D 联动 & 围绕“为什么数据浏览不和 3D 联动”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-08 & 为什么统计分析承担异常查询 & 围绕“为什么统计分析承担异常查询”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-09 & 为什么需要 COP 指标 & 围绕“为什么需要 COP 指标”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-10 & 为什么需要设备状态规则 & 围绕“为什么需要设备状态规则”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-11 & 为什么需要夜间负荷规则 & 围绕“为什么需要夜间负荷规则”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-12 & 为什么使用规则而非黑箱模型 & 围绕“为什么使用规则而非黑箱模型”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-13 & 为什么保留 CSV 导出 & 围绕“为什么保留 CSV 导出”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-14 & 为什么需要运营日报 & 围绕“为什么需要运营日报”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-15 & 为什么接入本地知识库 & 围绕“为什么接入本地知识库”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-16 & 为什么外部模型可选 & 围绕“为什么外部模型可选”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-17 & 为什么 MCP 与 REST 共用服务层 & 围绕“为什么 MCP 与 REST 共用服务层”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-18 & 为什么真实密钥不能入库 & 围绕“为什么真实密钥不能入库”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-19 & 为什么样例数据覆盖多个月 & 围绕“为什么样例数据覆盖多个月”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-20 & 为什么不提供手工插入数据 & 围绕“为什么不提供手工插入数据”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-21 & 如何证明数据不是写死页面 & 围绕“如何证明数据不是写死页面”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-22 & 如何证明异常条数一致 & 围绕“如何证明异常条数一致”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-23 & 如何证明楼层联动有效 & 围绕“如何证明楼层联动有效”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-24 & 如何证明刷新后状态保留 & 围绕“如何证明刷新后状态保留”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-25 & 如何证明模型失败可回退 & 围绕“如何证明模型失败可回退”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-26 & 如何证明接口契约稳定 & 围绕“如何证明接口契约稳定”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-27 & 如何证明系统可复现运行 & 围绕“如何证明系统可复现运行”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-28 & 如何证明测试覆盖核心功能 & 围绕“如何证明测试覆盖核心功能”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-29 & 如何证明文档与系统一致 & 围绕“如何证明文档与系统一致”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-30 & 如何证明经济分析与项目相关 & 围绕“如何证明经济分析与项目相关”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-31 & 教师可能检查 README & 围绕“教师可能检查 README”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-32 & 教师可能检查 SRS & 围绕“教师可能检查 SRS”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-33 & 教师可能检查 SDD & 围绕“教师可能检查 SDD”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-34 & 教师可能检查 SEE & 围绕“教师可能检查 SEE”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-35 & 教师可能检查 SEM & 围绕“教师可能检查 SEM”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-36 & 教师可能要求演示启动 & 围绕“教师可能要求演示启动”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-37 & 教师可能要求刷新页面 & 围绕“教师可能要求刷新页面”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-38 & 教师可能要求查看源码 & 围绕“教师可能要求查看源码”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-39 & 教师可能要求查看 API & 围绕“教师可能要求查看 API”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-40 & 教师可能要求查看提交包 & 围绕“教师可能要求查看提交包”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-41 & 后续可接入真实楼宇数据 & 围绕“后续可接入真实楼宇数据”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-42 & 后续可增加用户权限 & 围绕“后续可增加用户权限”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-43 & 后续可替换数据库 & 围绕“后续可替换数据库”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-44 & 后续可增加预测模型 & 围绕“后续可增加预测模型”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+QA-45 & 后续可接入真实工单系统 & 围绕“后续可接入真实工单系统”说明需求来源、业务价值、验收方式和与系统功能的对应关系。 & SRS、页面演示或接口返回。 \\
+\bottomrule
+\end{longtable}
+
+\subsection{需求变更与版本控制说明}
+项目在最终打磨阶段根据演示效果、教师要求和系统完整性进行了多轮需求修正。以下记录说明主要变更的原因和需求层影响。
+\begin{longtable}{L{1.7cm}L{4.2cm}L{6.6cm}L{3.0cm}}
+\caption{需求变更与版本控制说明}\\
+\toprule
+编号 & 变更项 & 变更原因与影响 & 状态 \\
+\midrule
+\endfirsthead
+\toprule
+编号 & 变更项 & 变更原因与影响 & 状态 \\
+\midrule
+\endhead
+C-01 & 从单日数据扩展为多月数据 & 解决数据量太少、趋势不足的问题，使系统能展示 2026-03-01 至 2026-06-01 的连续记录。 & 已纳入最终版 \\
+C-02 & 增加楼层筛选 & 把建筑级分析细化到楼层级，支撑 3D 楼层点击和异常定位。 & 已纳入最终版 \\
+C-03 & 统计分析承接异常查询 & 将异常相关内容集中在统计分析页，数据浏览保持全量查询职责。 & 已纳入最终版 \\
+C-04 & 健康楼层简化展示 & 健康楼层只显示健康提示，避免空图表降低演示质量。 & 已纳入最终版 \\
+C-05 & 增加三维楼宇视图 & 通过立体楼宇展示楼层风险，使总览页更直观。 & 已纳入最终版 \\
+C-06 & 增加工单持久化 & 避免刷新后工单消失，提高业务闭环可信度。 & 已纳入最终版 \\
+C-07 & 调整工单状态 & 去掉无意义的待处理状态，创建后直接进入处理中。 & 已纳入最终版 \\
+C-08 & 增加决策报告 & 把异常、工单和收益建议汇总为管理视角输出。 & 已纳入最终版 \\
+C-09 & 增加外部模型选择 & 支持多个 OpenAI-compatible 模型提供商，但保留本地回退。 & 已纳入最终版 \\
+C-10 & 增加 MCP Server & 让 AI 客户端可直接调用项目数据和分析能力。 & 已纳入最终版 \\
+C-11 & 增加正式 LaTeX 文档 & 把 Markdown 过程资料升级为可提交的正式 PDF。 & 已纳入最终版 \\
+C-12 & 重画关键流程图 & 解决图形重叠和箭头混乱问题，提高文档可读性。 & 已纳入最终版 \\
+C-13 & 收紧表格版式 & 避免长表超出页面宽度。 & 已纳入最终版 \\
+C-14 & 增加提交材料目录 & 将源码、正式 PDF、LaTeX 源和演示材料分区整理。 & 已纳入最终版 \\
+C-15 & 增加安全检查 & 确保提交材料不包含真实 .env 和 API Key。 & 已纳入最终版 \\
+\bottomrule
+\end{longtable}
+
+\end{document}
