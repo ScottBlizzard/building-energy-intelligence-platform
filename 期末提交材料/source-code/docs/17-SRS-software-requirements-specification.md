@@ -1,4 +1,4 @@
-# SRS 软件需求规格说明书
+﻿# SRS 软件需求规格说明书
 
 > 正式提交版已经按课程 LaTeX 模板重写并编译为 PDF。评审和最终提交请优先使用 `docs/final-latex/pdf/01-SRS-软件需求规格说明书.pdf`，LaTeX 源文件见 `docs/final-latex/tex/01-SRS-软件需求规格说明书.tex`。本文档保留为过程版本和快速查阅入口。
 
@@ -8,14 +8,14 @@
 
 编写日期：2026-05-31
 
-适用范围：课程期末项目最终提交、答辩演示、系统验收与后续维护。
+适用范围：课程期末项目最终提交、项目展示演示、系统验收与后续维护。
 
 ## 1. 文档信息
 
 | 项目 | 内容 |
 | --- | --- |
 | 文档类型 | Software Requirements Specification, SRS |
-| 面向对象 | 任课教师、项目组成员、答辩评审、后续维护人员 |
+| 面向对象 | 任课教师、项目组成员、项目展示评审、后续维护人员 |
 | 关联文档 | `docs/01-requirements.md`、`docs/03-user-manual.md`、`docs/06-api-contract.md`、`docs/14-final-submission-checklist.md` |
 | 代码范围 | `backend/`、`frontend/`、`data/`、`knowledge_base/`、`scripts/` |
 | 当前状态 | 最终演示版需求基线 |
@@ -185,7 +185,7 @@ MCP Server 入口为 `backend/app/mcp_server.py`，启动脚本为 `scripts/star
 
 ### 7.2 可测试性
 
-系统应提供一键自检脚本 `scripts/check-project.ps1`，覆盖 Python 语法检查、后端测试和前端构建。任何关键步骤失败时，脚本应返回失败。
+系统应提供一键验证脚本 `scripts/check-project.ps1`，覆盖 Python 语法检查、后端测试和前端构建。任何关键步骤失败时，脚本应返回失败。
 
 ### 7.3 可演示性
 
@@ -193,7 +193,7 @@ MCP Server 入口为 `backend/app/mcp_server.py`，启动脚本为 `scripts/star
 
 ### 7.4 安全性
 
-真实 API Key 只能存放在本地 `.env`。`.gitignore` 应排除 `.env` 和运行期数据。提交前应检查仓库中不存在真实密钥。
+真实 API Key 只能存放在本地 `.env`。`.gitignore` 应排除 `.env` 和运行期数据。交付确认阶段应检查仓库中不存在真实密钥。
 
 ### 7.5 可维护性
 

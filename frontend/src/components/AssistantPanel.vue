@@ -1,4 +1,4 @@
-<script setup>
+﻿<script setup>
 import { computed, ref } from "vue";
 import CitationCard from "./CitationCard.vue";
 
@@ -132,7 +132,7 @@ function updateModel(event) {
       </div>
 
       <div v-if="reply.follow_up?.length" class="citation-block">
-        <strong>建议继续追问</strong>
+        <strong>建议继续提问</strong>
         <div class="follow-up-list">
           <button
             v-for="item in reply.follow_up"

@@ -1,10 +1,10 @@
-# 最终提交与打包说明
+﻿# 最终提交与打包说明
 
-本文档用于最后提交前检查和打包，目标是保证评审人员收到的 zip 包可以清楚看到源码、文档、测试结果和演示材料。
+本文档用于最后交付确认阶段检查和打包，目标是保证评审人员收到的 zip 包可以清楚看到源码、文档、测试结果和演示材料。
 
 正式提交文档以 `docs/final-latex/pdf/` 中的 LaTeX 编译版 PDF 为准，并已同步到 `期末提交材料/documents/pdf-latex/`。Markdown 文档保留为过程资料和快速查阅入口。
 
-## 1. 提交前必须确认
+## 1. 交付确认阶段必须确认
 
 - [ ] 本地已拉取最新 `main` 分支。
 - [ ] 运行 `.\scripts\check-project.ps1` 通过。
@@ -90,7 +90,7 @@ building-energy-intelligence-platform-final.zip
 5. 安装前端依赖：cd frontend 后执行 npm install。
 6. 启动前端：.\scripts\start-frontend.ps1。
 7. 浏览器访问：http://127.0.0.1:5173。
-8. 可选：运行 .\scripts\check-project.ps1 进行完整自检。
+8. 可选：运行 .\scripts\check-project.ps1 进行完整验证。
 
 说明：
 - .env.example 不包含真实 API Key。
@@ -113,11 +113,11 @@ building-energy-intelligence-platform-final.zip
 
 ## 7. 最终提交口径
 
-答辩或报告中可以采用以下表述：
+项目展示或报告中可以采用以下表述：
 
 本项目已完成建筑能源智能管理系统的核心建设目标，形成了前端 Web 工作台、FastAPI 后端、MCP Server、样例数据集、知识库、外部大模型可选接入、异常分析、工单闭环、运营报告和完整交付文档。当前系统通过后端自动化测试和前端构建测试，具备课程期末项目演示和提交条件。
 
-## 8. 提交前安全检查
+## 8. 交付确认阶段安全检查
 
 提交 zip 前建议执行：
 
@@ -139,6 +139,6 @@ python .\scripts\build_final_latex_documents.py --compile
 
 系统侧已经完成最终打磨。提交侧仍需由 PPT 和视频负责人补齐：
 
-- 最终答辩 PPT。
+- 最终项目展示 PPT。
 - 演示视频或视频链接。
 - Canvas 上传截图或提交记录。

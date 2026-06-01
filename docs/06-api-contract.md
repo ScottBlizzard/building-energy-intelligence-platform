@@ -1,4 +1,4 @@
-# API 契约文档
+﻿# API 契约文档
 
 本文档用于定义前后端 REST API 与 MCP 协议接口契约，减少集成阶段返工，并作为最终提交材料中的接口说明。
 
@@ -352,7 +352,7 @@
       "path": "来源路径"
     }
   ],
-  "follow_up": ["可继续追问的问题"],
+  "follow_up": ["可继续提问的问题"],
   "llm_used": true,
   "llm_provider": "nvidia",
   "llm_model": "meta/llama-3.3-70b-instruct"
