@@ -11,6 +11,7 @@ from app.schemas.work_order import (
     WorkOrderSubmit,
     WorkOrderUpdate,
 )
+from app.services.permission_service import PermissionDenied, require_admin_operator, require_worker_operator
 from app.services.work_order_store import (
     accept_work_order,
     assign_work_order,
@@ -28,6 +29,10 @@ from app.services.work_order_store import (
 router = APIRouter()
 
 
+def _raise_for_permission(exc: PermissionDenied) -> None:
+    raise HTTPException(status_code=403, detail=str(exc))
+
+
 @router.get("")
 def get_persistent_work_orders(
     assignee_id: Optional[str] = None,
@@ -40,6 +45,10 @@ def get_persistent_work_orders(
 @router.post("")
 def post_work_order(payload: WorkOrderCreate):
     data = payload.model_dump()
+    try:
+        require_admin_operator(data.get("created_by") or "admin", "创建或确认工单")
+    except PermissionDenied as exc:
+        _raise_for_permission(exc)
     if data.get("assignee_id"):
         return create_work_order_from_anomaly(data, operator_id=data.get("created_by") or "admin")
     return create_work_order(data)
@@ -74,6 +83,10 @@ def patch_work_order(work_order_id: str, payload: WorkOrderUpdate):
 
 @router.patch("/{work_order_id}/assign")
 def patch_assign_work_order(work_order_id: str, payload: WorkOrderAssign):
+    try:
+        require_admin_operator(payload.operator_id, "派单")
+    except PermissionDenied as exc:
+        _raise_for_permission(exc)
     updated = assign_work_order(
         work_order_id,
         assignee_id=payload.assignee_id,
@@ -87,6 +100,10 @@ def patch_assign_work_order(work_order_id: str, payload: WorkOrderAssign):
 
 @router.patch("/{work_order_id}/accept")
 def patch_accept_work_order(work_order_id: str, payload: WorkOrderAccept):
+    try:
+        require_worker_operator(payload.operator_id, "接收工单")
+    except PermissionDenied as exc:
+        _raise_for_permission(exc)
     updated = accept_work_order(
         work_order_id,
         operator_id=payload.operator_id,
@@ -99,6 +116,10 @@ def patch_accept_work_order(work_order_id: str, payload: WorkOrderAccept):
 
 @router.patch("/{work_order_id}/submit")
 def patch_submit_work_order(work_order_id: str, payload: WorkOrderSubmit):
+    try:
+        require_worker_operator(payload.operator_id, "提交工单处理结果")
+    except PermissionDenied as exc:
+        _raise_for_permission(exc)
     updated = submit_work_order(
         work_order_id,
         operator_id=payload.operator_id,
@@ -117,6 +138,10 @@ def patch_submit_work_order(work_order_id: str, payload: WorkOrderSubmit):
 
 @router.patch("/{work_order_id}/review")
 def patch_review_work_order(work_order_id: str, payload: WorkOrderReview):
+    try:
+        require_admin_operator(payload.operator_id, "复核工单")
+    except PermissionDenied as exc:
+        _raise_for_permission(exc)
     updated = review_work_order(
         work_order_id,
         operator_id=payload.operator_id,
@@ -130,6 +155,10 @@ def patch_review_work_order(work_order_id: str, payload: WorkOrderReview):
 
 @router.patch("/{work_order_id}/ignore")
 def patch_ignore_work_order(work_order_id: str, payload: WorkOrderIgnore):
+    try:
+        require_admin_operator(payload.operator_id, "忽略工单")
+    except PermissionDenied as exc:
+        _raise_for_permission(exc)
     updated = ignore_work_order(
         work_order_id,
         operator_id=payload.operator_id,

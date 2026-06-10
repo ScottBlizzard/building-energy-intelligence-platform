@@ -28,8 +28,11 @@ import {
   fetchBuildingComparison,
   fetchBuildings,
   fetchCopRanking,
+  fetchCounterfactualScenario,
   fetchCurrentUser,
   fetchDatasetMeta,
+  fetchDecisionDispatchPlan,
+  fetchDecisionPriorities,
   fetchDemoUsers,
   fetchEquipmentSummary,
   fetchFloorRegistry,
@@ -179,6 +182,7 @@ const loading = reactive({
   assistant: false,
   explanation: false,
   orders: false,
+  decision: false,
   report: false
 });
 const errors = reactive({
@@ -188,6 +192,7 @@ const errors = reactive({
   assistant: "",
   export: "",
   orders: "",
+  decision: "",
   report: ""
 });
 const exportState = reactive({
@@ -216,6 +221,15 @@ const simulation = reactive({
   temperatureDelta: 1,
   nightShutdownHours: 1,
   electricityPrice: 0.82
+});
+
+const decisionState = reactive({
+  workerCapacity: 3,
+  priorities: [],
+  dispatchPlan: null,
+  counterfactual: null,
+  counterfactualLoading: false,
+  counterfactualError: ""
 });
 
 const analytics = reactive({
@@ -620,11 +634,28 @@ const selectedOrderAnomaly = computed(() =>
 const selectedAnomaly = computed(() =>
   analytics.anomalies.find((item) => anomalyKey(item) === selectedAnomalyKey.value)
 );
+const decisionByWorkOrderId = computed(() => {
+  const map = new Map();
+  decisionState.priorities.forEach((item) => {
+    if (item.work_order_id) {
+      map.set(item.work_order_id, item);
+    }
+  });
+  return map;
+});
+const selectedOrderDecision = computed(() => {
+  if (!selectedOrderAnomaly.value) {
+    return null;
+  }
+  return decisionState.priorities.find(
+    (item) => item.equipment_id === selectedOrderAnomaly.value.equipment_id
+  ) || null;
+});
 const highPriorityOrders = computed(() =>
   enrichedWorkOrders.value.filter((item) => item.priority === "高").slice(0, 6)
 );
 const orderBusinessStats = computed(() => {
-  const closedStatuses = new Set(["已关闭", "已完成", "已忽略"]);
+  const closedStatuses = new Set(["closed", "ignored", "已关闭", "已完成", "已忽略"]);
   return enrichedWorkOrders.value.reduce(
     (stats, item) => {
       stats.totalWastedCost += Number(item.wasted_cost_yuan || 0);
@@ -633,7 +664,7 @@ const orderBusinessStats = computed(() => {
       if (!closedStatuses.has(item.status)) {
         stats.openCount += 1;
       }
-      if (item.status === "待验证") {
+      if (item.status === "pending_review" || item.status === "待验证") {
         stats.pendingVerifyCount += 1;
       }
       if (item.priority === "高" || Number(item.risk_score || 0) >= 72) {
@@ -841,12 +872,19 @@ function inferRecommendedAction(anomaly) {
 
 function orderStatusRank(status) {
   return {
+    pending_confirm: 0,
+    assigned: 1,
+    in_progress: 2,
+    rejected: 3,
+    pending_review: 4,
+    closed: 5,
+    ignored: 6,
     待分派: 0,
-    处理中: 1,
-    待验证: 2,
-    已关闭: 3,
-    已完成: 3,
-    已忽略: 4
+    处理中: 2,
+    待验证: 4,
+    已关闭: 5,
+    已完成: 5,
+    已忽略: 6
   }[status] ?? 9;
 }
 
@@ -1012,9 +1050,61 @@ async function loadRoleDashboards() {
   }
 }
 
+async function loadDecisionState() {
+  if (!isAdmin.value) {
+    decisionState.priorities = [];
+    decisionState.dispatchPlan = null;
+    decisionState.counterfactual = null;
+    return;
+  }
+
+  loading.decision = true;
+  errors.decision = "";
+  try {
+    const [priorities, dispatchPlan] = await Promise.all([
+      fetchDecisionPriorities(12),
+      fetchDecisionDispatchPlan(decisionState.workerCapacity)
+    ]);
+    decisionState.priorities = priorities.items || [];
+    decisionState.dispatchPlan = dispatchPlan.item || null;
+  } catch (error) {
+    decisionState.priorities = [];
+    decisionState.dispatchPlan = null;
+    errors.decision = "经济决策建议暂时不可用，请确认后端 decisions 接口。";
+  } finally {
+    loading.decision = false;
+  }
+}
+
+async function loadCounterfactualForEquipment(equipmentId) {
+  if (!isAdmin.value || !equipmentId) {
+    decisionState.counterfactual = null;
+    decisionState.counterfactualError = "";
+    return;
+  }
+
+  decisionState.counterfactualLoading = true;
+  decisionState.counterfactualError = "";
+  try {
+    const payload = await fetchCounterfactualScenario({
+      equipment_id: equipmentId,
+      horizon_days: 7,
+      delay_days: 3,
+      start_date: simClock.value?.current_date || null
+    });
+    decisionState.counterfactual = payload.item;
+  } catch (error) {
+    decisionState.counterfactual = null;
+    decisionState.counterfactualError = "对照实验生成失败，请确认该设备在样本窗口内存在后续数据。";
+  } finally {
+    decisionState.counterfactualLoading = false;
+  }
+}
+
 async function bootstrapAuthenticatedApp() {
   await Promise.allSettled([loadOverview(), loadAssistantProviders(), loadDemoUserList(), loadSimState()]);
   await Promise.allSettled([loadRecords(), loadAnalytics(), loadPersistentWorkOrders(), loadRoleDashboards()]);
+  await loadDecisionState();
 }
 
 async function loadSimState() {
@@ -1027,6 +1117,7 @@ async function loadSimState() {
 
 async function reloadAfterClockChange() {
   await Promise.allSettled([loadOverview(), loadRecords(), loadAnalytics(), refreshBusinessState()]);
+  await loadCounterfactualForEquipment(selectedOrderAnomaly.value?.equipment_id);
 }
 
 async function handleStartSimulation() {
@@ -1399,6 +1490,7 @@ async function refreshBusinessState({ includeAnalytics = false } = {}) {
   await Promise.allSettled([
     loadPersistentWorkOrders(),
     loadRoleDashboards(),
+    loadDecisionState(),
     refreshOperationReport(),
     includeAnalytics ? loadAnalytics() : Promise.resolve()
   ]);
@@ -1640,6 +1732,20 @@ watch(
   () => orderDraft.floorLabel,
   () => {
     orderDraft.anomalyKey = "";
+  }
+);
+
+watch(
+  () => selectedOrderAnomaly.value?.equipment_id,
+  (equipmentId) => {
+    loadCounterfactualForEquipment(equipmentId);
+  }
+);
+
+watch(
+  () => decisionState.workerCapacity,
+  () => {
+    loadDecisionState();
   }
 );
 
@@ -2339,6 +2445,30 @@ onMounted(async () => {
             <span v-for="item in workerDashboard?.next_actions || []" :key="item">{{ item }}</span>
           </div>
 
+          <div v-if="workerDashboard?.standard_work_guidance" class="worker-support-grid">
+            <div class="worker-support-card">
+              <h3>{{ workerDashboard.standard_work_guidance.title }}</h3>
+              <p>{{ workerDashboard.standard_work_guidance.equipment_type }} · {{ workerDashboard.standard_work_guidance.anomaly_reason }}</p>
+              <ol>
+                <li v-for="step in workerDashboard.standard_work_guidance.steps" :key="step">{{ step }}</li>
+              </ol>
+              <div class="support-evidence">
+                <span v-for="item in workerDashboard.standard_work_guidance.required_evidence" :key="item">{{ item }}</span>
+              </div>
+            </div>
+            <div class="worker-support-card">
+              <h3>历史相似案例</h3>
+              <ul v-if="workerDashboard.similar_cases?.length" class="similar-case-list">
+                <li v-for="item in workerDashboard.similar_cases" :key="item.work_order_id">
+                  <strong>{{ item.work_order_id }} · {{ item.equipment_id }}</strong>
+                  <span>{{ item.actual_cause }} / {{ item.resolution_note }}</span>
+                  <em>预计回收 {{ formatNumber(item.estimated_saving_yuan) }} 元</em>
+                </li>
+              </ul>
+              <p v-else>暂无相似已关闭案例，按标准作业建议补充现场证据。</p>
+            </div>
+          </div>
+
           <div v-if="loading.orders" class="data-loading">
             <LoadingSpinner text="正在加载我的工单..." />
           </div>
@@ -2560,6 +2690,10 @@ onMounted(async () => {
                 <strong>{{ selectedOrderAnomaly.sla_hours || 24 }} 小时</strong>
               </div>
             </div>
+            <p v-if="selectedOrderDecision" class="order-create-hint">
+              已有同设备未闭环工单的经济决策分为 {{ selectedOrderDecision.decision_score }}：
+              {{ selectedOrderDecision.reason }}
+            </p>
           </div>
 
           <div class="order-impact-grid">
@@ -2578,6 +2712,82 @@ onMounted(async () => {
             <div>
               <span>预计可回收</span>
               <strong>{{ formatNumber(orderBusinessStats.totalSaving) }} 元</strong>
+            </div>
+          </div>
+
+          <div v-if="errors.decision" class="inline-banner-list">
+            <StatusBanner :status="errors.decision" type="warning" />
+          </div>
+
+          <div class="dispatch-decision-panel">
+            <div class="dispatch-header">
+              <div>
+                <span>Economic Dispatch</span>
+                <h3>今日资源约束派单建议</h3>
+                <p>{{ decisionState.dispatchPlan?.summary || "等待经济决策接口返回派单建议。" }}</p>
+              </div>
+              <label>
+                <span>今日可派工人</span>
+                <input v-model.number="decisionState.workerCapacity" type="number" min="1" max="8" />
+              </label>
+            </div>
+            <div v-if="loading.decision" class="data-loading data-loading--compact">
+              <LoadingSpinner text="正在计算优先级..." />
+            </div>
+            <div v-else-if="decisionState.dispatchPlan?.selected?.length" class="dispatch-grid">
+              <article v-for="item in decisionState.dispatchPlan.selected" :key="item.work_order_id" class="dispatch-card">
+                <div>
+                  <strong>#{{ item.decision_score }} · {{ item.work_order_id }}</strong>
+                  <span>{{ item.building_name }} {{ item.floor_label }} · {{ item.equipment_id }}</span>
+                </div>
+                <p>{{ item.reason }}</p>
+                <div class="dispatch-breakdown">
+                  <span>风险 {{ item.score_breakdown.risk }}</span>
+                  <span>损失 {{ item.score_breakdown.estimated_loss }}</span>
+                  <span>SLA {{ item.score_breakdown.sla }}</span>
+                  <span>碳排 {{ item.score_breakdown.carbon }}</span>
+                </div>
+              </article>
+            </div>
+            <EmptyState
+              v-else
+              icon="🧭"
+              title="暂无待排序工单"
+              description="生成或推进工单后，系统会按风险、损失、SLA 和碳排自动排序。"
+            />
+          </div>
+
+          <div v-if="selectedOrderAnomaly || decisionState.counterfactual" class="counterfactual-panel">
+            <div class="counterfactual-head">
+              <div>
+                <span>Time Machine Experiment</span>
+                <h3>异常处置三情景对照</h3>
+                <p>{{ decisionState.counterfactual?.decision_sentence || "选择一条异常后，系统会比较不处理、立即处理、延迟 3 天处理的未来 7 天影响。" }}</p>
+              </div>
+              <strong v-if="selectedOrderAnomaly">{{ selectedOrderAnomaly.equipment_id }}</strong>
+            </div>
+            <div v-if="decisionState.counterfactualLoading" class="data-loading data-loading--compact">
+              <LoadingSpinner text="正在生成对照实验..." />
+            </div>
+            <StatusBanner v-else-if="decisionState.counterfactualError" :status="decisionState.counterfactualError" type="warning" />
+            <div v-else-if="decisionState.counterfactual?.scenarios?.length" class="scenario-curve-grid">
+              <article v-for="scenario in decisionState.counterfactual.scenarios" :key="scenario.key" class="scenario-curve-card">
+                <strong>{{ scenario.label }}</strong>
+                <div class="scenario-bars">
+                  <span
+                    v-for="point in scenario.daily"
+                    :key="point.date"
+                    :style="{ height: `${Math.max(8, Math.min(100, point.loss_yuan / Math.max(1, scenario.total_loss_yuan) * 100))}%` }"
+                    :title="`${point.date} · ${point.loss_yuan} 元 · ${point.anomaly_count} 次异常`"
+                  ></span>
+                </div>
+                <div class="scenario-metrics">
+                  <span>{{ formatNumber(scenario.total_energy_kwh) }} kWh</span>
+                  <span>{{ formatNumber(scenario.total_loss_yuan) }} 元</span>
+                  <span>{{ formatNumber(scenario.total_carbon_kg) }} kg CO₂</span>
+                  <span>{{ scenario.total_anomaly_count }} 次异常</span>
+                </div>
+              </article>
             </div>
           </div>
 
@@ -2638,9 +2848,17 @@ onMounted(async () => {
                   <strong>{{ order.sla_hours || 24 }}h</strong>
                 </div>
               </div>
-              <ol v-if="order.status !== '已忽略'" class="order-flow">
+              <div v-if="decisionByWorkOrderId.get(order.work_order_id)" class="decision-score-box">
+                <div>
+                  <span>经济优先级分</span>
+                  <strong>{{ decisionByWorkOrderId.get(order.work_order_id).decision_score }}</strong>
+                </div>
+                <p>{{ decisionByWorkOrderId.get(order.work_order_id).reason }}</p>
+                <span>推荐工人：{{ decisionByWorkOrderId.get(order.work_order_id).recommended_worker_name }}</span>
+              </div>
+              <ol v-if="order.status !== 'ignored'" class="order-flow">
                 <li
-                  v-for="status in orderStatusOptions.filter((item) => item.key !== '已忽略')"
+                  v-for="status in orderStatusOptions.filter((item) => item.key !== 'ignored')"
                   :key="status.key"
                   :class="{
                     'is-active': orderStatusRank(status.key) <= orderStatusRank(order.status),
@@ -3355,6 +3573,79 @@ onMounted(async () => {
   padding: 7px 10px;
 }
 
+.worker-support-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.worker-support-card {
+  border: 1px solid rgba(15, 139, 141, 0.14);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(237, 249, 248, 0.86));
+  padding: 16px;
+}
+
+.worker-support-card h3 {
+  margin: 0 0 6px;
+  color: var(--accent-deep);
+  font-size: 16px;
+}
+
+.worker-support-card p {
+  margin: 0 0 10px;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.worker-support-card ol,
+.similar-case-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+  color: #263f49;
+  font-size: 13px;
+}
+
+.similar-case-list {
+  list-style: none;
+  padding: 0;
+}
+
+.similar-case-list li {
+  display: grid;
+  gap: 3px;
+  border-bottom: 1px solid rgba(20, 34, 48, 0.06);
+  padding-bottom: 8px;
+}
+
+.similar-case-list strong {
+  color: var(--accent-deep);
+}
+
+.similar-case-list span,
+.similar-case-list em {
+  color: var(--ink-soft);
+  font-style: normal;
+}
+
+.support-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.support-evidence span {
+  border-radius: 999px;
+  background: rgba(15, 139, 141, 0.1);
+  color: #0f6f71;
+  font-size: 12px;
+  padding: 5px 9px;
+}
+
 .order-summary-grid,
 .order-impact-grid,
 .simulation-result {
@@ -3397,6 +3688,173 @@ onMounted(async () => {
   margin: 12px 0 0;
   color: var(--ink-soft);
   font-size: 13px;
+}
+
+.dispatch-decision-panel,
+.counterfactual-panel {
+  border: 1px solid rgba(15, 139, 141, 0.16);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(237, 249, 248, 0.86));
+  padding: 18px;
+  margin-bottom: 18px;
+}
+
+.dispatch-header,
+.counterfactual-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.dispatch-header span,
+.counterfactual-head span {
+  color: #0f8b8d;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.dispatch-header h3,
+.counterfactual-head h3 {
+  margin: 3px 0 5px;
+  color: var(--accent-deep);
+  font-size: 18px;
+}
+
+.dispatch-header p,
+.counterfactual-head p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.dispatch-header label {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  min-width: 120px;
+}
+
+.dispatch-header input {
+  width: 100%;
+  border: 1px solid rgba(20, 34, 48, 0.12);
+  border-radius: 12px;
+  font: inherit;
+  padding: 9px 10px;
+}
+
+.dispatch-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.dispatch-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(20, 34, 48, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 14px;
+}
+
+.dispatch-card strong {
+  color: var(--accent-deep);
+}
+
+.dispatch-card span,
+.dispatch-card p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.dispatch-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dispatch-breakdown span {
+  border-radius: 999px;
+  background: rgba(15, 139, 141, 0.1);
+  color: #0f6f71;
+  padding: 4px 8px;
+}
+
+.counterfactual-head strong {
+  border-radius: 999px;
+  background: rgba(15, 139, 141, 0.1);
+  color: #0f6f71;
+  padding: 7px 11px;
+  white-space: nowrap;
+}
+
+.scenario-curve-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.scenario-curve-card {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(20, 34, 48, 0.08);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 14px;
+}
+
+.scenario-curve-card strong {
+  color: var(--accent-deep);
+  font-size: 15px;
+}
+
+.scenario-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  height: 96px;
+  border-bottom: 1px solid rgba(20, 34, 48, 0.1);
+}
+
+.scenario-bars span {
+  flex: 1;
+  min-height: 8px;
+  border-radius: 8px 8px 0 0;
+  background: linear-gradient(180deg, #f2a900, #d9364f);
+}
+
+.scenario-curve-card:nth-child(2) .scenario-bars span {
+  background: linear-gradient(180deg, #22a06b, #0f8b8d);
+}
+
+.scenario-curve-card:nth-child(3) .scenario-bars span {
+  background: linear-gradient(180deg, #7b61ff, #0f8b8d);
+}
+
+.scenario-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.scenario-metrics span {
+  border-radius: 10px;
+  background: rgba(20, 34, 48, 0.04);
+  color: var(--ink-soft);
+  font-size: 12px;
+  padding: 6px 8px;
+}
+
+.data-loading--compact {
+  padding: 18px;
 }
 
 .order-preview-strip {
@@ -3622,6 +4080,39 @@ onMounted(async () => {
   border-radius: 14px;
   background: rgba(15, 139, 141, 0.08);
   padding: 10px 12px;
+}
+
+.decision-score-box {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(15, 139, 141, 0.16);
+  border-radius: 14px;
+  background: rgba(15, 139, 141, 0.08);
+  padding: 12px;
+  margin: 12px 0;
+}
+
+.decision-score-box > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.decision-score-box span {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.decision-score-box strong {
+  color: var(--accent-deep);
+  font-size: 22px;
+}
+
+.decision-score-box p {
+  margin: 0;
+  color: #263f49;
+  font-size: 13px;
 }
 
 .work-order-actions {
@@ -3964,6 +4455,7 @@ onMounted(async () => {
   .login-role-grid,
   .command-layout,
   .business-kpi-grid,
+  .worker-support-grid,
   .admin-action-grid,
   .worker-submit-grid {
     grid-template-columns: 1fr;
@@ -3980,6 +4472,10 @@ onMounted(async () => {
 
   .order-summary-grid,
   .order-impact-grid,
+  .dispatch-header,
+  .counterfactual-head,
+  .dispatch-grid,
+  .scenario-curve-grid,
   .order-preview-strip,
   .order-create-grid,
   .work-order-board,

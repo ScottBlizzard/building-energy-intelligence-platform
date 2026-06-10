@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 from app.services import simulation_service
 from app.services.data_loader import get_dataset_meta
+from app.services.scenario_service import build_counterfactual_scenarios
 
 router = APIRouter()
 
@@ -15,6 +16,13 @@ class SimStart(BaseModel):
 
 class SimAdvance(BaseModel):
     days: int = 1
+
+
+class CounterfactualRequest(BaseModel):
+    equipment_id: str
+    horizon_days: int = 7
+    delay_days: int = 3
+    start_date: Optional[str] = None
 
 
 def _state_with_range() -> dict:
@@ -45,3 +53,15 @@ def advance_sim(payload: SimAdvance):
 def reset_sim():
     simulation_service.reset()
     return _state_with_range()
+
+
+@router.post("/counterfactual")
+def counterfactual(payload: CounterfactualRequest):
+    return {
+        "item": build_counterfactual_scenarios(
+            payload.equipment_id,
+            horizon_days=payload.horizon_days,
+            delay_days=payload.delay_days,
+            start_date=payload.start_date,
+        )
+    }

@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +21,11 @@ class AssistantReply(BaseModel):
     llm_used: bool = False
     llm_provider: Optional[str] = None
     llm_model: Optional[str] = None
+    grounding_used: bool = False
+    grounding_sources: List[str] = Field(default_factory=list)
+    grounding_status: str = "none"
+    validation_warnings: List[str] = Field(default_factory=list)
+    referenced_entities: Dict = Field(default_factory=dict)
 
 
 class AssistantModelOption(BaseModel):

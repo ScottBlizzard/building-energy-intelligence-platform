@@ -8,6 +8,7 @@ from app.services.analysis_service import (
     build_optimization_recommendations,
 )
 from app.services.data_loader import get_visible_dataset
+from app.services.permission_service import build_worker_support
 from app.services.work_order_store import build_work_order_metrics, list_work_orders
 
 
@@ -57,6 +58,7 @@ def build_admin_dashboard() -> Dict:
 def worker_dashboard(user_id: str) -> Dict:
     orders = list_work_orders(assignee_id=user_id)
     metrics = build_work_order_metrics(orders)
+    support = build_worker_support(user_id)
     needs_attention = [
         item for item in orders
         if item["status"] in {"assigned", "rejected"}
@@ -71,6 +73,8 @@ def worker_dashboard(user_id: str) -> Dict:
         "work_order_metrics": metrics,
         "items": orders,
         "needs_attention": len(needs_attention),
+        "standard_work_guidance": support["standard_work_guidance"],
+        "similar_cases": support["similar_cases"],
         "next_actions": [
             "先接收已派单任务。",
             "处理中的工单尽快完成并提交复核。",

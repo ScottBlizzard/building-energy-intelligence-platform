@@ -38,6 +38,40 @@ const selectedModelLabel = computed(() => {
   const match = props.modelOptions.find((item) => modelKey(item) === props.selectedModelKey);
   return match?.label || "本地规则问答";
 });
+const sourceBadges = computed(() => {
+  if (!props.reply) {
+    return [];
+  }
+  const badges = [];
+  const sources = props.reply.grounding_sources || [];
+  if (props.reply.grounding_used || sources.includes("work_orders")) {
+    badges.push({ key: "work_orders", label: "基于实时工单数据回答", tone: "success" });
+  }
+  if (sources.includes("knowledge_base") || props.reply.citations?.length) {
+    badges.push({ key: "knowledge_base", label: "基于知识库回答", tone: "info" });
+  }
+  if (props.reply.llm_used || sources.includes("external_llm")) {
+    badges.push({ key: "external_llm", label: "外部模型增强", tone: "model" });
+  }
+  if (props.reply.grounding_status === "fallback_after_validation") {
+    badges.push({ key: "fallback", label: "校验失败已降级", tone: "warning" });
+  }
+  return badges;
+});
+const referencedEntityText = computed(() => {
+  const entities = props.reply?.referenced_entities || {};
+  const parts = [];
+  if (entities.work_order_ids?.length) {
+    parts.push(`工单 ${entities.work_order_ids.join("、")}`);
+  }
+  if (entities.equipment_ids?.length) {
+    parts.push(`设备 ${entities.equipment_ids.join("、")}`);
+  }
+  if (entities.statuses?.length) {
+    parts.push(`状态 ${entities.statuses.join("、")}`);
+  }
+  return parts.join(" · ");
+});
 
 function modelKey(option) {
   return `${option.provider}::${option.model}`;
@@ -117,6 +151,21 @@ function updateModel(event) {
         <span class="reply-model">
           {{ reply.llm_used ? `外部模型：${selectedModelLabel}` : "本地规则问答" }}
         </span>
+      </div>
+      <div v-if="sourceBadges.length" class="source-badge-row">
+        <span
+          v-for="badge in sourceBadges"
+          :key="badge.key"
+          class="source-badge"
+          :class="`source-badge--${badge.tone}`"
+        >
+          {{ badge.label }}
+        </span>
+      </div>
+      <p v-if="referencedEntityText" class="entity-line">{{ referencedEntityText }}</p>
+      <div v-if="reply.validation_warnings?.length" class="validation-warning">
+        <strong>回答校验</strong>
+        <span v-for="item in reply.validation_warnings" :key="item">{{ item }}</span>
       </div>
       <p>{{ reply.answer }}</p>
 
@@ -295,6 +344,69 @@ function updateModel(event) {
 
 .reply-header h3 {
   margin: 0;
+}
+
+.source-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 10px;
+}
+
+.source-badge {
+  border: 1px solid rgba(18, 93, 115, 0.14);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 9px;
+}
+
+.source-badge--success {
+  background: rgba(226, 246, 237, 0.9);
+  border-color: rgba(15, 107, 79, 0.2);
+  color: #0f6b4f;
+}
+
+.source-badge--info {
+  background: rgba(229, 242, 255, 0.9);
+  border-color: rgba(37, 99, 235, 0.16);
+  color: #2450a6;
+}
+
+.source-badge--model {
+  background: rgba(244, 238, 255, 0.9);
+  border-color: rgba(123, 97, 255, 0.18);
+  color: #5540b8;
+}
+
+.source-badge--warning {
+  background: rgba(255, 246, 214, 0.94);
+  border-color: rgba(190, 128, 0, 0.2);
+  color: #8a5b00;
+}
+
+.entity-line {
+  border-left: 3px solid rgba(15, 139, 141, 0.28);
+  color: #48606b !important;
+  font-size: 13px;
+  margin: 0 0 12px !important;
+  padding-left: 10px;
+}
+
+.validation-warning {
+  display: grid;
+  gap: 4px;
+  border: 1px solid rgba(190, 128, 0, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 248, 222, 0.9);
+  color: #735000;
+  font-size: 13px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+}
+
+.validation-warning strong {
+  color: #735000;
 }
 
 .assistant-reply p {

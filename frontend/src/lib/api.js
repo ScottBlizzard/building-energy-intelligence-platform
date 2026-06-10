@@ -208,6 +208,13 @@ export function resetSimulation() {
   });
 }
 
+export function fetchCounterfactualScenario(payload) {
+  return request("/sim/counterfactual", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export function fetchAssistantProviders() {
   return request("/assistant/providers");
 }
@@ -249,6 +256,22 @@ export function fetchBudgetAnalysis(year, month) {
 
 export function fetchBudgetKPI(buildingId, year) {
   return request(`/budget/budgets/kpi/${encodeURIComponent(buildingId)}`, {}, { year });
+}
+
+export function fetchDecisionPriorities(limit = 10) {
+  return request("/decisions/work-order-priorities", {}, { limit });
+}
+
+export function fetchDecisionDispatchPlan(workerCapacity = 3) {
+  return request("/decisions/dispatch-plan", {}, { worker_capacity: workerCapacity });
+}
+
+export function fetchDecisionBudgetImpact(year = null, month = null) {
+  return request("/decisions/budget-impact", {}, { year, month });
+}
+
+export function fetchDecisionROICandidates(limit = 8) {
+  return request("/decisions/roi-candidates", {}, { limit });
 }
 
 export function fetchEquipmentAudit(buildingId) {

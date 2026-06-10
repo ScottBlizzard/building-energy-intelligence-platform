@@ -151,6 +151,7 @@ def build_external_assistant_answer(
     question: str,
     local_reply: Dict,
     kb_result: Dict,
+    grounding_context_text: str = "",
 ) -> Optional[Dict[str, str]]:
     """Return an external LLM answer, or None when disabled/unavailable."""
     config = get_llm_provider_config(
@@ -160,7 +161,7 @@ def build_external_assistant_answer(
     if not config.is_configured:
         return None
 
-    messages = _build_grounded_messages(question, local_reply, kb_result)
+    messages = _build_grounded_messages(question, local_reply, kb_result, grounding_context_text)
 
     try:
         answer = _chat_completion(config, messages)
@@ -176,7 +177,12 @@ def build_external_assistant_answer(
     return None
 
 
-def _build_grounded_messages(question: str, local_reply: Dict, kb_result: Dict) -> List[Dict[str, str]]:
+def _build_grounded_messages(
+    question: str,
+    local_reply: Dict,
+    kb_result: Dict,
+    grounding_context_text: str = "",
+) -> List[Dict[str, str]]:
     context_lines = []
     for item in kb_result.get("answer_context", [])[:4]:
         context_lines.append(
@@ -187,25 +193,31 @@ def _build_grounded_messages(question: str, local_reply: Dict, kb_result: Dict) 
             )
         )
 
-    context_text = "\n\n".join(context_lines) or "暂无额外知识库片段。"
+    knowledge_context = "\n\n".join(context_lines) or "暂无额外知识库片段。"
+    realtime_context = grounding_context_text.strip() or "本问题未匹配到需要强接地的实时工单上下文。"
     citations = "、".join(item.get("path", "") for item in local_reply.get("citations", []))
 
     system_prompt = (
         "你是建筑能源智能管理系统的运维问答助手。"
         "请使用中文回答，回答必须基于给定数据结论和知识库片段，"
-        "不要编造系统中没有的数据。必须直接回答用户问题，不要泛泛介绍系统能力。"
+        "不要编造系统中没有的数据。涉及工单时，只能使用 REAL_TIME_WORK_ORDER_CONTEXT "
+        "中给出的 work_order_id、equipment_id、状态、时间线、损失和节约数据；"
+        "如果上下文没有对应实体，就明确说明当前实时数据未提供。"
+        "必须直接回答用户问题，不要泛泛介绍系统能力。"
         "回答控制在 180 字以内，适合课堂演示。"
     )
     user_prompt = (
         "用户问题：{question}\n\n"
         "本地规则分析结论：{local_answer}\n\n"
-        "已匹配知识库片段：\n{context}\n\n"
+        "实时业务上下文：\n{realtime_context}\n\n"
+        "已匹配知识库片段：\n{knowledge_context}\n\n"
         "已有引用路径：{citations}\n\n"
         "请给出更自然但仍然可追溯的回答。不要说“可以询问”“随时提问”这类空泛话。"
     ).format(
         question=question,
         local_answer=local_reply.get("answer", ""),
-        context=context_text,
+        realtime_context=realtime_context,
+        knowledge_context=knowledge_context,
         citations=citations,
     )
 

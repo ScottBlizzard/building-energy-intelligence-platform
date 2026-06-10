@@ -9,12 +9,14 @@ from mcp.client.stdio import stdio_client
 
 
 @pytest.mark.anyio
-async def test_mcp_stdio_server_can_be_initialized_and_called():
+async def test_mcp_stdio_server_can_be_initialized_and_called(tmp_path):
     backend_dir = Path(__file__).resolve().parents[1]
     env = os.environ.copy()
     env["PYTHONPATH"] = str(backend_dir)
     env["LLM_ENABLED"] = "false"
     env["MCP_TRANSPORT"] = "stdio"
+    env["WORK_ORDER_FILE"] = str(tmp_path / "work_orders.json")
+    env["BUDGET_FILE"] = str(tmp_path / "budgets.json")
 
     server_params = StdioServerParameters(
         command=sys.executable,

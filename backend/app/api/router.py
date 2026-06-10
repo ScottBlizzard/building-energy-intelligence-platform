@@ -9,6 +9,7 @@ from app.api.routes import (
     budget,
     building_detail,
     data,
+    decision,
     export,
     health,
     roi,
@@ -31,4 +32,5 @@ api_router.include_router(work_orders.router, prefix="/work-orders", tags=["work
 api_router.include_router(simulation.router, prefix="/sim", tags=["simulation"])
 api_router.include_router(budget.router, prefix="/budget", tags=["budget"])
 api_router.include_router(roi.router, prefix="/roi", tags=["roi"])
+api_router.include_router(decision.router, prefix="/decisions", tags=["decisions"])
 

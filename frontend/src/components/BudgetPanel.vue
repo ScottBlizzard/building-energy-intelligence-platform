@@ -57,6 +57,34 @@
         </div>
       </div>
 
+      <div v-if="closureImpact" class="closure-impact-panel">
+        <div>
+          <span>Closure Impact</span>
+          <strong>已关闭工单预算修正</strong>
+          <p>{{ closureImpact.summary }}</p>
+        </div>
+        <div class="closure-impact-grid">
+          <div>
+            <span>减少预测电量</span>
+            <strong>{{ formatNumber(closureImpact.total_saved_kwh) }} kWh</strong>
+          </div>
+          <div>
+            <span>回收金额</span>
+            <strong>{{ formatNumber(closureImpact.total_saving_yuan) }} 元</strong>
+          </div>
+          <div>
+            <span>减排影响</span>
+            <strong>{{ formatNumber(closureImpact.total_carbon_kg) }} kg</strong>
+          </div>
+          <div>
+            <span>预测执行率</span>
+            <strong>
+              {{ closureImpact.budget_projection?.after_projected_execution_rate ?? analysis.total_projected_execution_rate }}%
+            </strong>
+          </div>
+        </div>
+      </div>
+
       <div class="budget-chart">
         <div class="budget-bar-header">
           <span>楼栋预算执行对比 · {{ selectedMonth }} 月</span>
@@ -185,6 +213,7 @@ import { ref, reactive, computed, watch, onMounted } from "vue";
 import {
   fetchBudgetAnalysis,
   fetchBudgetKPI,
+  fetchDecisionBudgetImpact,
   generateBudgets,
   setBudget,
 } from "../lib/api.js";
@@ -203,6 +232,7 @@ const loading = ref(false);
 const error = ref("");
 const analysis = ref(null);
 const selectedKPI = ref(null);
+const closureImpact = ref(null);
 
 const yearOptions = [2024, 2025, 2026, 2027];
 
@@ -241,11 +271,14 @@ async function loadBudgetAnalysis() {
   try {
     const result = await fetchBudgetAnalysis(selectedYear.value, selectedMonth.value);
     analysis.value = result.item;
+    const impact = await fetchDecisionBudgetImpact(selectedYear.value, selectedMonth.value);
+    closureImpact.value = impact.item;
     if (result.item.buildings.length && !selectedKPI.value) {
       await loadKPI(result.item.buildings[0].building_id);
     }
   } catch (e) {
     error.value = "预算数据加载失败，请确认后端服务可用。";
+    closureImpact.value = null;
   } finally {
     loading.value = false;
   }
@@ -336,6 +369,64 @@ onMounted(() => {
 .kpi-card--danger strong { color: #d9364f; }
 .text-danger { color: #d9364f; }
 
+.closure-impact-panel {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
+  gap: 16px;
+  border: 1px solid rgba(15,139,141,0.16);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(15,139,141,0.08), rgba(255,255,255,0.94));
+  padding: 18px;
+}
+
+.closure-impact-panel > div:first-child span {
+  color: #0f8b8d;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.closure-impact-panel > div:first-child strong {
+  display: block;
+  color: var(--ink-strong);
+  font-size: 18px;
+  margin-top: 4px;
+}
+
+.closure-impact-panel p {
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 8px 0 0;
+}
+
+.closure-impact-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.closure-impact-grid > div {
+  border: 1px solid rgba(20,34,48,0.07);
+  border-radius: 12px;
+  background: rgba(255,255,255,0.78);
+  padding: 12px;
+}
+
+.closure-impact-grid span {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.closure-impact-grid strong {
+  display: block;
+  color: #0f6f71;
+  font-size: 18px;
+  margin-top: 4px;
+}
+
 .budget-chart {
   background: rgba(255,255,255,0.92); border-radius: 16px; padding: 20px;
   box-shadow: 0 10px 28px rgba(20,34,48,0.06);
@@ -418,6 +509,10 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .budget-kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .closure-impact-panel,
+  .closure-impact-grid {
+    grid-template-columns: 1fr;
+  }
   .budget-set-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .budget-bar-subtitle { flex-direction: column; gap: 2px; }
 }

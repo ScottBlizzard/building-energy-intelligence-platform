@@ -16,6 +16,27 @@
       </button>
     </div>
 
+    <div v-if="roiCandidates.length" class="roi-candidate-panel">
+      <div class="roi-candidate-head">
+        <span>Retrofit Pool</span>
+        <strong>重复异常改造候选池</strong>
+        <p>设备多次异常后自动进入 ROI 讨论，改造通过后应影响未来预算基线和异常概率假设。</p>
+      </div>
+      <div class="roi-candidate-grid">
+        <article
+          v-for="item in roiCandidates.slice(0, 4)"
+          :key="item.equipment_id"
+          class="roi-candidate-card"
+          @click="selectCandidate(item)"
+        >
+          <strong>#{{ item.retrofit_score }} · {{ item.equipment_id }}</strong>
+          <span>{{ item.building_name }} · {{ item.equipment_type }}</span>
+          <p>{{ item.reason }}</p>
+          <em>{{ item.recommended_option }}</em>
+        </article>
+      </div>
+    </div>
+
     <div v-if="loading" class="data-loading">
       <LoadingSpinner text="正在分析设备能效..." />
     </div>
@@ -211,7 +232,12 @@
 
 <script setup>
 import { ref, reactive, computed, watch, onMounted } from "vue";
-import { fetchEquipmentAudit, analyzeROIProject, compareROIScenarios } from "../lib/api.js";
+import {
+  fetchDecisionROICandidates,
+  fetchEquipmentAudit,
+  analyzeROIProject,
+  compareROIScenarios
+} from "../lib/api.js";
 import SectionCard from "./SectionCard.vue";
 import StatusBanner from "./StatusBanner.vue";
 import LoadingSpinner from "./LoadingSpinner.vue";
@@ -230,6 +256,7 @@ const selectedEquipment = ref(null);
 const selectedPreset = ref("");
 const roiResult = ref(null);
 const scenarioComparison = ref(null);
+const roiCandidates = ref([]);
 
 const roiForm = reactive({
   investment_yuan: 150000,
@@ -249,8 +276,12 @@ async function loadAudit() {
   loading.value = true;
   error.value = "";
   try {
-    const result = await fetchEquipmentAudit(selectedBuilding.value);
+    const [result, candidates] = await Promise.all([
+      fetchEquipmentAudit(selectedBuilding.value),
+      fetchDecisionROICandidates(8)
+    ]);
     audit.value = result.item;
+    roiCandidates.value = candidates.items || [];
     selectedEquipment.value = null;
     roiResult.value = null;
     scenarioComparison.value = null;
@@ -258,6 +289,20 @@ async function loadAudit() {
     error.value = "设备诊断数据加载失败。";
   } finally {
     loading.value = false;
+  }
+}
+
+async function selectCandidate(candidate) {
+  if (!candidate?.building_id) {
+    return;
+  }
+  selectedBuilding.value = candidate.building_id;
+  await loadAudit();
+  const match = audit.value?.equipment_list?.find(
+    (item) => item.equipment_type === candidate.equipment_type
+  );
+  if (match) {
+    selectEquipment(match);
   }
 }
 
@@ -362,6 +407,80 @@ onMounted(() => {
 .roi-toolbar label { display: grid; gap: 6px; font-size: 13px; color: var(--ink-soft); }
 .roi-toolbar select {
   padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(20,34,48,0.12); font: inherit;
+}
+
+.roi-candidate-panel {
+  border: 1px solid rgba(15,139,141,0.16);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(15,139,141,0.08), rgba(255,255,255,0.94));
+  padding: 18px;
+}
+
+.roi-candidate-head {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 14px;
+}
+
+.roi-candidate-head span {
+  color: #0f8b8d;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.roi-candidate-head strong {
+  color: var(--ink-strong);
+  font-size: 18px;
+}
+
+.roi-candidate-head p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.roi-candidate-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.roi-candidate-card {
+  display: grid;
+  gap: 6px;
+  border: 1px solid rgba(20,34,48,0.08);
+  border-radius: 14px;
+  background: rgba(255,255,255,0.82);
+  padding: 14px;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.roi-candidate-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px rgba(20,34,48,0.09);
+}
+
+.roi-candidate-card strong {
+  color: var(--accent-deep);
+  font-size: 14px;
+}
+
+.roi-candidate-card span,
+.roi-candidate-card p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.roi-candidate-card em {
+  color: #15724d;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 700;
 }
 
 .equipment-audit-grid {
@@ -536,6 +655,7 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .equipment-audit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .roi-candidate-grid { grid-template-columns: 1fr; }
   .roi-preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .roi-custom-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .roi-result-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
