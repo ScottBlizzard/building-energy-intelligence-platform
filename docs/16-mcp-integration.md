@@ -2,7 +2,7 @@
 
 ## 1. 目标
 
-本项目已经补充独立的 Model Context Protocol Server，用于把建筑能耗数据接入、查询统计、异常诊断、运营报告和智能问答能力暴露给支持 MCP 的客户端。
+本项目已经补充独立的 Model Context Protocol Server，用于把建筑能耗数据接入、查询统计、异常诊断、业务闭环看板、运营报告和智能问答能力暴露给支持 MCP 的客户端。
 
 MCP 入口文件：
 
@@ -55,6 +55,11 @@ http://127.0.0.1:8765/mcp
 | `suggest_anomaly_work_orders` | 根据异常记录生成建议工单，不写入持久化文件。 |
 | `get_optimization_recommendations` | 输出节能优化建议。 |
 | `get_operation_report` | 生成当前范围的运营日报摘要。 |
+| `get_admin_business_dashboard` | 获取管理员业务看板，包括开放工单、待复核、高优先级未闭环和下一步动作。 |
+| `list_persistent_work_orders` | 查询持久化工单，支持按工人、状态和角色过滤，并返回状态统计。 |
+| `get_worker_business_dashboard` | 获取指定工人的个人工单看板和下一步动作。 |
+| `get_work_order_detail` | 查询单个工单详情及生命周期时间线。 |
+| `get_anomaly_event_context` | 获取异常事件上下文，包括规则解释、设备画像、关联工单和下一步动作。 |
 | `search_energy_knowledge` | 检索本地知识库并返回引用。 |
 | `ask_energy_assistant` | 使用本地规则、知识库引用和可选外部 LLM 回答运维问题。 |
 
@@ -76,9 +81,13 @@ http://127.0.0.1:8765/mcp
 3. 调用 `get_time_summary`，生成日维度能耗趋势。
 4. 调用 `get_cop_ranking`，确认 COP 统计能力。
 5. 调用 `get_anomalies` 和 `explain_anomaly`，验证异常诊断。
-6. 调用 `get_operation_report`，生成运营日报。
-7. 调用 `ask_energy_assistant`，验证智慧运维问答。
+6. 调用 `get_admin_business_dashboard`，验证管理员业务闭环看板。
+7. 调用 `list_persistent_work_orders`，确认工单状态机和持久化记录。
+8. 调用 `get_worker_business_dashboard`，验证工人只看到本人任务。
+9. 调用 `get_anomaly_event_context`，验证异常事件、设备上下文和关联工单聚合。
+10. 调用 `get_operation_report`，生成运营日报。
+11. 调用 `ask_energy_assistant`，验证智慧运维问答。
 
 ## 6. 与原项目描述的对应关系
 
-原描述要求“基于 MCP 协议开发数据接入与查询接口”。当前实现已经将原 FastAPI 服务层封装为独立 MCP Server，MCP Tools 覆盖数据接入、统一查询、统计分析、异常诊断、知识库检索和智能问答，MCP Resources 提供数据集和运营报告上下文。因此，该项已经从“REST 等价实现”补充为“REST + MCP 双接口实现”。
+原描述要求“基于 MCP 协议开发数据接入与查询接口”。当前实现已经将原 FastAPI 服务层封装为独立 MCP Server，MCP Tools 覆盖数据接入、统一查询、统计分析、异常诊断、业务闭环工单查询、知识库检索和智能问答，MCP Resources 提供数据集和运营报告上下文。因此，该项已经从“REST 等价实现”补充为“REST + MCP 双接口实现”。

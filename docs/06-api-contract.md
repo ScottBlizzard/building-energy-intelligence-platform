@@ -287,21 +287,98 @@
 - `risk`
 - `latest_anomaly`
 - `work_order`
+- `work_order_closure`
 - `forecast`
 - `recommendation`
 - `action_items`
+
+### `POST /api/v1/auth/login`
+
+用途：演示账号登录，返回用户信息和演示 token。
+
+请求体核心字段：
+
+- `username`
+- `password`
+
+演示账号：
+
+- `admin / admin123`
+- `worker_ahu / worker123`
+- `worker_chiller / worker123`
+
+### `GET /api/v1/auth/me`
+
+用途：根据 `Authorization: Bearer <token>` 返回当前用户。
+
+### `GET /api/v1/auth/users`
+
+用途：返回可分配工单的演示用户列表。
+
+### `GET /api/v1/admin/dashboard`
+
+用途：返回管理员业务闭环看板，包括开放工单、待复核、高优先级未闭环、已关闭工单、待复核队列和下一步动作。
+
+### `GET /api/v1/admin/worker-dashboard/{user_id}`
+
+用途：返回某个工人的个人工单看板，包括待接单、处理中、待复核和已关闭数量。
+
+### `GET /api/v1/anomaly-events/{record_id}`
+
+用途：返回异常事件上下文，聚合异常解释、设备画像、关联工单和下一步动作。
 
 ### `GET /api/v1/work-orders`
 
 用途：读取后端持久化保存的人工工单列表。
 
+查询参数：
+
+- `assignee_id`
+- `status`
+- `role`
+
 ### `POST /api/v1/work-orders`
 
-用途：把前端选择的异常记录创建为“处理中”工单，并写入 `data/runtime/work_orders.json`。
+用途：把前端选择的异常记录创建为持久化工单，并写入 `data/runtime/work_orders.json`。若带有 `assignee_id`，默认进入 `assigned` 已派单状态。
 
 ### `PATCH /api/v1/work-orders/{work_order_id}`
 
-用途：更新工单状态、负责人或处理备注。
+用途：兼容旧版页面，更新工单状态、负责人或处理备注。
+
+### `PATCH /api/v1/work-orders/{work_order_id}/assign`
+
+用途：管理员派单或重新派单。
+
+请求体核心字段：
+
+- `assignee_id`
+- `operator_id`
+- `note`
+
+### `PATCH /api/v1/work-orders/{work_order_id}/accept`
+
+用途：工人接单，状态进入 `in_progress`。
+
+### `PATCH /api/v1/work-orders/{work_order_id}/submit`
+
+用途：工人提交处理结果，状态进入 `pending_review`。
+
+请求体核心字段：
+
+- `operator_id`
+- `actual_cause`
+- `resolution_note`
+- `recovery_confirmed`
+- `parts_used`
+- `safety_note`
+
+### `PATCH /api/v1/work-orders/{work_order_id}/review`
+
+用途：管理员复核。`approved=true` 时关闭工单，`approved=false` 时驳回重办。
+
+### `PATCH /api/v1/work-orders/{work_order_id}/ignore`
+
+用途：管理员判断异常无需现场处理，将工单置为 `ignored`。
 
 ### `GET /api/v1/export/csv`
 
@@ -427,6 +504,11 @@ http://127.0.0.1:8765/mcp
 | `suggest_anomaly_work_orders` | 生成建议工单，不写入持久化文件 | `building_id`、`floor_label`、`start_time`、`end_time`、`limit` |
 | `get_optimization_recommendations` | 获取节能优化建议 | `building_id`、`floor_label`、`start_time`、`end_time` |
 | `get_operation_report` | 生成运营日报摘要 | `building_id`、`floor_label`、`start_time`、`end_time` |
+| `get_admin_business_dashboard` | 获取管理员业务闭环看板 | 无 |
+| `list_persistent_work_orders` | 查询持久化工单和状态统计 | `assignee_id`、`status`、`role`、`limit` |
+| `get_worker_business_dashboard` | 获取工人个人工单看板 | `user_id` |
+| `get_work_order_detail` | 获取单个工单详情和时间线 | `work_order_id` |
+| `get_anomaly_event_context` | 获取异常事件、设备上下文和关联工单 | `record_id` |
 | `search_energy_knowledge` | 检索本地知识库 | `query`、`top_k` |
 | `ask_energy_assistant` | 智能运维问答 | `question`、`use_external_llm` |
 

@@ -19,6 +19,9 @@ class WorkOrderCreate(BaseModel):
     possible_cause: str
     recommended_action: str
     owner_role: str
+    assignee_id: Optional[str] = None
+    assignee_name: Optional[str] = None
+    created_by: Optional[str] = None
     note: Optional[str] = ""
 
 
@@ -26,3 +29,34 @@ class WorkOrderUpdate(BaseModel):
     status: Optional[str] = None
     note: Optional[str] = None
     owner_role: Optional[str] = None
+
+
+class WorkOrderAssign(BaseModel):
+    assignee_id: str
+    note: Optional[str] = ""
+    operator_id: str = "admin"
+
+
+class WorkOrderAccept(BaseModel):
+    operator_id: str
+    note: Optional[str] = ""
+
+
+class WorkOrderSubmit(BaseModel):
+    operator_id: str
+    actual_cause: str
+    resolution_note: str
+    recovery_confirmed: bool = True
+    parts_used: Optional[str] = ""
+    safety_note: Optional[str] = ""
+
+
+class WorkOrderReview(BaseModel):
+    operator_id: str = "admin"
+    approved: bool
+    review_note: Optional[str] = ""
+
+
+class WorkOrderIgnore(BaseModel):
+    operator_id: str = "admin"
+    note: Optional[str] = ""

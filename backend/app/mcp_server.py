@@ -28,6 +28,8 @@ from app.services.analysis_service import (
     to_serializable_records,
 )
 from app.services.assistant_service import build_assistant_reply
+from app.services.admin_dashboard_service import build_admin_dashboard, worker_dashboard
+from app.services.anomaly_event_service import build_anomaly_event
 from app.services.data_loader import (
     get_building_options,
     get_dataset_meta as load_dataset_meta,
@@ -36,7 +38,7 @@ from app.services.data_loader import (
 )
 from app.services.knowledge_search_service import search_and_format_citations
 from app.services.llm_client import build_external_assistant_answer
-from app.services.work_order_store import list_work_orders
+from app.services.work_order_store import build_work_order_metrics, list_work_orders
 
 
 def _mcp_port() -> int:
@@ -299,6 +301,50 @@ def get_operation_report(
     """Generate an operation report summary for the selected scope."""
     frame = _load_analysis_frame(building_id, floor_label, start_time, end_time)
     return {"item": build_operation_report(frame, list_work_orders())}
+
+
+@mcp.tool()
+def get_admin_business_dashboard() -> dict:
+    """Return admin KPIs, pending review queue, high-priority open work orders, and next actions."""
+    return build_admin_dashboard()
+
+
+@mcp.tool()
+def list_persistent_work_orders(
+    assignee_id: Optional[str] = None,
+    status: Optional[str] = None,
+    role: Optional[Literal["admin", "worker"]] = None,
+    limit: int = 50,
+) -> dict:
+    """List persisted work orders with role, assignee, status, timeline, and closure metrics."""
+    items = list_work_orders(assignee_id=assignee_id, status=status, role=role)
+    limited = items[: _limit(limit, 200)]
+    return {
+        "metrics": build_work_order_metrics(items),
+        "items": limited,
+    }
+
+
+@mcp.tool()
+def get_worker_business_dashboard(user_id: str) -> dict:
+    """Return a worker-specific work order dashboard and next actions."""
+    return worker_dashboard(user_id)
+
+
+@mcp.tool()
+def get_work_order_detail(work_order_id: str) -> dict:
+    """Return one persisted work order with its lifecycle timeline."""
+    item = next(
+        (order for order in list_work_orders() if order.get("work_order_id") == work_order_id),
+        None,
+    )
+    return {"item": item}
+
+
+@mcp.tool()
+def get_anomaly_event_context(record_id: str) -> dict:
+    """Return an anomaly event with diagnosis, equipment context, linked work orders, and next action."""
+    return {"item": build_anomaly_event(record_id)}
 
 
 @mcp.tool()

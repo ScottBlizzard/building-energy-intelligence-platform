@@ -14,7 +14,7 @@
 ## 当前仓库包含什么
 
 - `backend/`：FastAPI 后端和 MCP Server，已包含总览、元数据、查询、分析、导出和知识引用型问答接口。
-- `frontend/`：Vue 3 + Vite 前端，已形成“总览 / 数据浏览 / 统计分析 / 工单中心 / 决策报告 / AI 助手”工作台。
+- `frontend/`：Vue 3 + Vite 前端，已形成“角色登录 / 总览 / 数据浏览 / 统计分析 / 工单中心 / 我的工单 / 决策报告 / AI 助手”工作台。
 - `data/`：样例能耗数据、数据字典、原始/处理后数据目录和数据检查说明。
 - `knowledge_base/`：异常诊断、设备维护、建筑类型、术语规则和结构化问答素材。
 - `docs/`：课程交付文档、SRS、SDS、SEE、SEM、接口契约、MCP 集成说明、验收报告和提交指南。
@@ -118,6 +118,16 @@ npm run dev
 - 后端文档：`http://127.0.0.1:8000/docs`
 - 健康检查：`http://127.0.0.1:8000/api/v1/health`
 
+### 3.1 演示账号
+
+| 角色 | 账号 | 密码 | 演示职责 |
+| --- | --- | --- | --- |
+| 管理员 | `admin` | `admin123` | 查看全局看板、生成工单、派单、复核关闭 |
+| 空调巡检员 | `worker_ahu` | `worker123` | 查看本人 AHU 工单、接单、提交处理结果 |
+| 制冷值班员 | `worker_chiller` | `worker123` | 查看本人制冷机房工单、接单、提交处理结果 |
+
+推荐演示链路：管理员登录生成并派单 -> 工人登录接单并提交处理结果 -> 管理员重新登录复核关闭 -> 查看运营日报和 MCP 工具输出。
+
 ### 4. 启动 MCP Server
 
 默认 stdio transport，适合支持 MCP 的本地客户端：
@@ -161,14 +171,25 @@ npm run dev
 - `GET /api/v1/analytics/work-orders`
 - `GET /api/v1/analytics/optimization-recommendations`
 - `GET /api/v1/analytics/operation-report`
+- `POST /api/v1/auth/login`
+- `GET /api/v1/auth/me`
+- `GET /api/v1/auth/users`
+- `GET /api/v1/admin/dashboard`
+- `GET /api/v1/admin/worker-dashboard/{user_id}`
+- `GET /api/v1/anomaly-events/{record_id}`
 - `GET /api/v1/work-orders`
 - `POST /api/v1/work-orders`
 - `PATCH /api/v1/work-orders/{work_order_id}`
+- `PATCH /api/v1/work-orders/{work_order_id}/assign`
+- `PATCH /api/v1/work-orders/{work_order_id}/accept`
+- `PATCH /api/v1/work-orders/{work_order_id}/submit`
+- `PATCH /api/v1/work-orders/{work_order_id}/review`
+- `PATCH /api/v1/work-orders/{work_order_id}/ignore`
 - `GET /api/v1/export/csv`
 - `GET /api/v1/assistant/providers`
 - `POST /api/v1/assistant/query`
 
-MCP 接入说明见 [`docs/16-mcp-integration.md`](docs/16-mcp-integration.md)。MCP Server 入口为 `backend/app/mcp_server.py`，覆盖数据元信息、建筑清单、能耗记录查询、统计分析、异常解释、运营报告、知识库检索和智能问答。
+MCP 接入说明见 [`docs/16-mcp-integration.md`](docs/16-mcp-integration.md)。MCP Server 入口为 `backend/app/mcp_server.py`，覆盖数据元信息、建筑清单、能耗记录查询、统计分析、异常解释、业务闭环看板、运营报告、知识库检索和智能问答。
 
 ## 数据与知识库说明
 
@@ -213,6 +234,8 @@ python .\scripts\generate_sample_dataset.py
 - SEE 软件经济分析与评价：[`docs/19-SEE-software-economic-evaluation.md`](docs/19-SEE-software-economic-evaluation.md)
 - SEM 软件工程管理说明：[`docs/20-SEM-software-engineering-management.md`](docs/20-SEM-software-engineering-management.md)
 - 最终提交与打包说明：[`docs/21-final-submission-guide.md`](docs/21-final-submission-guide.md)
+- 业务逻辑闭环开发迭代计划：[`docs/22-business-logic-iteration-plan.md`](docs/22-business-logic-iteration-plan.md)
+- 业务逻辑闭环实现与验收记录：[`docs/23-business-logic-closure-acceptance.md`](docs/23-business-logic-closure-acceptance.md)
 
 ## 开发说明
 
@@ -236,5 +259,6 @@ python .\scripts\generate_sample_dataset.py
 1. 已完成两轮任务整合后的核心系统打磨，前后端、数据、知识库、外部大模型配置和演示文档已进入可演示状态。
 2. 统计分析不再只停留在建筑级查询，已补充异常解释、楼层设备台账、设备运行监测、异常工单和运营优化建议。
 3. 总览页已加入可拖拽旋转的三维楼宇风险态势图，点击楼层可联动统计分析筛选。
-4. 已新增“工单中心”和“决策报告”导航，用于展示后端持久化工单闭环、能耗预测、节能模拟和一键运营日报。
-5. 已补齐 SRS、SDS、SEE、SEM、验收报告和最终提交说明。系统侧进入封版状态，剩余主要是 PPT、演示视频和 Canvas 打包提交。
+4. 已新增角色登录、管理员工单中心和工人“我的工单”，用于展示异常确认、派单、接单、处理、复核关闭和归档日报的完整业务闭环。
+5. 已新增“决策报告”导航，用于展示后端持久化工单闭环、能耗预测、节能模拟和一键运营日报。
+6. 已补齐 SRS、SDS、SEE、SEM、验收报告、最终提交说明和业务闭环迭代/验收文档。系统侧进入封版状态，剩余主要是 PPT、演示视频和 Canvas 打包提交。

@@ -94,8 +94,39 @@ export function fetchOperationReport(params = {}) {
   return request("/analytics/operation-report", {}, params);
 }
 
-export function fetchPersistentWorkOrders() {
-  return request("/work-orders");
+export function loginUser(payload) {
+  return request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchCurrentUser(token) {
+  return request("/auth/me", {
+    headers: {
+      Authorization: `Bearer ${token}`
+    }
+  });
+}
+
+export function fetchDemoUsers() {
+  return request("/auth/users");
+}
+
+export function fetchAdminDashboard() {
+  return request("/admin/dashboard");
+}
+
+export function fetchWorkerDashboard(userId) {
+  return request(`/admin/worker-dashboard/${encodeURIComponent(userId)}`);
+}
+
+export function fetchAnomalyEvent(recordId) {
+  return request(`/anomaly-events/${encodeURIComponent(recordId)}`);
+}
+
+export function fetchPersistentWorkOrders(params = {}) {
+  return request("/work-orders", {}, params);
 }
 
 export function createPersistentWorkOrder(payload) {
@@ -107,6 +138,41 @@ export function createPersistentWorkOrder(payload) {
 
 export function updatePersistentWorkOrder(workOrderId, payload) {
   return request(`/work-orders/${encodeURIComponent(workOrderId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function assignPersistentWorkOrder(workOrderId, payload) {
+  return request(`/work-orders/${encodeURIComponent(workOrderId)}/assign`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function acceptPersistentWorkOrder(workOrderId, payload) {
+  return request(`/work-orders/${encodeURIComponent(workOrderId)}/accept`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function submitPersistentWorkOrder(workOrderId, payload) {
+  return request(`/work-orders/${encodeURIComponent(workOrderId)}/submit`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function reviewPersistentWorkOrder(workOrderId, payload) {
+  return request(`/work-orders/${encodeURIComponent(workOrderId)}/review`, {
+    method: "PATCH",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function ignorePersistentWorkOrder(workOrderId, payload) {
+  return request(`/work-orders/${encodeURIComponent(workOrderId)}/ignore`, {
     method: "PATCH",
     body: JSON.stringify(payload)
   });

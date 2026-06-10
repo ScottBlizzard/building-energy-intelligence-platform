@@ -675,7 +675,10 @@ def build_operation_report(frame: pd.DataFrame, work_orders: List[Dict] | None =
         else 0
     )
     forecast_week_kwh = round(forecast_base * 7, 2)
-    open_orders = [item for item in work_orders if item.get("status") != "已完成"]
+    closed_statuses = {"已完成", "closed", "ignored", "已关闭", "已忽略"}
+    open_orders = [item for item in work_orders if item.get("status") not in closed_statuses]
+    pending_review = [item for item in work_orders if item.get("status") == "pending_review"]
+    closed_orders = [item for item in work_orders if item.get("status") in {"closed", "已关闭", "已完成"}]
     top_floor = next((item for item in floors if item.get("anomaly_count", 0) > 0), floors[0] if floors else None)
     top_recommendation = recommendations[0] if recommendations else None
     top_anomaly = anomalies[0] if anomalies else None
@@ -693,7 +696,8 @@ def build_operation_report(frame: pd.DataFrame, work_orders: List[Dict] | None =
         else "当前范围未发现异常记录。"
     )
     order_text = (
-        f"当前已有 {len(open_orders)} 个未完成工单，建议优先处理高优先级和设备状态异常工单。"
+        f"当前已有 {len(open_orders)} 个未完成工单，其中 {len(pending_review)} 个等待管理员复核，"
+        "建议优先处理高优先级和设备状态异常工单。"
         if open_orders
         else "当前没有未完成工单，可维持常规巡检。"
     )
@@ -718,6 +722,7 @@ def build_operation_report(frame: pd.DataFrame, work_orders: List[Dict] | None =
         "risk": risk_text,
         "latest_anomaly": anomaly_text,
         "work_order": order_text,
+        "work_order_closure": f"当前已关闭 {len(closed_orders)} 个工单，可作为日报归档案例。",
         "forecast": f"按最近日度趋势估算，未来 7 天电耗约 {forecast_week_kwh:,.0f} kWh。",
         "recommendation": recommendation_text,
         "action_items": [

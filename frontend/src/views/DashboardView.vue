@@ -13,8 +13,11 @@ import KpiCard from "../components/KpiCard.vue";
 import SectionCard from "../components/SectionCard.vue";
 import BuildingRiskScene from "../components/BuildingRiskScene.vue";
 import {
+  acceptPersistentWorkOrder,
+  assignPersistentWorkOrder,
   createPersistentWorkOrder,
   downloadCsvExport,
+  fetchAdminDashboard,
   fetchAnomalyExplanation,
   fetchAnomalies,
   fetchAnomalyReasons,
@@ -22,7 +25,9 @@ import {
   fetchBuildingComparison,
   fetchBuildings,
   fetchCopRanking,
+  fetchCurrentUser,
   fetchDatasetMeta,
+  fetchDemoUsers,
   fetchEquipmentSummary,
   fetchFloorRegistry,
   fetchFloorSummary,
@@ -32,8 +37,13 @@ import {
   fetchPersistentWorkOrders,
   fetchRecords,
   fetchTimeSummary,
+  fetchWorkerDashboard,
   fetchWorkOrders,
+  ignorePersistentWorkOrder,
+  loginUser,
   queryAssistant,
+  reviewPersistentWorkOrder,
+  submitPersistentWorkOrder,
   updatePersistentWorkOrder
 } from "../lib/api";
 
@@ -86,21 +96,46 @@ function createDefaultAnalysisFilters() {
 }
 
 const WORK_ORDER_STORAGE_KEY = "building-energy-work-order-state";
+const AUTH_STORAGE_KEY = "building-energy-auth-state";
 
 function loadPersistedWorkOrderState() {
   if (typeof window === "undefined") {
-    return { statusById: {}, notesById: {} };
+    return { statusById: {}, notesById: {}, generatedOrders: [], submitDrafts: {}, reviewNotes: {}, assignmentById: {} };
   }
 
   try {
     const raw = window.localStorage.getItem(WORK_ORDER_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : { statusById: {}, notesById: {}, generatedOrders: [] };
+    return raw
+      ? JSON.parse(raw)
+      : { statusById: {}, notesById: {}, generatedOrders: [], submitDrafts: {}, reviewNotes: {}, assignmentById: {} };
   } catch {
-    return { statusById: {}, notesById: {}, generatedOrders: [] };
+    return { statusById: {}, notesById: {}, generatedOrders: [], submitDrafts: {}, reviewNotes: {}, assignmentById: {} };
+  }
+}
+
+function loadAuthState() {
+  if (typeof window === "undefined") {
+    return { user: null, token: "" };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : { user: null, token: "" };
+  } catch {
+    return { user: null, token: "" };
   }
 }
 
 const activeTab = ref("overview");
+const persistedAuthState = loadAuthState();
+const currentUser = ref(persistedAuthState.user || null);
+const authToken = ref(persistedAuthState.token || "");
+const loginForm = reactive({
+  username: persistedAuthState.user?.user_id || "admin",
+  password: persistedAuthState.user?.role === "worker" ? "worker123" : "admin123"
+});
+const loggingIn = ref(false);
+const loginError = ref("");
 const apiStatus = reactive({
   message: "正在尝试连接后端接口...",
   type: "info"
@@ -120,6 +155,9 @@ const assistantProviders = ref({
   default_model: "",
   options: []
 });
+const demoUsers = ref([]);
+const adminDashboard = ref(null);
+const workerDashboard = ref(null);
 const selectedAssistantModelKey = ref("");
 const recordSummary = reactive({
   count: 0,
@@ -154,13 +192,16 @@ const persistedWorkOrderState = loadPersistedWorkOrderState();
 const workOrderState = reactive({
   statusById: persistedWorkOrderState.statusById || {},
   notesById: persistedWorkOrderState.notesById || {},
-  generatedOrders: persistedWorkOrderState.generatedOrders || []
+  generatedOrders: persistedWorkOrderState.generatedOrders || [],
+  submitDrafts: persistedWorkOrderState.submitDrafts || {},
+  reviewNotes: persistedWorkOrderState.reviewNotes || {},
+  assignmentById: persistedWorkOrderState.assignmentById || {}
 });
 const orderDraft = reactive({
   buildingId: "",
   floorLabel: "",
   anomalyKey: "",
-  assignee: "楼层巡检员-李明"
+  assigneeId: "worker_ahu"
 });
 const simulation = reactive({
   temperatureDelta: 1,
@@ -185,12 +226,16 @@ const analytics = reactive({
   operationReport: null
 });
 
-const tabs = [
+const adminTabs = [
   { key: "overview", label: "总览" },
   { key: "data", label: "数据浏览" },
   { key: "analytics", label: "统计分析" },
   { key: "orders", label: "工单中心" },
   { key: "report", label: "决策报告" },
+  { key: "assistant", label: "智能问答" }
+];
+const workerTabs = [
+  { key: "worker", label: "我的工单" },
   { key: "assistant", label: "智能问答" }
 ];
 
@@ -403,16 +448,45 @@ const activeAnalysisSummary = computed(() => {
   return parts.join(" · ");
 });
 const orderStatusOptions = [
-  { key: "处理中", label: "处理中" },
-  { key: "已完成", label: "已完成" },
-  { key: "已忽略", label: "已忽略" }
+  { key: "pending_confirm", label: "待确认" },
+  { key: "assigned", label: "已派单" },
+  { key: "in_progress", label: "处理中" },
+  { key: "pending_review", label: "待复核" },
+  { key: "rejected", label: "已驳回" },
+  { key: "closed", label: "已关闭" },
+  { key: "ignored", label: "已忽略" }
 ];
-const orderAssignees = [
-  "楼层巡检员-李明",
-  "空调系统运维员-王强",
-  "制冷机房值班员-赵磊",
-  "能源管理员-陈晨"
-];
+const legacyStatusMap = {
+  处理中: "in_progress",
+  已完成: "closed",
+  已忽略: "ignored"
+};
+const statusLabelMap = Object.fromEntries(orderStatusOptions.map((item) => [item.key, item.label]));
+const statusRank = {
+  pending_confirm: 0,
+  assigned: 1,
+  in_progress: 2,
+  rejected: 3,
+  pending_review: 4,
+  closed: 5,
+  ignored: 6
+};
+const priorityRank = {
+  高: 0,
+  中: 1,
+  低: 2
+};
+const visibleTabs = computed(() => (currentUser.value?.role === "worker" ? workerTabs : adminTabs));
+const isAuthenticated = computed(() => Boolean(currentUser.value && authToken.value));
+const isAdmin = computed(() => currentUser.value?.role === "admin");
+const isWorker = computed(() => currentUser.value?.role === "worker");
+const workerUsers = computed(() => demoUsers.value.filter((item) => item.role === "worker"));
+const selectedAssignee = computed(
+  () =>
+    workerUsers.value.find((item) => item.user_id === orderDraft.assigneeId) ||
+    workerUsers.value[0] ||
+    null
+);
 const analysisHealthState = computed(() => {
   if (!analysisFilters.floorLabel || loading.analytics || analytics.anomalies.length) {
     return null;
@@ -444,23 +518,22 @@ const analysisHealthState = computed(() => {
 const enrichedWorkOrders = computed(() =>
   workOrderState.generatedOrders.map((item) => ({
     ...item,
-    status: workOrderState.statusById[item.work_order_id] || item.status || "处理中",
-    note: workOrderState.notesById[item.work_order_id] || ""
+    status: normalizeOrderStatus(workOrderState.statusById[item.work_order_id] || item.status || "pending_confirm"),
+    status_label: item.status_label || statusLabelMap[normalizeOrderStatus(item.status)] || item.status_label,
+    note: workOrderState.notesById[item.work_order_id] ?? item.note ?? "",
+    assignee_id: item.assignee_id || "",
+    assignee_name: item.assignee_name || item.owner_role || "",
+    timeline: Array.isArray(item.timeline) ? item.timeline : []
   }))
 );
+const roleScopedWorkOrders = computed(() => {
+  if (!isWorker.value) {
+    return enrichedWorkOrders.value;
+  }
+  return enrichedWorkOrders.value.filter((item) => item.assignee_id === currentUser.value?.user_id);
+});
 const sortedWorkOrders = computed(() => {
-  const statusRank = {
-    处理中: 0,
-    已忽略: 1,
-    已完成: 2
-  };
-  const priorityRank = {
-    高: 0,
-    中: 1,
-    低: 2
-  };
-
-  return [...enrichedWorkOrders.value].sort((a, b) => {
+  return [...roleScopedWorkOrders.value].sort((a, b) => {
     const statusDiff = (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9);
     if (statusDiff !== 0) {
       return statusDiff;
@@ -476,11 +549,32 @@ const sortedWorkOrders = computed(() => {
 });
 const orderStats = computed(() => {
   const stats = Object.fromEntries(orderStatusOptions.map((item) => [item.key, 0]));
-  enrichedWorkOrders.value.forEach((item) => {
+  roleScopedWorkOrders.value.forEach((item) => {
     stats[item.status] = (stats[item.status] || 0) + 1;
   });
   return stats;
 });
+const adminClosureRate = computed(() => {
+  const metrics = adminDashboard.value?.work_order_metrics;
+  const total = Number(metrics?.total || roleScopedWorkOrders.value.length || 0);
+  const closed = Number(metrics?.closed || orderStats.value.closed || 0);
+  return total ? `${Math.round((closed / total) * 100)}%` : "0%";
+});
+const workerActionableOrders = computed(() =>
+  sortedWorkOrders.value.filter((item) => ["assigned", "in_progress", "rejected"].includes(item.status))
+);
+const pendingReviewOrders = computed(() =>
+  sortedWorkOrders.value.filter((item) => item.status === "pending_review")
+);
+const adminNextActions = computed(() =>
+  adminDashboard.value?.next_actions?.length
+    ? adminDashboard.value.next_actions
+    : [
+        "复核待复核工单，及时关闭已恢复问题。",
+        "为高风险异常派单，避免停留在监测告警阶段。",
+        "将已关闭工单纳入今日运营日报。"
+      ]
+);
 const availableOrderFloorOptions = computed(() => {
   const floors = new Map();
   analytics.globalAnomalies
@@ -553,6 +647,7 @@ const operationReport = computed(() => {
       risk: analytics.operationReport.risk,
       latestAnomaly: analytics.operationReport.latest_anomaly,
       workOrder: analytics.operationReport.work_order,
+      workOrderClosure: analytics.operationReport.work_order_closure,
       forecast: analytics.operationReport.forecast,
       saving: `按当前模拟策略，预计节电 ${formatNumber(simulationResult.value.savingKwh)} kWh，节约约 ${formatNumber(simulationResult.value.savingCost)} 元。`,
       recommendation: analytics.operationReport.recommendation,
@@ -574,7 +669,8 @@ const operationReport = computed(() => {
     latestAnomaly: analytics.anomalies[0]
       ? `最近异常：${analytics.anomalies[0].building_name} ${analytics.anomalies[0].floor_label}，${analytics.anomalies[0].anomaly_reason}。`
       : "当前筛选范围暂无异常。",
-    workOrder: `${sortedWorkOrders.value.filter((item) => item.status !== "已完成").length} 个工单未完成。`,
+    workOrder: `${sortedWorkOrders.value.filter((item) => !isOrderClosed(item)).length} 个工单未完成。`,
+    workOrderClosure: `${orderStats.value.closed || 0} 个工单已复核关闭，可作为日报归档案例。`,
     forecast: `未来 7 天预测电耗约 ${formatNumber(projectedWeekKwh.value)} kWh。`,
     saving: `按当前模拟策略，预计节电 ${formatNumber(simulationResult.value.savingKwh)} kWh，节约约 ${formatNumber(simulationResult.value.savingCost)} 元。`,
     recommendation: topRecommendation
@@ -601,6 +697,23 @@ function floorSortValue(label = "") {
 
 function formatNumber(value) {
   return Number(value || 0).toLocaleString("zh-CN");
+}
+
+function normalizeOrderStatus(status) {
+  return legacyStatusMap[status] || status || "pending_confirm";
+}
+
+function getOrderStatusLabel(orderOrStatus) {
+  const status = typeof orderOrStatus === "string" ? orderOrStatus : orderOrStatus?.status;
+  const normalized = normalizeOrderStatus(status);
+  if (typeof orderOrStatus === "object" && orderOrStatus?.status_label) {
+    return orderOrStatus.status_label;
+  }
+  return statusLabelMap[normalized] || status || "待确认";
+}
+
+function isOrderClosed(order) {
+  return ["closed", "ignored"].includes(normalizeOrderStatus(order?.status));
 }
 
 function anomalyKey(item) {
@@ -743,6 +856,116 @@ function selectDefaultAssistantModel() {
   );
 }
 
+function persistAuthState() {
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(
+      AUTH_STORAGE_KEY,
+      JSON.stringify({ user: currentUser.value, token: authToken.value })
+    );
+  }
+}
+
+function clearAuthState() {
+  currentUser.value = null;
+  authToken.value = "";
+  adminDashboard.value = null;
+  workerDashboard.value = null;
+  if (typeof window !== "undefined") {
+    window.localStorage.removeItem(AUTH_STORAGE_KEY);
+  }
+}
+
+function switchToDefaultRoleTab() {
+  activeTab.value = isWorker.value ? "worker" : "overview";
+}
+
+async function loadDemoUserList() {
+  try {
+    const payload = await fetchDemoUsers();
+    demoUsers.value = payload.items || [];
+    if (!orderDraft.assigneeId && workerUsers.value.length) {
+      orderDraft.assigneeId = workerUsers.value[0].user_id;
+    }
+  } catch (error) {
+    demoUsers.value = [];
+  }
+}
+
+async function loadRoleDashboards() {
+  if (!isAuthenticated.value) {
+    return;
+  }
+
+  try {
+    if (isAdmin.value) {
+      const payload = await fetchAdminDashboard();
+      adminDashboard.value = payload.item || payload;
+      workerDashboard.value = null;
+    } else if (isWorker.value && currentUser.value?.user_id) {
+      const payload = await fetchWorkerDashboard(currentUser.value.user_id);
+      workerDashboard.value = payload.item || payload;
+      adminDashboard.value = null;
+    }
+  } catch (error) {
+    if (isAdmin.value) {
+      adminDashboard.value = null;
+    } else {
+      workerDashboard.value = null;
+    }
+  }
+}
+
+async function bootstrapAuthenticatedApp() {
+  await Promise.allSettled([loadOverview(), loadAssistantProviders(), loadDemoUserList()]);
+  await Promise.allSettled([loadRecords(), loadAnalytics(), loadPersistentWorkOrders(), loadRoleDashboards()]);
+}
+
+async function handleLogin() {
+  loggingIn.value = true;
+  loginError.value = "";
+  try {
+    const payload = await loginUser({
+      username: loginForm.username.trim(),
+      password: loginForm.password
+    });
+    currentUser.value = payload.user;
+    authToken.value = payload.access_token || payload.token || "";
+    persistAuthState();
+    switchToDefaultRoleTab();
+    await bootstrapAuthenticatedApp();
+  } catch (error) {
+    loginError.value = "账号或密码不正确，请使用管理员 admin/admin123 或工人 worker_ahu/worker123 登录。";
+  } finally {
+    loggingIn.value = false;
+  }
+}
+
+function handleLogout() {
+  clearAuthState();
+  loginForm.username = "admin";
+  loginForm.password = "admin123";
+  activeTab.value = "overview";
+}
+
+async function restoreSession() {
+  if (!authToken.value || !currentUser.value) {
+    return;
+  }
+
+  try {
+    const payload = await fetchCurrentUser(authToken.value);
+    currentUser.value = payload.user || payload;
+    persistAuthState();
+    if (!visibleTabs.value.some((item) => item.key === activeTab.value)) {
+      switchToDefaultRoleTab();
+    }
+    await bootstrapAuthenticatedApp();
+  } catch (error) {
+    clearAuthState();
+    loginError.value = "登录状态已失效，请重新登录。";
+  }
+}
+
 async function loadAssistantProviders() {
   try {
     assistantProviders.value = await fetchAssistantProviders();
@@ -799,11 +1022,18 @@ async function loadPersistentWorkOrders() {
   loading.orders = true;
   errors.orders = "";
   try {
-    const payload = await fetchPersistentWorkOrders();
+    const params = isWorker.value
+      ? { assignee_id: currentUser.value?.user_id, role: "worker" }
+      : {};
+    const payload = await fetchPersistentWorkOrders(params);
     workOrderState.generatedOrders.splice(0, workOrderState.generatedOrders.length, ...payload.items);
     payload.items.forEach((item) => {
-      workOrderState.statusById[item.work_order_id] = item.status || "处理中";
+      workOrderState.statusById[item.work_order_id] = normalizeOrderStatus(item.status || "pending_confirm");
       workOrderState.notesById[item.work_order_id] = item.note || "";
+      if (!workOrderState.assignmentById[item.work_order_id]) {
+        workOrderState.assignmentById[item.work_order_id] = item.assignee_id || orderDraft.assigneeId;
+      }
+      ensureOrderDrafts(item);
     });
   } catch (error) {
     errors.orders = "后端工单存储暂时不可用，当前无法同步持久化工单。";
@@ -947,25 +1177,62 @@ async function handleSceneSelectFloor({ buildingId, floorLabel }) {
   await loadAnalytics();
 }
 
-async function updateWorkOrderStatus(workOrderId, status) {
-  workOrderState.statusById[workOrderId] = status;
-  try {
-    const updated = await updatePersistentWorkOrder(workOrderId, {
-      status,
-      note: workOrderState.notesById[workOrderId] || ""
-    });
-    const index = workOrderState.generatedOrders.findIndex((item) => item.work_order_id === workOrderId);
-    if (index >= 0) {
-      workOrderState.generatedOrders.splice(index, 1, updated);
-    }
-  } catch (error) {
-    errors.orders = "工单状态已在页面更新，但同步到后端失败。";
+function upsertWorkOrder(updated) {
+  if (!updated?.work_order_id) {
+    return;
   }
+
+  updated.status = normalizeOrderStatus(updated.status);
+  const index = workOrderState.generatedOrders.findIndex(
+    (item) => item.work_order_id === updated.work_order_id
+  );
+  if (index >= 0) {
+    workOrderState.generatedOrders.splice(index, 1, updated);
+  } else {
+    workOrderState.generatedOrders.unshift(updated);
+  }
+  workOrderState.statusById[updated.work_order_id] = updated.status;
+  workOrderState.notesById[updated.work_order_id] = updated.note || workOrderState.notesById[updated.work_order_id] || "";
+  workOrderState.assignmentById[updated.work_order_id] = updated.assignee_id || workOrderState.assignmentById[updated.work_order_id] || "";
+  ensureOrderDrafts(updated);
+}
+
+function ensureOrderDrafts(order) {
+  const id = order?.work_order_id;
+  if (!id) {
+    return;
+  }
+  if (!workOrderState.submitDrafts[id]) {
+    workOrderState.submitDrafts[id] = {
+      actual_cause: order.actual_cause || "",
+      resolution_note: order.resolution_note || "",
+      recovery_confirmed: order.recovery_confirmed ?? true,
+      parts_used: order.parts_used || "",
+      safety_note: order.safety_note || ""
+    };
+  }
+  if (workOrderState.reviewNotes[id] === undefined) {
+    workOrderState.reviewNotes[id] = order.review_note || "";
+  }
+}
+
+async function refreshBusinessState({ includeAnalytics = false } = {}) {
+  await Promise.allSettled([
+    loadPersistentWorkOrders(),
+    loadRoleDashboards(),
+    refreshOperationReport(),
+    includeAnalytics ? loadAnalytics() : Promise.resolve()
+  ]);
 }
 
 async function generateWorkOrder() {
   const anomaly = selectedOrderAnomaly.value;
   if (!anomaly) {
+    return;
+  }
+  const assignee = selectedAssignee.value;
+  if (!assignee) {
+    errors.orders = "请先选择一名工人，再生成工单。";
     return;
   }
 
@@ -974,7 +1241,7 @@ async function generateWorkOrder() {
     work_order_id: workOrderId,
     source_record_id: anomaly.record_id,
     priority: inferOrderPriority(anomaly),
-    status: "处理中",
+    status: "assigned",
     building_id: anomaly.building_id,
     building_name: anomaly.building_name,
     floor_label: anomaly.floor_label,
@@ -985,7 +1252,10 @@ async function generateWorkOrder() {
     anomaly_reason: anomaly.anomaly_reason,
     possible_cause: "由异常明细人工确认后生成工单，需现场复核设备运行状态。",
     recommended_action: inferRecommendedAction(anomaly),
-    owner_role: orderDraft.assignee || inferOwnerRole(anomaly)
+    owner_role: assignee.display_name || inferOwnerRole(anomaly),
+    assignee_id: assignee.user_id,
+    assignee_name: assignee.display_name,
+    created_by: currentUser.value?.user_id || "admin"
   };
 
   loading.orders = true;
@@ -993,30 +1263,16 @@ async function generateWorkOrder() {
   try {
     const saved = await createPersistentWorkOrder({
       ...order,
-      note: `已分配给${order.owner_role}处理。`
+      note: `管理员已派单给${order.assignee_name}，等待接单。`
     });
-    const existingIndex = workOrderState.generatedOrders.findIndex(
-      (item) => item.work_order_id === saved.work_order_id
-    );
-    if (existingIndex >= 0) {
-      workOrderState.generatedOrders.splice(existingIndex, 1, saved);
-    } else {
-      workOrderState.generatedOrders.unshift(saved);
-    }
-    workOrderState.statusById[saved.work_order_id] = saved.status || "处理中";
-    workOrderState.notesById[saved.work_order_id] = saved.note || "";
+    upsertWorkOrder(saved);
     orderDraft.anomalyKey = "";
-    await refreshOperationReport();
+    await refreshBusinessState({ includeAnalytics: true });
   } catch (error) {
     errors.orders = "生成工单失败，请确认后端工单接口可用。";
   } finally {
     loading.orders = false;
   }
-}
-
-async function completeWorkOrder(workOrderId) {
-  await updateWorkOrderStatus(workOrderId, "已完成");
-  await refreshOperationReport();
 }
 
 async function saveWorkOrderNote(order) {
@@ -1026,14 +1282,113 @@ async function saveWorkOrderNote(order) {
       status: order.status,
       note
     });
-    const index = workOrderState.generatedOrders.findIndex(
-      (item) => item.work_order_id === order.work_order_id
-    );
-    if (index >= 0) {
-      workOrderState.generatedOrders.splice(index, 1, updated);
-    }
+    upsertWorkOrder(updated);
   } catch (error) {
     errors.orders = "备注保存失败，请稍后重试。";
+  }
+}
+
+async function handleAssignWorkOrder(order) {
+  const assigneeId = workOrderState.assignmentById[order.work_order_id] || order.assignee_id || orderDraft.assigneeId;
+  if (!assigneeId) {
+    errors.orders = "请选择工人后再派单。";
+    return;
+  }
+  loading.orders = true;
+  errors.orders = "";
+  try {
+    const updated = await assignPersistentWorkOrder(order.work_order_id, {
+      assignee_id: assigneeId,
+      operator_id: currentUser.value?.user_id || "admin",
+      note: workOrderState.notesById[order.work_order_id] || "管理员重新派单。"
+    });
+    upsertWorkOrder(updated);
+    await refreshBusinessState();
+  } catch (error) {
+    errors.orders = "派单失败，请检查后端工单状态。";
+  } finally {
+    loading.orders = false;
+  }
+}
+
+async function handleAcceptWorkOrder(order) {
+  loading.orders = true;
+  errors.orders = "";
+  try {
+    const updated = await acceptPersistentWorkOrder(order.work_order_id, {
+      operator_id: currentUser.value?.user_id || "",
+      note: "工人已接单，开始现场处理。"
+    });
+    upsertWorkOrder(updated);
+    await refreshBusinessState();
+  } catch (error) {
+    errors.orders = "接单失败：该工单可能不属于当前工人，或状态不允许接单。";
+  } finally {
+    loading.orders = false;
+  }
+}
+
+async function handleSubmitWorkOrder(order) {
+  const draft = workOrderState.submitDrafts[order.work_order_id] || {};
+  if (!draft.actual_cause?.trim() || !draft.resolution_note?.trim()) {
+    errors.orders = "提交复核前需要填写实际原因和处理结果。";
+    return;
+  }
+
+  loading.orders = true;
+  errors.orders = "";
+  try {
+    const updated = await submitPersistentWorkOrder(order.work_order_id, {
+      operator_id: currentUser.value?.user_id || "",
+      actual_cause: draft.actual_cause.trim(),
+      resolution_note: draft.resolution_note.trim(),
+      recovery_confirmed: Boolean(draft.recovery_confirmed),
+      parts_used: draft.parts_used || "",
+      safety_note: draft.safety_note || ""
+    });
+    upsertWorkOrder(updated);
+    await refreshBusinessState();
+  } catch (error) {
+    errors.orders = "提交复核失败：请确认工单已处于处理中状态。";
+  } finally {
+    loading.orders = false;
+  }
+}
+
+async function handleReviewWorkOrder(order, approved) {
+  loading.orders = true;
+  errors.orders = "";
+  try {
+    const updated = await reviewPersistentWorkOrder(order.work_order_id, {
+      operator_id: currentUser.value?.user_id || "admin",
+      approved,
+      review_note:
+        workOrderState.reviewNotes[order.work_order_id] ||
+        (approved ? "现场结果复核通过，工单关闭归档。" : "复核未通过，请补充处理记录后重新提交。")
+    });
+    upsertWorkOrder(updated);
+    await refreshBusinessState();
+  } catch (error) {
+    errors.orders = "复核失败：只有待复核工单可以执行复核。";
+  } finally {
+    loading.orders = false;
+  }
+}
+
+async function handleIgnoreWorkOrder(order) {
+  loading.orders = true;
+  errors.orders = "";
+  try {
+    const updated = await ignorePersistentWorkOrder(order.work_order_id, {
+      operator_id: currentUser.value?.user_id || "admin",
+      note: workOrderState.notesById[order.work_order_id] || "管理员确认无需派工，记录为忽略。"
+    });
+    upsertWorkOrder(updated);
+    await refreshBusinessState();
+  } catch (error) {
+    errors.orders = "忽略失败：当前状态不允许忽略。";
+  } finally {
+    loading.orders = false;
   }
 }
 
@@ -1083,13 +1438,51 @@ watch(
 );
 
 onMounted(async () => {
-  await Promise.allSettled([loadOverview(), loadAssistantProviders()]);
-  await Promise.allSettled([loadRecords(), loadAnalytics(), loadPersistentWorkOrders()]);
+  await restoreSession();
 });
 </script>
 
 <template>
-  <main class="dashboard-shell">
+  <main v-if="!isAuthenticated" class="login-shell">
+    <section class="login-panel">
+      <div class="login-copy">
+        <span class="login-eyebrow">Energy Operations</span>
+        <h1>建筑能源业务闭环工作台</h1>
+        <p>使用管理员或工人账号进入系统，分别演示异常确认、派单、接单、现场处理、复核关闭的完整链路。</p>
+        <div class="login-role-grid">
+          <button type="button" @click="loginForm.username = 'admin'; loginForm.password = 'admin123'">
+            <strong>管理员</strong>
+            <span>admin / admin123</span>
+          </button>
+          <button type="button" @click="loginForm.username = 'worker_ahu'; loginForm.password = 'worker123'">
+            <strong>空调巡检员</strong>
+            <span>worker_ahu / worker123</span>
+          </button>
+          <button type="button" @click="loginForm.username = 'worker_chiller'; loginForm.password = 'worker123'">
+            <strong>制冷值班员</strong>
+            <span>worker_chiller / worker123</span>
+          </button>
+        </div>
+      </div>
+
+      <form class="login-form" @submit.prevent="handleLogin">
+        <label class="field-label">
+          <span>账号</span>
+          <input v-model="loginForm.username" autocomplete="username" />
+        </label>
+        <label class="field-label">
+          <span>密码</span>
+          <input v-model="loginForm.password" type="password" autocomplete="current-password" />
+        </label>
+        <StatusBanner v-if="loginError" :status="loginError" type="warning" />
+        <button class="primary-button" type="submit" :disabled="loggingIn">
+          {{ loggingIn ? "正在登录..." : "进入系统" }}
+        </button>
+      </form>
+    </section>
+  </main>
+
+  <main v-else class="dashboard-shell">
     <AppHeader>
       <template #actions>
         <StatusBanner 
@@ -1098,6 +1491,15 @@ onMounted(async () => {
         />
       </template>
     </AppHeader>
+
+    <section class="user-strip">
+      <div>
+        <span class="role-badge">{{ currentUser.role === "admin" ? "管理员" : "工人" }}</span>
+        <strong>{{ currentUser.display_name }}</strong>
+        <span>{{ currentUser.specialty }} · {{ currentUser.user_id }}</span>
+      </div>
+      <button class="secondary-button" type="button" @click="handleLogout">退出登录</button>
+    </section>
     
     <div class="hero-stats">
       <div class="stat-card">
@@ -1119,7 +1521,7 @@ onMounted(async () => {
     </div>
 
     <TabNavigation 
-      :tabs="tabs" 
+      :tabs="visibleTabs"
       v-model:activeTab="activeTab"
     />
 
@@ -1130,6 +1532,50 @@ onMounted(async () => {
         <KpiCard title="平均 COP" :value="overview.average_cop" caption="系统能效比" />
         <KpiCard title="异常记录" :value="overview.abnormal_record_count" caption="异常检测数量" />
       </section>
+
+      <SectionCard
+        v-if="isAdmin"
+        class="business-command-card"
+        eyebrow="Operations"
+        title="管理员业务闭环看板"
+        description="把异常监测、工单派发、现场处理和复核归档串成一条可演示的运营链路。"
+      >
+        <div class="business-kpi-grid">
+          <div>
+            <span>开放工单</span>
+            <strong>{{ adminDashboard?.kpis?.open_work_order_count ?? orderStats.assigned + orderStats.in_progress + orderStats.pending_review + orderStats.rejected }}</strong>
+          </div>
+          <div>
+            <span>待复核</span>
+            <strong>{{ adminDashboard?.kpis?.pending_review_count ?? pendingReviewOrders.length }}</strong>
+          </div>
+          <div>
+            <span>高优先级未闭环</span>
+            <strong>{{ adminDashboard?.kpis?.high_priority_open_count ?? highPriorityOrders.length }}</strong>
+          </div>
+          <div>
+            <span>闭环率</span>
+            <strong>{{ adminClosureRate }}</strong>
+          </div>
+        </div>
+        <div class="command-layout">
+          <div class="command-list">
+            <h3>下一步动作</h3>
+            <ul>
+              <li v-for="item in adminNextActions" :key="item">{{ item }}</li>
+            </ul>
+          </div>
+          <div class="command-list">
+            <h3>待复核工单</h3>
+            <ul v-if="(adminDashboard?.pending_review || []).length">
+              <li v-for="item in adminDashboard.pending_review" :key="item.work_order_id">
+                {{ item.work_order_id }} · {{ item.building_name }} {{ item.floor_label }} · {{ item.assignee_name || item.owner_role }}
+              </li>
+            </ul>
+            <p v-else>暂无待复核工单。</p>
+          </div>
+        </div>
+      </SectionCard>
 
       <div class="content-grid">
         <SectionCard
@@ -1601,9 +2047,132 @@ onMounted(async () => {
       </div>
     </template>
 
+    <template v-else-if="activeTab === 'worker'">
+      <div class="content-grid content-grid--single">
+        <SectionCard eyebrow="My Tasks" title="我的工单工作台" description="工人只看到分配给自己的任务，并按接单、处理、提交复核的顺序推进。">
+          <div class="business-kpi-grid">
+            <div>
+              <span>待接单</span>
+              <strong>{{ workerDashboard?.kpis?.assigned_count || orderStats.assigned }}</strong>
+            </div>
+            <div>
+              <span>处理中</span>
+              <strong>{{ workerDashboard?.kpis?.in_progress_count || orderStats.in_progress }}</strong>
+            </div>
+            <div>
+              <span>待复核</span>
+              <strong>{{ workerDashboard?.kpis?.pending_review_count || orderStats.pending_review }}</strong>
+            </div>
+            <div>
+              <span>已关闭</span>
+              <strong>{{ workerDashboard?.kpis?.closed_count || orderStats.closed }}</strong>
+            </div>
+          </div>
+
+          <div class="worker-next-actions">
+            <span v-for="item in workerDashboard?.next_actions || []" :key="item">{{ item }}</span>
+          </div>
+
+          <div v-if="loading.orders" class="data-loading">
+            <LoadingSpinner text="正在加载我的工单..." />
+          </div>
+          <div v-else-if="!sortedWorkOrders.length" class="data-empty">
+            <EmptyState icon="🧾" title="暂无分配给你的工单" description="请让管理员从工单中心选择异常并派单给当前工人。" />
+          </div>
+          <div v-else class="work-order-board work-order-board--single">
+            <article
+              v-for="order in sortedWorkOrders"
+              :key="order.work_order_id"
+              class="work-order-card"
+              :class="[
+                `work-order-card--${order.priority}`,
+                `work-order-card--${order.status}`
+              ]"
+            >
+              <div class="work-order-card__head">
+                <div>
+                  <span class="work-order-id">{{ order.work_order_id }}</span>
+                  <h3>{{ order.building_name }} · {{ order.floor_label }} · {{ order.equipment_id }}</h3>
+                </div>
+                <div class="order-badges">
+                  <span class="priority-pill">{{ order.priority }}优先级</span>
+                  <span class="status-chip">{{ getOrderStatusLabel(order) }}</span>
+                </div>
+              </div>
+              <div class="work-order-meta">
+                <span>区域：{{ order.zone_name }}</span>
+                <span>设备：{{ order.equipment_type }}</span>
+                <span>派单人：{{ order.created_by || "admin" }}</span>
+                <span>时间：{{ order.timestamp }}</span>
+              </div>
+              <p><strong>异常原因：</strong>{{ order.anomaly_reason }}</p>
+              <p><strong>处置建议：</strong>{{ order.recommended_action }}</p>
+
+              <div class="work-order-actions">
+                <button
+                  v-if="['assigned', 'rejected'].includes(order.status)"
+                  class="primary-button"
+                  type="button"
+                  :disabled="loading.orders"
+                  @click="handleAcceptWorkOrder(order)"
+                >
+                  接单并开始处理
+                </button>
+
+                <div v-if="order.status === 'in_progress'" class="worker-submit-grid">
+                  <label>
+                    <span>现场实际原因</span>
+                    <textarea v-model="workOrderState.submitDrafts[order.work_order_id].actual_cause" rows="2" placeholder="例如：AHU 过滤网堵塞导致风量不足。" />
+                  </label>
+                  <label>
+                    <span>处理结果</span>
+                    <textarea v-model="workOrderState.submitDrafts[order.work_order_id].resolution_note" rows="2" placeholder="例如：已清洗过滤网并恢复自动控制。" />
+                  </label>
+                  <label>
+                    <span>更换部件</span>
+                    <input v-model="workOrderState.submitDrafts[order.work_order_id].parts_used" placeholder="无或填写部件名称" />
+                  </label>
+                  <label>
+                    <span>安全备注</span>
+                    <input v-model="workOrderState.submitDrafts[order.work_order_id].safety_note" placeholder="例如：已挂牌确认，无安全隐患" />
+                  </label>
+                  <label class="checkbox-field">
+                    <input v-model="workOrderState.submitDrafts[order.work_order_id].recovery_confirmed" type="checkbox" />
+                    <span>现场已恢复正常</span>
+                  </label>
+                  <button class="primary-button" type="button" :disabled="loading.orders" @click="handleSubmitWorkOrder(order)">
+                    提交管理员复核
+                  </button>
+                </div>
+
+                <StatusBanner
+                  v-if="order.status === 'pending_review'"
+                  status="已提交管理员复核，请等待关闭或驳回。"
+                  type="success"
+                />
+                <StatusBanner
+                  v-if="order.status === 'closed'"
+                  status="该工单已复核关闭，处理结果已归档。"
+                  type="success"
+                />
+              </div>
+
+              <ol v-if="order.timeline.length" class="timeline-list">
+                <li v-for="event in order.timeline.slice(-4)" :key="event.event_id">
+                  <strong>{{ event.action }}</strong>
+                  <span>{{ event.operator_name || event.operator }} · {{ event.created_at || event.timestamp }}</span>
+                  <p>{{ event.note }}</p>
+                </li>
+              </ol>
+            </article>
+          </div>
+        </SectionCard>
+      </div>
+    </template>
+
     <template v-else-if="activeTab === 'orders'">
       <div class="content-grid content-grid--single">
-        <SectionCard eyebrow="Work Orders" title="异常工单处理中心" description="把异常记录转成可跟踪的运维任务，状态和备注会写入后端 JSON 文件，刷新或重开页面仍然保留。">
+        <SectionCard eyebrow="Work Orders" title="异常工单处理中心" description="管理员从异常记录生成工单，派给工人处理，再对提交结果进行复核归档。">
           <div v-if="errors.orders" class="inline-banner-list">
             <StatusBanner :status="errors.orders" type="warning" />
           </div>
@@ -1652,24 +2221,24 @@ onMounted(async () => {
               </label>
 
               <label class="field-label">
-                <span>分配管理员</span>
-                <select v-model="orderDraft.assignee">
-                  <option v-for="assignee in orderAssignees" :key="assignee" :value="assignee">
-                    {{ assignee }}
+                <span>分配工人</span>
+                <select v-model="orderDraft.assigneeId">
+                  <option v-for="worker in workerUsers" :key="worker.user_id" :value="worker.user_id">
+                    {{ worker.display_name }} · {{ worker.specialty }}
                   </option>
                 </select>
               </label>
 
               <button class="primary-button" type="button" :disabled="!selectedOrderAnomaly || loading.orders" @click="generateWorkOrder">
-                生成处理中工单
+                生成并派单
               </button>
             </div>
             <p class="order-create-hint">
-              先从异常记录中选择一个问题，再分配给管理员，系统会生成一个“处理中”工单，并持久化保存到后端。
+              生成后工单进入“已派单”，对应工人登录后会在“我的工单”看到并接单处理。
             </p>
           </div>
 
-          <div class="order-summary-grid">
+          <div class="order-summary-grid order-summary-grid--wide">
             <div v-for="status in orderStatusOptions" :key="status.key" class="order-summary-card">
               <span>{{ status.label }}</span>
               <strong>{{ orderStats[status.key] || 0 }}</strong>
@@ -1680,7 +2249,7 @@ onMounted(async () => {
             <LoadingSpinner text="正在加载异常工单..." />
           </div>
           <div v-else-if="!sortedWorkOrders.length" class="data-empty">
-            <EmptyState icon="🧾" title="还没有生成工单" description="请先在上方选择异常记录并分配管理员，然后生成处理中工单。" />
+            <EmptyState icon="🧾" title="还没有生成工单" description="请先在上方选择异常记录并分配工人，然后生成派单工单。" />
           </div>
           <div v-else class="work-order-board">
             <article
@@ -1697,47 +2266,85 @@ onMounted(async () => {
                   <span class="work-order-id">{{ order.work_order_id }}</span>
                   <h3>{{ order.building_name }} · {{ order.floor_label }} · {{ order.equipment_id }}</h3>
                 </div>
-                <span class="priority-pill">{{ order.priority }}优先级</span>
+                <div class="order-badges">
+                  <span class="priority-pill">{{ order.priority }}优先级</span>
+                  <span class="status-chip">{{ getOrderStatusLabel(order) }}</span>
+                </div>
               </div>
               <div class="work-order-meta">
                 <span>区域：{{ order.zone_name }}</span>
                 <span>设备：{{ order.equipment_type }}</span>
-                <span>负责人：{{ order.owner_role }}</span>
+                <span>工人：{{ order.assignee_name || order.owner_role || "未分配" }}</span>
                 <span>时间：{{ order.timestamp }}</span>
               </div>
               <p><strong>异常原因：</strong>{{ order.anomaly_reason }}</p>
               <p><strong>可能原因：</strong>{{ order.possible_cause }}</p>
               <p><strong>处置建议：</strong>{{ order.recommended_action }}</p>
+              <p v-if="order.actual_cause"><strong>现场原因：</strong>{{ order.actual_cause }}</p>
+              <p v-if="order.resolution_note"><strong>处理结果：</strong>{{ order.resolution_note }}</p>
+
               <div class="work-order-actions">
                 <label>
-                  <span>处理状态</span>
-                  <select
-                    :value="order.status"
-                    @change="updateWorkOrderStatus(order.work_order_id, $event.target.value)"
-                  >
-                    <option v-for="status in orderStatusOptions" :key="status.key" :value="status.key">
-                      {{ status.label }}
-                    </option>
-                  </select>
-                </label>
-                <button
-                  v-if="order.status !== '已完成'"
-                  class="complete-button"
-                  type="button"
-                  @click="completeWorkOrder(order.work_order_id)"
-                >
-                  完成工单
-                </button>
-                <label class="work-order-note">
-                  <span>处理备注</span>
+                  <span>工单备注</span>
                   <textarea
                     v-model="workOrderState.notesById[order.work_order_id]"
                     rows="2"
-                    placeholder="例如：已安排楼层巡检员现场复核。"
+                    placeholder="例如：要求优先检查制冷机组供回水温差。"
                     @blur="saveWorkOrderNote(order)"
                   />
                 </label>
+
+                <div v-if="['pending_confirm', 'assigned'].includes(order.status)" class="admin-action-grid">
+                  <label>
+                    <span>调整分配工人</span>
+                    <select v-model="workOrderState.assignmentById[order.work_order_id]">
+                      <option v-for="worker in workerUsers" :key="worker.user_id" :value="worker.user_id">
+                        {{ worker.display_name }} · {{ worker.specialty }}
+                      </option>
+                    </select>
+                  </label>
+                  <button class="primary-button" type="button" :disabled="loading.orders" @click="handleAssignWorkOrder(order)">
+                    确认派单
+                  </button>
+                  <button class="secondary-button" type="button" :disabled="loading.orders" @click="handleIgnoreWorkOrder(order)">
+                    忽略告警
+                  </button>
+                </div>
+
+                <div v-if="order.status === 'pending_review'" class="review-panel">
+                  <label>
+                    <span>复核意见</span>
+                    <textarea v-model="workOrderState.reviewNotes[order.work_order_id]" rows="2" placeholder="例如：能耗曲线恢复正常，现场处理记录完整。" />
+                  </label>
+                  <div class="review-actions">
+                    <button class="complete-button" type="button" :disabled="loading.orders" @click="handleReviewWorkOrder(order, true)">
+                      复核通过并关闭
+                    </button>
+                    <button class="secondary-button" type="button" :disabled="loading.orders" @click="handleReviewWorkOrder(order, false)">
+                      驳回重办
+                    </button>
+                  </div>
+                </div>
+
+                <StatusBanner
+                  v-if="order.status === 'closed'"
+                  status="该工单已关闭，处理过程已进入归档链路。"
+                  type="success"
+                />
+                <StatusBanner
+                  v-if="order.status === 'ignored'"
+                  status="该告警已被管理员忽略，不再进入现场处理。"
+                  type="info"
+                />
               </div>
+
+              <ol v-if="order.timeline.length" class="timeline-list">
+                <li v-for="event in order.timeline.slice(-4)" :key="event.event_id">
+                  <strong>{{ event.action }}</strong>
+                  <span>{{ event.operator_name || event.operator }} · {{ event.created_at || event.timestamp }}</span>
+                  <p>{{ event.note }}</p>
+                </li>
+              </ol>
             </article>
           </div>
         </SectionCard>
@@ -1817,6 +2424,7 @@ onMounted(async () => {
             <p>{{ operationReport.risk }}</p>
             <p>{{ operationReport.latestAnomaly }}</p>
             <p>{{ operationReport.workOrder }}</p>
+            <p>{{ operationReport.workOrderClosure }}</p>
             <p>{{ operationReport.forecast }}</p>
             <p>{{ operationReport.saving }}</p>
             <p>{{ operationReport.recommendation }}</p>
@@ -1876,6 +2484,123 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.login-shell {
+  width: min(1120px, calc(100% - 32px));
+  min-height: 100vh;
+  margin: 0 auto;
+  display: grid;
+  align-items: center;
+  padding: 36px 0;
+}
+
+.login-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+  gap: 24px;
+  align-items: stretch;
+}
+
+.login-copy,
+.login-form,
+.user-strip,
+.business-command-card {
+  border: 1px solid rgba(20, 34, 48, 0.1);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow: 0 20px 48px rgba(25, 42, 70, 0.1);
+  backdrop-filter: blur(18px);
+}
+
+.login-copy,
+.login-form {
+  border-radius: 18px;
+  padding: 26px;
+}
+
+.login-eyebrow {
+  display: inline-flex;
+  color: var(--accent-deep);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.login-copy h1 {
+  margin: 14px 0 14px;
+  max-width: 12ch;
+  font-size: clamp(34px, 5vw, 56px);
+  line-height: 1.08;
+}
+
+.login-copy p {
+  max-width: 58ch;
+  margin: 0;
+  color: var(--ink-soft);
+}
+
+.login-role-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.login-role-grid button {
+  border: 1px solid rgba(18, 93, 115, 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.82);
+  color: var(--ink-strong);
+  cursor: pointer;
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  text-align: left;
+}
+
+.login-role-grid span {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.login-form {
+  align-content: center;
+  display: grid;
+  gap: 16px;
+}
+
+.user-strip {
+  border-radius: 16px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 18px;
+  padding: 14px 16px;
+}
+
+.user-strip > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  color: var(--ink-soft);
+}
+
+.user-strip strong {
+  color: var(--ink-strong);
+}
+
+.role-badge,
+.status-chip {
+  display: inline-flex;
+  border-radius: 999px;
+  background: rgba(15, 139, 141, 0.12);
+  color: var(--accent-deep);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 5px 10px;
+}
+
 .hero-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -2094,12 +2819,100 @@ onMounted(async () => {
   grid-column: 1 / -1;
 }
 
+.business-command-card {
+  border-radius: 18px;
+  margin-bottom: 20px;
+}
+
+.business-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.business-kpi-grid > div {
+  border: 1px solid rgba(20, 34, 48, 0.08);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(236, 247, 243, 0.88));
+  padding: 14px;
+}
+
+.business-kpi-grid span {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.business-kpi-grid strong {
+  display: block;
+  color: var(--accent-deep);
+  font-size: 26px;
+  margin-top: 5px;
+}
+
+.command-layout {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.command-list {
+  border: 1px solid rgba(20, 34, 48, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  padding: 14px;
+}
+
+.command-list h3 {
+  margin: 0 0 10px;
+  color: var(--accent-deep);
+  font-size: 16px;
+}
+
+.command-list ul,
+.timeline-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.command-list li,
+.command-list p {
+  margin: 0;
+  color: #263f49;
+}
+
+.command-list li + li {
+  margin-top: 8px;
+}
+
+.worker-next-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: -4px 0 18px;
+}
+
+.worker-next-actions span {
+  border: 1px solid rgba(15, 139, 141, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.8);
+  color: var(--accent-deep);
+  font-size: 13px;
+  padding: 7px 10px;
+}
+
 .order-summary-grid,
 .simulation-result {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 18px;
+}
+
+.order-summary-grid--wide {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
 }
 
 .order-create-panel {
@@ -2162,6 +2975,10 @@ onMounted(async () => {
   gap: 16px;
 }
 
+.work-order-board--single {
+  grid-template-columns: 1fr;
+}
+
 .work-order-card {
   border: 1px solid rgba(20, 34, 48, 0.08);
   border-left: 6px solid rgba(15, 139, 141, 0.5);
@@ -2179,21 +2996,40 @@ onMounted(async () => {
   border-left-color: #f39c12;
 }
 
-.work-order-card--处理中 {
+.work-order-card--pending_confirm,
+.work-order-card--assigned {
   border-left-color: #f2a900;
   background:
     linear-gradient(145deg, rgba(255, 245, 217, 0.96), rgba(255, 255, 255, 0.88));
   box-shadow: 0 22px 52px rgba(242, 169, 0, 0.18);
 }
 
-.work-order-card--已完成 {
+.work-order-card--in_progress {
+  border-left-color: #0f8b8d;
+  background:
+    linear-gradient(145deg, rgba(224, 246, 245, 0.94), rgba(255, 255, 255, 0.88));
+}
+
+.work-order-card--pending_review {
+  border-left-color: #125d73;
+  background:
+    linear-gradient(145deg, rgba(226, 239, 245, 0.94), rgba(255, 255, 255, 0.88));
+}
+
+.work-order-card--rejected {
+  border-left-color: #d9364f;
+  background:
+    linear-gradient(145deg, rgba(253, 231, 235, 0.94), rgba(255, 255, 255, 0.88));
+}
+
+.work-order-card--closed {
   border-left-color: #22a06b;
   background:
     linear-gradient(145deg, rgba(225, 247, 237, 0.96), rgba(255, 255, 255, 0.84));
   opacity: 0.82;
 }
 
-.work-order-card--已忽略 {
+.work-order-card--ignored {
   border-left-color: #9aa6ac;
   opacity: 0.78;
 }
@@ -2224,6 +3060,13 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
+.order-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .work-order-meta {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2242,6 +3085,31 @@ onMounted(async () => {
   display: grid;
   gap: 12px;
   margin-top: 14px;
+}
+
+.admin-action-grid,
+.worker-submit-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.worker-submit-grid label:nth-child(1),
+.worker-submit-grid label:nth-child(2),
+.review-panel label {
+  grid-column: 1 / -1;
+}
+
+.review-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .complete-button {
@@ -2264,6 +3132,7 @@ onMounted(async () => {
 
 .work-order-actions select,
 .work-order-actions textarea,
+.work-order-actions input,
 .simulation-form input {
   width: 100%;
   border: 1px solid rgba(20, 34, 48, 0.12);
@@ -2276,6 +3145,52 @@ onMounted(async () => {
 
 .work-order-note textarea {
   resize: vertical;
+}
+
+.checkbox-field {
+  align-content: center;
+  grid-template-columns: auto 1fr;
+  min-height: 46px;
+}
+
+.checkbox-field input {
+  width: 18px;
+  height: 18px;
+}
+
+.timeline-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  border-top: 1px solid rgba(20, 34, 48, 0.08);
+  padding-top: 12px;
+}
+
+.timeline-list li {
+  border-left: 3px solid rgba(15, 139, 141, 0.25);
+  padding-left: 10px;
+}
+
+.timeline-list strong,
+.timeline-list span,
+.timeline-list p {
+  display: block;
+}
+
+.timeline-list strong {
+  color: var(--accent-deep);
+  font-size: 13px;
+}
+
+.timeline-list span {
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.timeline-list p {
+  margin: 2px 0 0;
+  color: #263f49;
+  font-size: 13px;
 }
 
 .forecast-chart {
@@ -2479,6 +3394,20 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
+  .login-panel,
+  .login-role-grid,
+  .command-layout,
+  .business-kpi-grid,
+  .admin-action-grid,
+  .worker-submit-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .user-strip {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .hero-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
