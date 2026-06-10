@@ -37,6 +37,13 @@ STATUS_ORDER = {
 
 PRIORITY_ORDER = {"高": 0, "中": 1, "低": 2}
 
+# Estimated post-repair recovery factors. There is no measured "after" reading in
+# the sample dataset, so these are used to project an estimated improvement from the
+# captured baseline. Outputs carry `after_is_estimated=True` and are labelled as
+# estimates in the UI/report, never presented as measured values.
+ESTIMATED_KWH_RECOVERY_FACTOR = 0.78
+ESTIMATED_COP_RECOVERY_FACTOR = 1.15
+
 
 def _store_path() -> Path:
     return get_settings().work_order_file
@@ -123,7 +130,14 @@ def _normalize_order(item: Dict) -> Dict:
     normalized["parts_used"] = normalized.get("parts_used") or ""
     normalized["safety_note"] = normalized.get("safety_note") or ""
     normalized["review_note"] = normalized.get("review_note") or ""
+    normalized["attachment_name"] = normalized.get("attachment_name") or ""
+    normalized["attachment_note"] = normalized.get("attachment_note") or ""
     normalized["recovery_confirmed"] = bool(normalized.get("recovery_confirmed", False))
+    normalized["before_kwh"] = normalized.get("before_kwh")
+    normalized["before_cop"] = normalized.get("before_cop")
+    normalized["after_kwh"] = normalized.get("after_kwh")
+    normalized["after_cop"] = normalized.get("after_cop")
+    normalized["after_is_estimated"] = bool(normalized.get("after_is_estimated", False))
     return normalized
 
 
@@ -205,8 +219,12 @@ def create_work_order(payload: Dict) -> Dict:
         "review_note": payload.get("review_note") or "",
         "parts_used": payload.get("parts_used") or "",
         "safety_note": payload.get("safety_note") or "",
+        "attachment_name": payload.get("attachment_name") or "",
+        "attachment_note": payload.get("attachment_note") or "",
         "recovery_confirmed": bool(payload.get("recovery_confirmed", False)),
         "closed_at": payload.get("closed_at") or "",
+        "before_kwh": payload.get("before_kwh"),
+        "before_cop": payload.get("before_cop"),
         "created_at": created_at,
         "updated_at": created_at,
         "timeline": [
@@ -337,6 +355,8 @@ def submit_work_order(
     recovery_confirmed: bool,
     parts_used: str = "",
     safety_note: str = "",
+    attachment_name: str = "",
+    attachment_note: str = "",
 ) -> Optional[Dict]:
     orders = _read_orders()
     item = _find_order(orders, work_order_id)
@@ -354,6 +374,23 @@ def submit_work_order(
     item["recovery_confirmed"] = recovery_confirmed
     item["parts_used"] = parts_used
     item["safety_note"] = safety_note
+    item["attachment_name"] = attachment_name
+    item["attachment_note"] = attachment_note
+    # ---- estimated before / after comparison ----
+    # No post-repair measurement exists in the dataset, so the "after" values are
+    # projected estimates derived from the captured baseline (real "before") using
+    # conservative recovery factors. They are surfaced to the UI as estimates only.
+    before_kwh = item.get("before_kwh")
+    before_cop = item.get("before_cop")
+    if recovery_confirmed and before_kwh:
+        item["after_kwh"] = round(before_kwh * ESTIMATED_KWH_RECOVERY_FACTOR, 2)
+    else:
+        item["after_kwh"] = round(before_kwh, 2) if before_kwh else None
+    if recovery_confirmed and before_cop:
+        item["after_cop"] = round(before_cop * ESTIMATED_COP_RECOVERY_FACTOR, 2)
+    else:
+        item["after_cop"] = round(before_cop, 2) if before_cop else None
+    item["after_is_estimated"] = bool(recovery_confirmed and (before_kwh or before_cop))
     item.setdefault("timeline", []).append(
         _timeline_event(
             action="submit",
@@ -391,6 +428,13 @@ def review_work_order(
     item["review_note"] = review_note
     if approved:
         item["closed_at"] = _now()
+        # Causal link: from the (simulated) repair date onward the equipment
+        # recovers to its normal baseline in the revealed future.
+        from app.services import simulation_service
+
+        equipment_id = item.get("equipment_id")
+        if equipment_id:
+            simulation_service.register_intervention(equipment_id)
     item.setdefault("timeline", []).append(
         _timeline_event(
             action="review_approve" if approved else "review_reject",
@@ -443,12 +487,16 @@ def build_work_order_metrics(items: Optional[List[Dict]] = None) -> Dict:
         item for item in open_orders if item.get("priority") == "高"
     ]
 
+    assigned_count = len([item for item in orders if item["status"] == "assigned"])
+    newly_assigned = max(0, assigned_count)
+
     return {
         "total": len(orders),
         "open_count": len(open_orders),
         "closed_count": len(closed_orders),
         "pending_review_count": len(pending_review),
         "high_priority_open_count": len(high_priority_open),
+        "newly_assigned": newly_assigned,
         "status_counts": counts,
         "status_labels": STATUS_LABELS,
         "next_actions": [
@@ -456,4 +504,39 @@ def build_work_order_metrics(items: Optional[List[Dict]] = None) -> Dict:
             "处理高优先级未关闭工单",
             "确认待确认异常是否需要派单",
         ],
+    }
+
+
+def create_pending_confirm_drafts(anomaly_payloads: List[Dict], operator_id: str = "admin") -> Dict:
+    """Batch create pending_confirm draft work orders from anomalies.
+    Skips anomalies that already have an open work order."""
+    orders = _read_orders()
+    existing_ids = {
+        item["source_record_id"]
+        for item in orders
+        if item.get("source_record_id") and _open_status(item.get("status", ""))
+    }
+    created = []
+    skipped = 0
+    for anomaly in anomaly_payloads:
+        record_id = anomaly.get("source_record_id")
+        if record_id and record_id in existing_ids:
+            skipped += 1
+            continue
+        payload = {
+            **anomaly,
+            "status": "pending_confirm",
+            "created_by": operator_id,
+            "note": f"系统自动从异常记录生成，等待管理员确认。",
+        }
+        order = create_work_order(payload)
+        created.append(order)
+        if record_id:
+            existing_ids.add(record_id)
+
+    return {
+        "created": created,
+        "created_count": len(created),
+        "skipped_count": skipped,
+        "message": f"已生成 {len(created)} 个待确认工单，跳过 {skipped} 个已有工单的异常。",
     }

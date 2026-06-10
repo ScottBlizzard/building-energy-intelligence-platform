@@ -683,6 +683,35 @@ def build_operation_report(frame: pd.DataFrame, work_orders: List[Dict] | None =
     top_recommendation = recommendations[0] if recommendations else None
     top_anomaly = anomalies[0] if anomalies else None
 
+    # ---- closed case summaries ----
+    closed_cases: List[Dict] = []
+    for order in closed_orders[:8]:
+        before_kwh = order.get("before_kwh")
+        after_kwh = order.get("after_kwh")
+        before_cop = order.get("before_cop")
+        after_cop = order.get("after_cop")
+        estimated = bool(order.get("after_is_estimated"))
+        prefix = "预计" if estimated else ""
+        saving_pct = ""
+        if before_kwh and after_kwh and before_kwh > 0:
+            saving_pct = f"{prefix}电耗下降 {round((before_kwh - after_kwh) / before_kwh * 100, 1)}%"
+        cop_change = ""
+        if before_cop and after_cop:
+            cop_change = f"{prefix}COP {round(before_cop, 2)} → {round(after_cop, 2)}"
+
+        closed_cases.append({
+            "work_order_id": order.get("work_order_id", ""),
+            "building_name": order.get("building_name", ""),
+            "floor_label": order.get("floor_label", ""),
+            "equipment_id": order.get("equipment_id", ""),
+            "actual_cause": order.get("actual_cause", ""),
+            "resolution_note": order.get("resolution_note", ""),
+            "closed_at": order.get("closed_at", ""),
+            "saving_summary": saving_pct,
+            "cop_summary": cop_change,
+            "after_is_estimated": estimated,
+        })
+
     risk_text = (
         f"当前最需要关注 {top_floor['building_name']} {top_floor['floor_label']}，"
         f"异常 {top_floor['anomaly_count']} 条，风险等级为 {top_floor['risk_level']}。"
@@ -707,6 +736,15 @@ def build_operation_report(frame: pd.DataFrame, work_orders: List[Dict] | None =
         else "建议保持日报监测，重点关注 COP、夜间负荷和设备状态。"
     )
 
+    # Build closed case summary text
+    closed_summary = f"当前已关闭 {len(closed_orders)} 个工单，可作为日报归档案例。"
+    if closed_cases:
+        closed_buildings = sorted(set(c["building_name"] for c in closed_cases))
+        closed_summary += f" 涉及建筑：{'、'.join(closed_buildings)}。"
+        savings = [c for c in closed_cases if c["saving_summary"]]
+        if savings:
+            closed_summary += f" 其中 {len(savings)} 个工单预计带来能耗改善（估算值）。"
+
     return {
         "title": "建筑能源运营日报",
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
@@ -722,7 +760,8 @@ def build_operation_report(frame: pd.DataFrame, work_orders: List[Dict] | None =
         "risk": risk_text,
         "latest_anomaly": anomaly_text,
         "work_order": order_text,
-        "work_order_closure": f"当前已关闭 {len(closed_orders)} 个工单，可作为日报归档案例。",
+        "work_order_closure": closed_summary,
+        "closed_cases": closed_cases,
         "forecast": f"按最近日度趋势估算，未来 7 天电耗约 {forecast_week_kwh:,.0f} kWh。",
         "recommendation": recommendation_text,
         "action_items": [
@@ -870,6 +909,45 @@ def build_anomaly_work_orders(frame: pd.DataFrame) -> List[Dict]:
             ["priority_order", "timestamp"], ascending=[True, False]
         )[export_columns]
     )
+
+
+def build_anomaly_work_order_drafts(frame: pd.DataFrame) -> List[Dict]:
+    """Generate work order draft payloads from anomalies for pending_confirm queue.
+    Includes before_kwh / before_cop for later before/after comparison."""
+    if frame.empty:
+        return []
+
+    working = _add_operational_dimensions(frame)
+    anomalies = (
+        working[working["is_anomaly"]]
+        .copy()
+        .sort_values(["timestamp", "electricity_kwh"], ascending=[False, False])
+        .head(30)
+    )
+    if anomalies.empty:
+        return []
+
+    drafts: List[Dict] = []
+    for _, row in anomalies.iterrows():
+        drafts.append({
+            "work_order_id": f"WO-DRAFT-{pd.Timestamp(row['timestamp']).strftime('%Y%m%d%H')}-{row['record_id']}",
+            "source_record_id": str(row["record_id"]),
+            "priority": _work_order_priority(row),
+            "building_id": str(row["building_id"]),
+            "building_name": str(row["building_name"]),
+            "floor_label": str(row["floor_label"]),
+            "zone_name": str(row["zone_name"]),
+            "equipment_id": str(row["equipment_id"]),
+            "equipment_type": str(row["equipment_type"]),
+            "timestamp": _format_timestamp(row["timestamp"]),
+            "anomaly_reason": str(row["anomaly_reason"]),
+            "possible_cause": _work_order_cause(row),
+            "recommended_action": _work_order_action(row),
+            "owner_role": _owner_role(str(row["equipment_type"])),
+            "before_kwh": round(float(row["electricity_kwh"]), 2),
+            "before_cop": round(float(row["average_cop"]), 2),
+        })
+    return drafts
 
 
 def _work_order_priority(row: pd.Series) -> str:

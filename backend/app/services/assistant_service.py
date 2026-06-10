@@ -11,7 +11,7 @@ from app.services.analysis_service import (
     build_optimization_recommendations,
     build_overview,
 )
-from app.services.data_loader import get_building_options, read_dataset
+from app.services.data_loader import get_building_options, get_visible_dataset
 
 
 BUILDING_KEYWORDS = {
@@ -58,7 +58,7 @@ def _format_building_list(buildings: List[Dict[str, str]]) -> str:
 
 
 def build_assistant_reply(question: str) -> Dict[str, List]:
-    dataset = read_dataset()
+    dataset = get_visible_dataset()
     overview = build_overview(dataset)
     buildings = get_building_options()
     question_text = question.lower().strip()

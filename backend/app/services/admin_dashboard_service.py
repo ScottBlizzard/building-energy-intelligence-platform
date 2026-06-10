@@ -7,12 +7,12 @@ from app.services.analysis_service import (
     build_floor_registry,
     build_optimization_recommendations,
 )
-from app.services.data_loader import read_dataset
+from app.services.data_loader import get_visible_dataset
 from app.services.work_order_store import build_work_order_metrics, list_work_orders
 
 
 def build_admin_dashboard() -> Dict:
-    frame = read_dataset()
+    frame = get_visible_dataset()
     anomalies = build_anomaly_summary(frame)
     floors = build_floor_registry(frame)
     recommendations = build_optimization_recommendations(frame)
@@ -57,6 +57,10 @@ def build_admin_dashboard() -> Dict:
 def worker_dashboard(user_id: str) -> Dict:
     orders = list_work_orders(assignee_id=user_id)
     metrics = build_work_order_metrics(orders)
+    needs_attention = [
+        item for item in orders
+        if item["status"] in {"assigned", "rejected"}
+    ]
     return {
         "kpis": {
             "assigned_count": len([item for item in orders if item["status"] == "assigned"]),
@@ -66,9 +70,10 @@ def worker_dashboard(user_id: str) -> Dict:
         },
         "work_order_metrics": metrics,
         "items": orders,
+        "needs_attention": len(needs_attention),
         "next_actions": [
             "先接收已派单任务。",
-            "处理高优先级工单并填写现场原因。",
-            "处理完成后提交管理员复核。",
+            "处理中的工单尽快完成并提交复核。",
+            "被驳回任务请根据复核意见补充处置。",
         ],
     }

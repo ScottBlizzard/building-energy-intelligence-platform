@@ -15,6 +15,7 @@ import BuildingRiskScene from "../components/BuildingRiskScene.vue";
 import {
   acceptPersistentWorkOrder,
   assignPersistentWorkOrder,
+  createAutoConfirmQueue,
   createPersistentWorkOrder,
   downloadCsvExport,
   fetchAdminDashboard,
@@ -44,7 +45,11 @@ import {
   queryAssistant,
   reviewPersistentWorkOrder,
   submitPersistentWorkOrder,
-  updatePersistentWorkOrder
+  updatePersistentWorkOrder,
+  fetchSimState,
+  startSimulation,
+  advanceSimulation,
+  resetSimulation
 } from "../lib/api";
 
 const TrendChart = defineAsyncComponent(() => import("../components/TrendChart.vue"));
@@ -130,6 +135,8 @@ const activeTab = ref("overview");
 const persistedAuthState = loadAuthState();
 const currentUser = ref(persistedAuthState.user || null);
 const authToken = ref(persistedAuthState.token || "");
+const simClock = ref({ active: false, current_date: null, interventions: [], data_range: {} });
+const simLoading = ref(false);
 const loginForm = reactive({
   username: persistedAuthState.user?.user_id || "admin",
   password: persistedAuthState.user?.role === "worker" ? "worker123" : "admin123"
@@ -648,6 +655,7 @@ const operationReport = computed(() => {
       latestAnomaly: analytics.operationReport.latest_anomaly,
       workOrder: analytics.operationReport.work_order,
       workOrderClosure: analytics.operationReport.work_order_closure,
+      closedCases: analytics.operationReport.closed_cases || [],
       forecast: analytics.operationReport.forecast,
       saving: `按当前模拟策略，预计节电 ${formatNumber(simulationResult.value.savingKwh)} kWh，节约约 ${formatNumber(simulationResult.value.savingCost)} 元。`,
       recommendation: analytics.operationReport.recommendation,
@@ -662,6 +670,7 @@ const operationReport = computed(() => {
   return {
     title: "本周期能源运营报告",
     generatedAt: "",
+    closedCases: [],
     overview: `当前覆盖 ${overview.value.building_count || 0} 栋建筑、${overview.value.total_records || 0} 条记录，平均 COP 为 ${overview.value.average_cop || 0}。`,
     risk: topOrder
       ? `优先处理 ${topOrder.building_name} ${topOrder.floor_label} 的 ${topOrder.equipment_id}，原因是${topOrder.anomaly_reason}。`
@@ -916,8 +925,56 @@ async function loadRoleDashboards() {
 }
 
 async function bootstrapAuthenticatedApp() {
-  await Promise.allSettled([loadOverview(), loadAssistantProviders(), loadDemoUserList()]);
+  await Promise.allSettled([loadOverview(), loadAssistantProviders(), loadDemoUserList(), loadSimState()]);
   await Promise.allSettled([loadRecords(), loadAnalytics(), loadPersistentWorkOrders(), loadRoleDashboards()]);
+}
+
+async function loadSimState() {
+  try {
+    simClock.value = await fetchSimState();
+  } catch (error) {
+    simClock.value = { active: false, current_date: null, interventions: [], data_range: {} };
+  }
+}
+
+async function reloadAfterClockChange() {
+  await Promise.allSettled([loadOverview(), loadRecords(), loadAnalytics(), refreshBusinessState()]);
+}
+
+async function handleStartSimulation() {
+  simLoading.value = true;
+  try {
+    simClock.value = await startSimulation(null);
+    await reloadAfterClockChange();
+  } catch (error) {
+    errors.orders = "启动运营沙盘失败，请检查后端 /sim 接口。";
+  } finally {
+    simLoading.value = false;
+  }
+}
+
+async function handleAdvanceDay(days = 1) {
+  simLoading.value = true;
+  try {
+    simClock.value = await advanceSimulation(days);
+    await reloadAfterClockChange();
+  } catch (error) {
+    errors.orders = "推进日期失败，请检查后端 /sim 接口。";
+  } finally {
+    simLoading.value = false;
+  }
+}
+
+async function handleResetSimulation() {
+  simLoading.value = true;
+  try {
+    simClock.value = await resetSimulation();
+    await reloadAfterClockChange();
+  } catch (error) {
+    errors.orders = "重置运营沙盘失败，请检查后端 /sim 接口。";
+  } finally {
+    simLoading.value = false;
+  }
 }
 
 async function handleLogin() {
@@ -1208,7 +1265,9 @@ function ensureOrderDrafts(order) {
       resolution_note: order.resolution_note || "",
       recovery_confirmed: order.recovery_confirmed ?? true,
       parts_used: order.parts_used || "",
-      safety_note: order.safety_note || ""
+      safety_note: order.safety_note || "",
+      attachment_name: order.attachment_name || "",
+      attachment_note: order.attachment_note || ""
     };
   }
   if (workOrderState.reviewNotes[id] === undefined) {
@@ -1255,7 +1314,9 @@ async function generateWorkOrder() {
     owner_role: assignee.display_name || inferOwnerRole(anomaly),
     assignee_id: assignee.user_id,
     assignee_name: assignee.display_name,
-    created_by: currentUser.value?.user_id || "admin"
+    created_by: currentUser.value?.user_id || "admin",
+    before_kwh: Number(anomaly.electricity_kwh) || null,
+    before_cop: Number(anomaly.average_cop) || null
   };
 
   loading.orders = true;
@@ -1344,7 +1405,9 @@ async function handleSubmitWorkOrder(order) {
       resolution_note: draft.resolution_note.trim(),
       recovery_confirmed: Boolean(draft.recovery_confirmed),
       parts_used: draft.parts_used || "",
-      safety_note: draft.safety_note || ""
+      safety_note: draft.safety_note || "",
+      attachment_name: draft.attachment_name || "",
+      attachment_note: draft.attachment_note || ""
     });
     upsertWorkOrder(updated);
     await refreshBusinessState();
@@ -1387,6 +1450,23 @@ async function handleIgnoreWorkOrder(order) {
     await refreshBusinessState();
   } catch (error) {
     errors.orders = "忽略失败：当前状态不允许忽略。";
+  } finally {
+    loading.orders = false;
+  }
+}
+
+async function handleAutoConfirmQueue() {
+  loading.orders = true;
+  errors.orders = "";
+  try {
+    const result = await createAutoConfirmQueue();
+    if (result.created_count > 0) {
+      result.created.forEach((order) => upsertWorkOrder(order));
+    }
+    await refreshBusinessState({ includeAnalytics: true });
+    errors.orders = "";
+  } catch (error) {
+    errors.orders = "自动生成待确认队列失败，请检查后端接口。";
   } finally {
     loading.orders = false;
   }
@@ -1500,7 +1580,40 @@ onMounted(async () => {
       </div>
       <button class="secondary-button" type="button" @click="handleLogout">退出登录</button>
     </section>
-    
+
+    <section class="sim-strip" :class="{ 'sim-strip--active': simClock.active }">
+      <div class="sim-clock">
+        <span class="sim-clock-label">运营沙盘 · 时间机器</span>
+        <strong v-if="simClock.active" class="sim-clock-date">{{ simClock.current_date }}</strong>
+        <strong v-else class="sim-clock-date sim-clock-date--off">未启动（当前显示全量历史）</strong>
+        <span v-if="simClock.active && simClock.data_range?.end" class="sim-clock-range">
+          数据边界：{{ (simClock.data_range.start || '').slice(0, 10) }} ~ {{ (simClock.data_range.end || '').slice(0, 10) }}
+        </span>
+        <span v-if="simClock.active && simClock.interventions?.length" class="sim-clock-fixed">
+          已修复设备：{{ simClock.interventions.length }}
+        </span>
+      </div>
+      <div v-if="isAdmin" class="sim-actions">
+        <button v-if="!simClock.active" class="primary-button" type="button" :disabled="simLoading" @click="handleStartSimulation">
+          启动沙盘（定位到 5 月）
+        </button>
+        <template v-else>
+          <button class="primary-button" type="button" :disabled="simLoading" @click="handleAdvanceDay(1)">
+            ▶ 下一天
+          </button>
+          <button class="secondary-button" type="button" :disabled="simLoading" @click="handleAdvanceDay(7)">
+            ⏭ 下一周
+          </button>
+          <button class="secondary-button" type="button" :disabled="simLoading" @click="handleResetSimulation">
+            重置
+          </button>
+        </template>
+      </div>
+      <p class="sim-hint">
+        指针之前为已发生历史，之后为"未来"。关闭工单后该设备会在后续日期恢复正常；不处理则异常持续——推进日期即可看到你的决策如何改变系统未来。
+      </p>
+    </section>
+
     <div class="hero-stats">
       <div class="stat-card">
         <span class="stat-label">数据记录</span>
@@ -2051,8 +2164,8 @@ onMounted(async () => {
       <div class="content-grid content-grid--single">
         <SectionCard eyebrow="My Tasks" title="我的工单工作台" description="工人只看到分配给自己的任务，并按接单、处理、提交复核的顺序推进。">
           <div class="business-kpi-grid">
-            <div>
-              <span>待接单</span>
+            <div :class="{ 'kpi--highlight': (workerDashboard?.kpis?.assigned_count || orderStats.assigned) > 0 }">
+              <span>待接单 <b v-if="(workerDashboard?.kpis?.assigned_count || orderStats.assigned) > 0" class="badge-dot">{{ workerDashboard?.kpis?.assigned_count || orderStats.assigned }}</b></span>
               <strong>{{ workerDashboard?.kpis?.assigned_count || orderStats.assigned }}</strong>
             </div>
             <div>
@@ -2140,6 +2253,14 @@ onMounted(async () => {
                     <input v-model="workOrderState.submitDrafts[order.work_order_id].recovery_confirmed" type="checkbox" />
                     <span>现场已恢复正常</span>
                   </label>
+                  <label>
+                    <span>现场附件（文件名）</span>
+                    <input v-model="workOrderState.submitDrafts[order.work_order_id].attachment_name" placeholder="例如：现场照片-20260610.jpg" />
+                  </label>
+                  <label>
+                    <span>附件备注</span>
+                    <input v-model="workOrderState.submitDrafts[order.work_order_id].attachment_note" placeholder="例如：过滤网清洗前后对比照片" />
+                  </label>
                   <button class="primary-button" type="button" :disabled="loading.orders" @click="handleSubmitWorkOrder(order)">
                     提交管理员复核
                   </button>
@@ -2155,6 +2276,35 @@ onMounted(async () => {
                   status="该工单已复核关闭，处理结果已归档。"
                   type="success"
                 />
+              </div>
+
+              <!-- Before/After Comparison -->
+              <div v-if="order.status === 'closed' && (order.before_kwh || order.after_kwh)" class="before-after-compare">
+                <h4>处理前后能耗对比<span v-if="order.after_is_estimated" class="estimate-tag">处理后为估算值</span></h4>
+                <div class="before-after-grid">
+                  <div>
+                    <span>处理前电耗</span>
+                    <strong>{{ order.before_kwh || '-' }} kWh</strong>
+                  </div>
+                  <div>
+                    <span>处理后电耗</span>
+                    <strong>{{ order.after_kwh || '-' }} kWh</strong>
+                  </div>
+                  <div>
+                    <span>处理前 COP</span>
+                    <strong>{{ order.before_cop || '-' }}</strong>
+                  </div>
+                  <div>
+                    <span>处理后 COP</span>
+                    <strong>{{ order.after_cop || '-' }}</strong>
+                  </div>
+                </div>
+              </div>
+              <!-- Attachment Info -->
+              <div v-if="order.attachment_name" class="attachment-info">
+                <span>📎 现场附件：</span>
+                <strong>{{ order.attachment_name }}</strong>
+                <span v-if="order.attachment_note"> · {{ order.attachment_note }}</span>
               </div>
 
               <ol v-if="order.timeline.length" class="timeline-list">
@@ -2231,6 +2381,9 @@ onMounted(async () => {
 
               <button class="primary-button" type="button" :disabled="!selectedOrderAnomaly || loading.orders" @click="generateWorkOrder">
                 生成并派单
+              </button>
+              <button class="secondary-button" type="button" :disabled="loading.orders" @click="handleAutoConfirmQueue" style="grid-column: 1 / -1; border-color: var(--accent-deep); color: var(--accent-deep);">
+                🔄 一键生成待确认工单队列（从所有异常自动创建待确认工单）
               </button>
             </div>
             <p class="order-create-hint">
@@ -2338,6 +2491,35 @@ onMounted(async () => {
                 />
               </div>
 
+              <!-- Before/After Comparison -->
+              <div v-if="order.status === 'closed' && (order.before_kwh || order.after_kwh)" class="before-after-compare">
+                <h4>处理前后能耗对比<span v-if="order.after_is_estimated" class="estimate-tag">处理后为估算值</span></h4>
+                <div class="before-after-grid">
+                  <div>
+                    <span>处理前电耗</span>
+                    <strong>{{ order.before_kwh || '-' }} kWh</strong>
+                  </div>
+                  <div>
+                    <span>处理后电耗</span>
+                    <strong>{{ order.after_kwh || '-' }} kWh</strong>
+                  </div>
+                  <div>
+                    <span>处理前 COP</span>
+                    <strong>{{ order.before_cop || '-' }}</strong>
+                  </div>
+                  <div>
+                    <span>处理后 COP</span>
+                    <strong>{{ order.after_cop || '-' }}</strong>
+                  </div>
+                </div>
+              </div>
+              <!-- Attachment Info -->
+              <div v-if="order.attachment_name" class="attachment-info">
+                <span>📎 现场附件：</span>
+                <strong>{{ order.attachment_name }}</strong>
+                <span v-if="order.attachment_note"> · {{ order.attachment_note }}</span>
+              </div>
+
               <ol v-if="order.timeline.length" class="timeline-list">
                 <li v-for="event in order.timeline.slice(-4)" :key="event.event_id">
                   <strong>{{ event.action }}</strong>
@@ -2431,6 +2613,21 @@ onMounted(async () => {
             <ul v-if="operationReport.actionItems?.length" class="report-action-list">
               <li v-for="item in operationReport.actionItems" :key="item">{{ item }}</li>
             </ul>
+            <!-- Closed Case Cards -->
+            <div v-if="operationReport.closedCases?.length" class="closed-cases-section">
+              <h4>已关闭工单案例</h4>
+              <div class="closed-case-grid">
+                <article v-for="item in operationReport.closedCases.slice(0, 4)" :key="item.work_order_id" class="closed-case-card">
+                  <h5>{{ item.building_name }} · {{ item.floor_label }} · {{ item.equipment_id }}</h5>
+                  <p><strong>现场原因：</strong>{{ item.actual_cause || '-' }}</p>
+                  <p><strong>处理结果：</strong>{{ item.resolution_note || '-' }}</p>
+                  <p v-if="item.saving_summary || item.cop_summary" class="closed-case-effect">
+                    {{ item.saving_summary }}{{ item.saving_summary && item.cop_summary ? ' · ' : '' }}{{ item.cop_summary }}
+                  </p>
+                  <span class="closed-case-time">{{ item.closed_at }}</span>
+                </article>
+              </div>
+            </div>
           </div>
         </SectionCard>
 
@@ -3443,5 +3640,220 @@ onMounted(async () => {
   .export-message {
     font-size: 12px;
   }
+}
+
+/* -------------------------------------------------- */
+/* New: notification badge, before/after, closed cases */
+/* -------------------------------------------------- */
+
+.badge-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #d9364f;
+  color: #fff;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  margin-left: 6px;
+  animation: pulse-badge 1.8s ease-in-out infinite;
+}
+
+@keyframes pulse-badge {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+.kpi--highlight {
+  border-color: rgba(217, 54, 79, 0.35) !important;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(253, 235, 237, 0.9)) !important;
+}
+
+.before-after-compare {
+  border: 1px solid rgba(34, 160, 107, 0.18);
+  border-radius: 18px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(236, 251, 243, 0.88));
+  padding: 14px;
+  margin-top: 12px;
+}
+
+.before-after-compare h4 {
+  margin: 0 0 10px;
+  color: #15724d;
+  font-size: 14px;
+}
+
+.before-after-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.before-after-grid > div {
+  text-align: center;
+  border: 1px solid rgba(20, 34, 48, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 10px 6px;
+}
+
+.before-after-grid span {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.before-after-grid strong {
+  display: block;
+  color: var(--accent-deep);
+  font-size: 20px;
+  margin-top: 4px;
+}
+
+.attachment-info {
+  margin-top: 10px;
+  border: 1px solid rgba(15, 139, 141, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.74);
+  padding: 10px;
+  font-size: 13px;
+  color: #263f49;
+}
+
+.attachment-info strong {
+  color: var(--accent-deep);
+}
+
+.closed-cases-section {
+  margin-top: 18px;
+}
+
+.closed-cases-section h4 {
+  margin: 0 0 12px;
+  color: var(--accent-deep);
+  font-size: 15px;
+}
+
+.closed-case-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.closed-case-card {
+  border: 1px solid rgba(20, 34, 48, 0.08);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(242, 250, 250, 0.86));
+  padding: 14px;
+}
+
+.closed-case-card h5 {
+  margin: 0 0 8px;
+  color: var(--accent-deep);
+  font-size: 14px;
+}
+
+.closed-case-card p {
+  margin: 0 0 6px;
+  color: #263f49;
+  font-size: 13px;
+}
+
+.closed-case-effect {
+  color: #15724d !important;
+  font-weight: 600;
+}
+
+.closed-case-time {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 11px;
+  margin-top: 8px;
+}
+
+.estimate-tag {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(20, 114, 77, 0.12);
+  color: #15724d;
+  font-size: 11px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.sim-strip {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px 16px;
+  margin: 0 0 14px;
+  padding: 12px 16px;
+  border: 1px dashed rgba(20, 34, 48, 0.18);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(240, 243, 250, 0.85));
+}
+
+.sim-strip--active {
+  border-style: solid;
+  border-color: rgba(37, 99, 235, 0.35);
+  background: linear-gradient(145deg, rgba(239, 246, 255, 0.95), rgba(224, 236, 255, 0.9));
+}
+
+.sim-clock {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+}
+
+.sim-clock-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #2563eb;
+  text-transform: uppercase;
+}
+
+.sim-clock-date {
+  font-size: 22px;
+  font-weight: 800;
+  color: #14253a;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-clock-date--off {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-soft);
+}
+
+.sim-clock-range,
+.sim-clock-fixed {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.sim-clock-fixed {
+  color: #15724d;
+  font-weight: 600;
+}
+
+.sim-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sim-hint {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 12px;
+  color: var(--ink-soft);
+  line-height: 1.5;
 }
 </style>

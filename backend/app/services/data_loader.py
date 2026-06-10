@@ -56,7 +56,11 @@ def get_filtered_dataset(
     start_time: Optional[datetime] = None,
     end_time: Optional[datetime] = None,
 ) -> pd.DataFrame:
+    from app.services import simulation_service
+
     frame = read_dataset().copy()
+    # Apply operator interventions (causal recovery) before any windowing.
+    frame = simulation_service.apply_interventions(frame)
 
     if building_id:
         frame = frame[frame["building_id"] == building_id]
@@ -65,7 +69,20 @@ def get_filtered_dataset(
     if end_time is not None:
         frame = frame[frame["timestamp"] <= pd.Timestamp(end_time)]
 
+    # Hide data after the current simulated date (no-op when simulation inactive).
+    frame = simulation_service.apply_window(frame)
+
     return frame.reset_index(drop=True)
+
+
+def get_visible_dataset() -> pd.DataFrame:
+    """Full dataset as seen at the current simulated date (interventions + window).
+
+    No-op equivalent to ``read_dataset()`` when the simulation clock is inactive.
+    """
+    from app.services import simulation_service
+
+    return simulation_service.apply(read_dataset().copy()).reset_index(drop=True)
 
 
 def get_building_options() -> List[Dict[str, str]]:

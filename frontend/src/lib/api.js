@@ -178,6 +178,36 @@ export function ignorePersistentWorkOrder(workOrderId, payload) {
   });
 }
 
+export function createAutoConfirmQueue() {
+  return request("/work-orders/auto-confirm-queue", {
+    method: "POST"
+  });
+}
+
+export function fetchSimState() {
+  return request("/sim/state");
+}
+
+export function startSimulation(startDate = null) {
+  return request("/sim/start", {
+    method: "POST",
+    body: JSON.stringify({ start_date: startDate })
+  });
+}
+
+export function advanceSimulation(days = 1) {
+  return request("/sim/advance", {
+    method: "POST",
+    body: JSON.stringify({ days })
+  });
+}
+
+export function resetSimulation() {
+  return request("/sim/reset", {
+    method: "POST"
+  });
+}
+
 export function fetchAssistantProviders() {
   return request("/assistant/providers");
 }

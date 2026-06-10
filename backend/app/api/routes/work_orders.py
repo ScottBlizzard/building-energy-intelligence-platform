@@ -16,6 +16,7 @@ from app.services.work_order_store import (
     assign_work_order,
     create_work_order,
     create_work_order_from_anomaly,
+    create_pending_confirm_drafts,
     ignore_work_order,
     list_work_orders,
     review_work_order,
@@ -42,6 +43,16 @@ def post_work_order(payload: WorkOrderCreate):
     if data.get("assignee_id"):
         return create_work_order_from_anomaly(data, operator_id=data.get("created_by") or "admin")
     return create_work_order(data)
+
+
+@router.post("/auto-confirm-queue")
+def post_auto_confirm_queue():
+    from app.services.analysis_service import build_anomaly_work_order_drafts
+    from app.services.data_loader import get_visible_dataset
+    frame = get_visible_dataset()
+    drafts = build_anomaly_work_order_drafts(frame)
+    result = create_pending_confirm_drafts(drafts, operator_id="admin")
+    return result
 
 
 @router.patch("/{work_order_id}")
@@ -92,6 +103,8 @@ def patch_submit_work_order(work_order_id: str, payload: WorkOrderSubmit):
         recovery_confirmed=payload.recovery_confirmed,
         parts_used=payload.parts_used or "",
         safety_note=payload.safety_note or "",
+        attachment_name=payload.attachment_name or "",
+        attachment_note=payload.attachment_note or "",
     )
     if not updated:
         raise HTTPException(status_code=409, detail="Work order cannot be submitted")

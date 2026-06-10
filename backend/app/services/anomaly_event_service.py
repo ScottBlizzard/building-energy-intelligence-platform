@@ -8,12 +8,12 @@ from app.services.analysis_service import (
     build_anomaly_summary,
     build_equipment_summary,
 )
-from app.services.data_loader import read_dataset
+from app.services.data_loader import get_visible_dataset
 from app.services.work_order_store import list_work_orders
 
 
 def build_anomaly_event(record_id: str) -> Optional[Dict]:
-    frame = build_analysis_frame(read_dataset())
+    frame = build_analysis_frame(get_visible_dataset())
     explanation = build_anomaly_explanation(frame, record_id)
     if not explanation:
         return None

@@ -7,7 +7,7 @@ class WorkOrderCreate(BaseModel):
     work_order_id: Optional[str] = None
     source_record_id: Optional[str] = None
     priority: str = "中"
-    status: str = "处理中"
+    status: Optional[str] = None
     building_id: str
     building_name: str
     floor_label: str
@@ -23,6 +23,8 @@ class WorkOrderCreate(BaseModel):
     assignee_name: Optional[str] = None
     created_by: Optional[str] = None
     note: Optional[str] = ""
+    before_kwh: Optional[float] = None
+    before_cop: Optional[float] = None
 
 
 class WorkOrderUpdate(BaseModel):
@@ -49,6 +51,8 @@ class WorkOrderSubmit(BaseModel):
     recovery_confirmed: bool = True
     parts_used: Optional[str] = ""
     safety_note: Optional[str] = ""
+    attachment_name: Optional[str] = ""
+    attachment_note: Optional[str] = ""
 
 
 class WorkOrderReview(BaseModel):

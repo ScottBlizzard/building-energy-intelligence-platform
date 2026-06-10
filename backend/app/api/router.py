@@ -10,6 +10,7 @@ from app.api.routes import (
     data,
     export,
     health,
+    simulation,
     work_orders,
 )
 
@@ -25,4 +26,5 @@ api_router.include_router(admin.router, prefix="/admin", tags=["admin"])
 api_router.include_router(assistant.router, prefix="/assistant", tags=["assistant"])
 api_router.include_router(export.router, prefix="/export", tags=["export"])
 api_router.include_router(work_orders.router, prefix="/work-orders", tags=["work-orders"])
+api_router.include_router(simulation.router, prefix="/sim", tags=["simulation"])
 
