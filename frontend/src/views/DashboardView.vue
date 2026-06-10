@@ -12,6 +12,8 @@ import DataTable from "../components/DataTable.vue";
 import KpiCard from "../components/KpiCard.vue";
 import SectionCard from "../components/SectionCard.vue";
 import BuildingRiskScene from "../components/BuildingRiskScene.vue";
+import BudgetPanel from "../components/BudgetPanel.vue";
+import ROIPanel from "../components/ROIPanel.vue";
 import {
   acceptPersistentWorkOrder,
   assignPersistentWorkOrder,
@@ -238,6 +240,8 @@ const adminTabs = [
   { key: "data", label: "数据浏览" },
   { key: "analytics", label: "统计分析" },
   { key: "orders", label: "工单中心" },
+  { key: "budget", label: "预算管理" },
+  { key: "roi", label: "改造分析" },
   { key: "report", label: "决策报告" },
   { key: "assistant", label: "智能问答" }
 ];
@@ -304,7 +308,10 @@ const anomalyColumns = [
   { key: "timestamp", label: "时间" },
   { key: "equipment_id", label: "设备" },
   { key: "equipment_status", label: "状态" },
-  { key: "anomaly_reason", label: "原因" }
+  { key: "anomaly_reason", label: "原因" },
+  { key: "severity", label: "等级" },
+  { key: "risk_score", label: "风险分" },
+  { key: "wasted_cost_yuan", label: "损失(元)" }
 ];
 
 const floorColumns = [
@@ -338,6 +345,8 @@ const workOrderColumns = [
   { key: "floor_label", label: "楼层" },
   { key: "equipment_id", label: "设备" },
   { key: "anomaly_reason", label: "异常原因" },
+  { key: "risk_score", label: "风险分" },
+  { key: "wasted_cost_yuan", label: "损失(元)" },
   { key: "recommended_action", label: "处置建议" },
   { key: "owner_role", label: "负责人" }
 ];
@@ -463,6 +472,12 @@ const orderStatusOptions = [
   { key: "closed", label: "已关闭" },
   { key: "ignored", label: "已忽略" }
 ];
+const orderAssignees = [
+  "楼层巡检员-李明",
+  "空调系统运维员-王强",
+  "制冷机房值班员-赵磊",
+  "能源管理员-陈晨"
+];
 const legacyStatusMap = {
   处理中: "in_progress",
   已完成: "closed",
@@ -526,7 +541,7 @@ const enrichedWorkOrders = computed(() =>
   workOrderState.generatedOrders.map((item) => ({
     ...item,
     status: normalizeOrderStatus(workOrderState.statusById[item.work_order_id] || item.status || "pending_confirm"),
-    status_label: item.status_label || statusLabelMap[normalizeOrderStatus(item.status)] || item.status_label,
+    status_label: item.status_label || statusLabelMap[normalizeOrderStatus(item.status)] || item.status_label || item.status,
     note: workOrderState.notesById[item.work_order_id] ?? item.note ?? "",
     assignee_id: item.assignee_id || "",
     assignee_name: item.assignee_name || item.owner_role || "",
@@ -608,6 +623,51 @@ const selectedAnomaly = computed(() =>
 const highPriorityOrders = computed(() =>
   enrichedWorkOrders.value.filter((item) => item.priority === "高").slice(0, 6)
 );
+const orderBusinessStats = computed(() => {
+  const closedStatuses = new Set(["已关闭", "已完成", "已忽略"]);
+  return enrichedWorkOrders.value.reduce(
+    (stats, item) => {
+      stats.totalWastedCost += Number(item.wasted_cost_yuan || 0);
+      stats.totalSaving += Number(item.estimated_saving_yuan || 0);
+      stats.totalCarbon += Number(item.carbon_kg || 0);
+      if (!closedStatuses.has(item.status)) {
+        stats.openCount += 1;
+      }
+      if (item.status === "待验证") {
+        stats.pendingVerifyCount += 1;
+      }
+      if (item.priority === "高" || Number(item.risk_score || 0) >= 72) {
+        stats.highRiskCount += 1;
+      }
+      return stats;
+    },
+    {
+      totalWastedCost: 0,
+      totalSaving: 0,
+      totalCarbon: 0,
+      openCount: 0,
+      pendingVerifyCount: 0,
+      highRiskCount: 0
+    }
+  );
+});
+const anomalyBusinessStats = computed(() =>
+  analytics.anomalies.reduce(
+    (stats, item) => {
+      stats.totalWastedKwh += Number(item.wasted_kwh || 0);
+      stats.totalWastedCost += Number(item.wasted_cost_yuan || 0);
+      stats.totalSaving += Number(item.estimated_saving_yuan || 0);
+      stats.totalCarbon += Number(item.carbon_kg || 0);
+      return stats;
+    },
+    {
+      totalWastedKwh: 0,
+      totalWastedCost: 0,
+      totalSaving: 0,
+      totalCarbon: 0
+    }
+  )
+);
 const forecastSeries = computed(() => {
   const points = (analytics.globalTimeSummary.length ? analytics.globalTimeSummary : analytics.timeSummary).slice(-10);
   if (!points.length) {
@@ -656,6 +716,9 @@ const operationReport = computed(() => {
       workOrder: analytics.operationReport.work_order,
       workOrderClosure: analytics.operationReport.work_order_closure,
       closedCases: analytics.operationReport.closed_cases || [],
+      businessSummary: analytics.operationReport.business_summary,
+      verificationSummary: analytics.operationReport.verification_summary,
+      businessImpact: analytics.operationReport.business_impact || {},
       forecast: analytics.operationReport.forecast,
       saving: `按当前模拟策略，预计节电 ${formatNumber(simulationResult.value.savingKwh)} kWh，节约约 ${formatNumber(simulationResult.value.savingCost)} 元。`,
       recommendation: analytics.operationReport.recommendation,
@@ -680,6 +743,14 @@ const operationReport = computed(() => {
       : "当前筛选范围暂无异常。",
     workOrder: `${sortedWorkOrders.value.filter((item) => !isOrderClosed(item)).length} 个工单未完成。`,
     workOrderClosure: `${orderStats.value.closed || 0} 个工单已复核关闭，可作为日报归档案例。`,
+    businessSummary: `异常估算浪费 ${formatNumber(anomalyBusinessStats.value.totalWastedKwh)} kWh，约 ${formatNumber(anomalyBusinessStats.value.totalWastedCost)} 元。`,
+    verificationSummary: `当前工单估算可回收 ${formatNumber(orderBusinessStats.value.totalSaving)} 元，待验证任务需用下一采样周期数据关闭。`,
+    businessImpact: {
+      total_wasted_kwh: anomalyBusinessStats.value.totalWastedKwh,
+      total_wasted_cost_yuan: anomalyBusinessStats.value.totalWastedCost,
+      total_estimated_saving_yuan: anomalyBusinessStats.value.totalSaving,
+      total_carbon_kg: anomalyBusinessStats.value.totalCarbon
+    },
     forecast: `未来 7 天预测电耗约 ${formatNumber(projectedWeekKwh.value)} kWh。`,
     saving: `按当前模拟策略，预计节电 ${formatNumber(simulationResult.value.savingKwh)} kWh，节约约 ${formatNumber(simulationResult.value.savingCost)} 元。`,
     recommendation: topRecommendation
@@ -704,8 +775,8 @@ function floorSortValue(label = "") {
   return match ? Number(match[1]) : 50;
 }
 
-function formatNumber(value) {
-  return Number(value || 0).toLocaleString("zh-CN");
+function formatNumber(value, options = {}) {
+  return Number(value || 0).toLocaleString("zh-CN", options);
 }
 
 function normalizeOrderStatus(status) {
@@ -730,6 +801,12 @@ function anomalyKey(item) {
 }
 
 function inferOrderPriority(anomaly) {
+  if (anomaly?.severity === "高" || Number(anomaly?.risk_score || 0) >= 72) {
+    return "高";
+  }
+  if (anomaly?.severity === "中" || Number(anomaly?.risk_score || 0) >= 48) {
+    return "中";
+  }
   if (anomaly?.anomaly_reason === "设备状态异常") {
     return "高";
   }
@@ -760,6 +837,17 @@ function inferRecommendedAction(anomaly) {
     return "核对运行时间表，检查新风阀、过滤网和风机频率。";
   }
   return "安排现场巡检，复核末端阀门、房间占用状态和设定温度。";
+}
+
+function orderStatusRank(status) {
+  return {
+    待分派: 0,
+    处理中: 1,
+    待验证: 2,
+    已关闭: 3,
+    已完成: 3,
+    已忽略: 4
+  }[status] ?? 9;
 }
 
 function toDateTimeLocal(value) {
@@ -1254,6 +1342,38 @@ function upsertWorkOrder(updated) {
   ensureOrderDrafts(updated);
 }
 
+async function updateWorkOrderStatus(workOrderId, status) {
+  workOrderState.statusById[workOrderId] = status;
+  const order = enrichedWorkOrders.value.find((item) => item.work_order_id === workOrderId);
+  const note = workOrderState.notesById[workOrderId] || "";
+  const payload = {
+    status,
+    note
+  };
+  if (status === "in_progress") {
+    payload.dispatch_action = `已分派给${order?.owner_role || "能源管理员"}处理。`;
+  }
+  if (status === "pending_review") {
+    payload.resolution_action = note || `已按建议动作处理：${order?.recommended_action || "完成现场处置"}`;
+    payload.verification_status = "待验证";
+  }
+  if (status === "closed") {
+    payload.verification_status = "通过";
+    payload.verification_result = order?.verification_method
+      ? `复测通过：${order.verification_method}`
+      : "复测通过，异常指标已回落至阈值内。";
+  }
+  try {
+    const updated = await updatePersistentWorkOrder(workOrderId, payload);
+    const index = workOrderState.generatedOrders.findIndex((item) => item.work_order_id === workOrderId);
+    if (index >= 0) {
+      workOrderState.generatedOrders.splice(index, 1, updated);
+    }
+  } catch (error) {
+    errors.orders = "工单状态已在页面更新，但同步到后端失败。";
+  }
+}
+
 function ensureOrderDrafts(order) {
   const id = order?.work_order_id;
   if (!id) {
@@ -1316,7 +1436,18 @@ async function generateWorkOrder() {
     assignee_name: assignee.display_name,
     created_by: currentUser.value?.user_id || "admin",
     before_kwh: Number(anomaly.electricity_kwh) || null,
-    before_cop: Number(anomaly.average_cop) || null
+    before_cop: Number(anomaly.average_cop) || null,
+    severity: anomaly.severity,
+    risk_score: anomaly.risk_score,
+    triggered_rule_count: anomaly.triggered_rule_count,
+    wasted_kwh: anomaly.wasted_kwh,
+    wasted_cost_yuan: anomaly.wasted_cost_yuan,
+    carbon_kg: anomaly.carbon_kg,
+    estimated_saving_yuan: anomaly.estimated_saving_yuan,
+    sla_hours: anomaly.sla_hours,
+    business_impact_summary: anomaly.business_impact_summary,
+    verification_method: anomaly.verification_method,
+    verification_status: "未验证"
   };
 
   loading.orders = true;
@@ -1324,7 +1455,7 @@ async function generateWorkOrder() {
   try {
     const saved = await createPersistentWorkOrder({
       ...order,
-      note: `管理员已派单给${order.assignee_name}，等待接单。`
+      note: `管理员已派单给${order.assignee_name}，等待接单。SLA ${order.sla_hours || 24} 小时。`
     });
     upsertWorkOrder(saved);
     orderDraft.anomalyKey = "";
@@ -1334,6 +1465,11 @@ async function generateWorkOrder() {
   } finally {
     loading.orders = false;
   }
+}
+
+async function completeWorkOrder(workOrderId) {
+  await updateWorkOrderStatus(workOrderId, "closed");
+  await refreshOperationReport();
 }
 
 async function saveWorkOrderNote(order) {
@@ -2017,6 +2153,22 @@ onMounted(async () => {
                 <span>平均 COP</span>
                 <strong>{{ anomalyExplanation.metrics.average_cop }}</strong>
               </div>
+              <div>
+                <span>风险分</span>
+                <strong>{{ anomalyExplanation.metrics.risk_score }}</strong>
+              </div>
+              <div>
+                <span>估算损失</span>
+                <strong>{{ formatNumber(anomalyExplanation.metrics.wasted_cost_yuan) }} 元</strong>
+              </div>
+              <div>
+                <span>预计回收</span>
+                <strong>{{ formatNumber(anomalyExplanation.metrics.estimated_saving_yuan) }} 元</strong>
+              </div>
+              <div>
+                <span>碳排影响</span>
+                <strong>{{ formatNumber(anomalyExplanation.metrics.carbon_kg) }} kg</strong>
+              </div>
             </div>
             <div class="explain-detail-grid">
               <div>
@@ -2032,6 +2184,7 @@ onMounted(async () => {
                 <h4>处置建议</h4>
                 <p><strong>可能原因：</strong>{{ anomalyExplanation.possible_cause }}</p>
                 <p><strong>建议动作：</strong>{{ anomalyExplanation.recommended_action }}</p>
+                <p v-if="anomalyExplanation.verification_method"><strong>验证口径：</strong>{{ anomalyExplanation.verification_method }}</p>
               </div>
             </div>
           </div>
@@ -2322,7 +2475,7 @@ onMounted(async () => {
 
     <template v-else-if="activeTab === 'orders'">
       <div class="content-grid content-grid--single">
-        <SectionCard eyebrow="Work Orders" title="异常工单处理中心" description="管理员从异常记录生成工单，派给工人处理，再对提交结果进行复核归档。">
+        <SectionCard eyebrow="Work Orders" title="异常工单处理中心" description="把异常记录转成可分派、可处置、可复核归档的运维任务，支持管理员派单、工人接单处置、复核关闭的完整流程。">
           <div v-if="errors.orders" class="inline-banner-list">
             <StatusBanner :status="errors.orders" type="warning" />
           </div>
@@ -2387,8 +2540,45 @@ onMounted(async () => {
               </button>
             </div>
             <p class="order-create-hint">
-              生成后工单进入“已派单”，对应工人登录后会在“我的工单”看到并接单处理。
+              先从异常记录中选择一个问题并分配工人，系统会携带风险分、估算损失、SLA 和验证方法生成工单，工人登录后即可接单处理。
             </p>
+            <div v-if="selectedOrderAnomaly" class="order-preview-strip">
+              <div>
+                <span>风险分</span>
+                <strong>{{ selectedOrderAnomaly.risk_score || "-" }}</strong>
+              </div>
+              <div>
+                <span>估算浪费</span>
+                <strong>{{ formatNumber(selectedOrderAnomaly.wasted_cost_yuan) }} 元</strong>
+              </div>
+              <div>
+                <span>可回收</span>
+                <strong>{{ formatNumber(selectedOrderAnomaly.estimated_saving_yuan) }} 元</strong>
+              </div>
+              <div>
+                <span>SLA</span>
+                <strong>{{ selectedOrderAnomaly.sla_hours || 24 }} 小时</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="order-impact-grid">
+            <div>
+              <span>未闭环工单</span>
+              <strong>{{ orderBusinessStats.openCount }}</strong>
+            </div>
+            <div>
+              <span>高风险任务</span>
+              <strong>{{ orderBusinessStats.highRiskCount }}</strong>
+            </div>
+            <div>
+              <span>估算损失</span>
+              <strong>{{ formatNumber(orderBusinessStats.totalWastedCost) }} 元</strong>
+            </div>
+            <div>
+              <span>预计可回收</span>
+              <strong>{{ formatNumber(orderBusinessStats.totalSaving) }} 元</strong>
+            </div>
           </div>
 
           <div class="order-summary-grid order-summary-grid--wide">
@@ -2419,9 +2609,9 @@ onMounted(async () => {
                   <span class="work-order-id">{{ order.work_order_id }}</span>
                   <h3>{{ order.building_name }} · {{ order.floor_label }} · {{ order.equipment_id }}</h3>
                 </div>
-                <div class="order-badges">
+                <div class="work-order-pills">
                   <span class="priority-pill">{{ order.priority }}优先级</span>
-                  <span class="status-chip">{{ getOrderStatusLabel(order) }}</span>
+                  <span class="status-pill">{{ getOrderStatusLabel(order) }}</span>
                 </div>
               </div>
               <div class="work-order-meta">
@@ -2430,9 +2620,42 @@ onMounted(async () => {
                 <span>工人：{{ order.assignee_name || order.owner_role || "未分配" }}</span>
                 <span>时间：{{ order.timestamp }}</span>
               </div>
+              <div class="work-order-impact">
+                <div>
+                  <span>风险分</span>
+                  <strong>{{ order.risk_score || "-" }}</strong>
+                </div>
+                <div>
+                  <span>估算损失</span>
+                  <strong>{{ formatNumber(order.wasted_cost_yuan) }} 元</strong>
+                </div>
+                <div>
+                  <span>可回收</span>
+                  <strong>{{ formatNumber(order.estimated_saving_yuan) }} 元</strong>
+                </div>
+                <div>
+                  <span>SLA</span>
+                  <strong>{{ order.sla_hours || 24 }}h</strong>
+                </div>
+              </div>
+              <ol v-if="order.status !== '已忽略'" class="order-flow">
+                <li
+                  v-for="status in orderStatusOptions.filter((item) => item.key !== '已忽略')"
+                  :key="status.key"
+                  :class="{
+                    'is-active': orderStatusRank(status.key) <= orderStatusRank(order.status),
+                    'is-current': status.key === order.status
+                  }"
+                >
+                  {{ status.label }}
+                </li>
+              </ol>
               <p><strong>异常原因：</strong>{{ order.anomaly_reason }}</p>
               <p><strong>可能原因：</strong>{{ order.possible_cause }}</p>
               <p><strong>处置建议：</strong>{{ order.recommended_action }}</p>
+              <p v-if="order.business_impact_summary" class="work-order-business">{{ order.business_impact_summary }}</p>
+              <p v-if="order.verification_method" class="work-order-business"><strong>验证口径：</strong>{{ order.verification_method }}</p>
+              <p v-if="order.verification_result" class="work-order-business"><strong>复测结果：</strong>{{ order.verification_result }}</p>
               <p v-if="order.actual_cause"><strong>现场原因：</strong>{{ order.actual_cause }}</p>
               <p v-if="order.resolution_note"><strong>处理结果：</strong>{{ order.resolution_note }}</p>
 
@@ -2602,11 +2825,31 @@ onMounted(async () => {
           <StatusBanner v-if="errors.report" :status="errors.report" type="warning" />
           <div class="operation-report">
             <h3>{{ operationReport.title }}</h3>
+            <div class="report-metric-grid">
+              <div>
+                <span>异常浪费</span>
+                <strong>{{ formatNumber(operationReport.businessImpact?.total_wasted_kwh) }} kWh</strong>
+              </div>
+              <div>
+                <span>经济损失</span>
+                <strong>{{ formatNumber(operationReport.businessImpact?.total_wasted_cost_yuan) }} 元</strong>
+              </div>
+              <div>
+                <span>预计回收</span>
+                <strong>{{ formatNumber(operationReport.businessImpact?.total_estimated_saving_yuan) }} 元</strong>
+              </div>
+              <div>
+                <span>碳排影响</span>
+                <strong>{{ formatNumber(operationReport.businessImpact?.total_carbon_kg) }} kg</strong>
+              </div>
+            </div>
             <p>{{ operationReport.overview }}</p>
             <p>{{ operationReport.risk }}</p>
             <p>{{ operationReport.latestAnomaly }}</p>
             <p>{{ operationReport.workOrder }}</p>
             <p>{{ operationReport.workOrderClosure }}</p>
+            <p v-if="operationReport.businessSummary">{{ operationReport.businessSummary }}</p>
+            <p v-if="operationReport.verificationSummary">{{ operationReport.verificationSummary }}</p>
             <p>{{ operationReport.forecast }}</p>
             <p>{{ operationReport.saving }}</p>
             <p>{{ operationReport.recommendation }}</p>
@@ -2646,6 +2889,18 @@ onMounted(async () => {
             description="当前筛选范围没有触发明显节能建议。"
           />
         </SectionCard>
+      </div>
+    </template>
+
+    <template v-else-if="activeTab === 'budget'">
+      <div class="content-grid content-grid--single">
+        <BudgetPanel :buildings="buildings" />
+      </div>
+    </template>
+
+    <template v-else-if="activeTab === 'roi'">
+      <div class="content-grid content-grid--single">
+        <ROIPanel :buildings="buildings" />
       </div>
     </template>
 
@@ -3101,9 +3356,10 @@ onMounted(async () => {
 }
 
 .order-summary-grid,
+.order-impact-grid,
 .simulation-result {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 14px;
   margin-bottom: 18px;
 }
@@ -3141,6 +3397,42 @@ onMounted(async () => {
   margin: 12px 0 0;
   color: var(--ink-soft);
   font-size: 13px;
+}
+
+.order-preview-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.order-preview-strip > div,
+.order-impact-grid > div,
+.work-order-impact > div,
+.report-metric-grid > div {
+  border: 1px solid rgba(20, 34, 48, 0.08);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.76);
+  padding: 12px;
+}
+
+.order-preview-strip span,
+.order-impact-grid span,
+.work-order-impact span,
+.report-metric-grid span {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.order-preview-strip strong,
+.order-impact-grid strong,
+.work-order-impact strong,
+.report-metric-grid strong {
+  display: block;
+  color: var(--accent-deep);
+  font-size: 18px;
+  margin-top: 5px;
 }
 
 .order-summary-card,
@@ -3201,16 +3493,18 @@ onMounted(async () => {
   box-shadow: 0 22px 52px rgba(242, 169, 0, 0.18);
 }
 
-.work-order-card--in_progress {
+.work-order-card--in_progress,
+.work-order-card--处理中 {
   border-left-color: #0f8b8d;
   background:
     linear-gradient(145deg, rgba(224, 246, 245, 0.94), rgba(255, 255, 255, 0.88));
 }
 
-.work-order-card--pending_review {
-  border-left-color: #125d73;
+.work-order-card--pending_review,
+.work-order-card--待验证 {
+  border-left-color: #7b61ff;
   background:
-    linear-gradient(145deg, rgba(226, 239, 245, 0.94), rgba(255, 255, 255, 0.88));
+    linear-gradient(145deg, rgba(241, 238, 255, 0.95), rgba(255, 255, 255, 0.86));
 }
 
 .work-order-card--rejected {
@@ -3219,7 +3513,9 @@ onMounted(async () => {
     linear-gradient(145deg, rgba(253, 231, 235, 0.94), rgba(255, 255, 255, 0.88));
 }
 
-.work-order-card--closed {
+.work-order-card--closed,
+.work-order-card--已关闭,
+.work-order-card--已完成 {
   border-left-color: #22a06b;
   background:
     linear-gradient(145deg, rgba(225, 247, 237, 0.96), rgba(255, 255, 255, 0.84));
@@ -3257,11 +3553,20 @@ onMounted(async () => {
   white-space: nowrap;
 }
 
-.order-badges {
+.work-order-pills {
   display: flex;
+  gap: 8px;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+}
+
+.status-pill {
+  border-radius: 999px;
+  background: rgba(15, 139, 141, 0.12);
+  color: #0f6f71;
+  font-size: 12px;
+  padding: 6px 10px;
+  white-space: nowrap;
 }
 
 .work-order-meta {
@@ -3276,6 +3581,47 @@ onMounted(async () => {
 .work-order-card p {
   margin: 8px 0;
   color: #263f49;
+}
+
+.work-order-impact {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+
+.order-flow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  list-style: none;
+  margin: 12px 0;
+  padding: 0;
+}
+
+.order-flow li {
+  border: 1px solid rgba(20, 34, 48, 0.08);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  padding: 7px 8px;
+  text-align: center;
+}
+
+.order-flow li.is-active {
+  background: rgba(15, 139, 141, 0.12);
+  color: #0f6f71;
+}
+
+.order-flow li.is-current {
+  border-color: rgba(15, 139, 141, 0.32);
+  font-weight: 700;
+}
+
+.work-order-business {
+  border-radius: 14px;
+  background: rgba(15, 139, 141, 0.08);
+  padding: 10px 12px;
 }
 
 .work-order-actions {
@@ -3307,6 +3653,22 @@ onMounted(async () => {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.status-quick-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.status-quick-actions button {
+  border: 1px solid rgba(15, 139, 141, 0.2);
+  border-radius: 14px;
+  background: rgba(15, 139, 141, 0.1);
+  color: #0f6f71;
+  cursor: pointer;
+  font: inherit;
+  padding: 9px 12px;
 }
 
 .complete-button {
@@ -3449,6 +3811,13 @@ onMounted(async () => {
     linear-gradient(145deg, rgba(255, 255, 255, 0.94), rgba(235, 247, 245, 0.9));
   border: 1px solid rgba(20, 34, 48, 0.08);
   padding: 22px;
+}
+
+.report-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .operation-report h3 {
@@ -3610,14 +3979,19 @@ onMounted(async () => {
   }
 
   .order-summary-grid,
+  .order-impact-grid,
+  .order-preview-strip,
   .order-create-grid,
   .work-order-board,
+  .work-order-impact,
+  .order-flow,
   .work-order-meta,
   .analysis-filter-panel,
   .explain-metric-grid,
   .explain-detail-grid,
   .floor-registry-grid,
   .registry-meta,
+  .report-metric-grid,
   .simulation-result {
     grid-template-columns: 1fr;
   }

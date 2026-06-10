@@ -11,7 +11,9 @@ from app.services.analysis_service import (
     build_optimization_recommendations,
     build_overview,
 )
+from app.services.budget_service import build_budget_analysis, build_budget_kpi
 from app.services.data_loader import get_building_options, get_visible_dataset
+from app.services.roi_service import build_equipment_audit
 
 
 BUILDING_KEYWORDS = {
@@ -57,6 +59,37 @@ def _format_building_list(buildings: List[Dict[str, str]]) -> str:
     return "、".join(item["building_name"] for item in buildings)
 
 
+def _building_id_for_name(buildings: List[Dict[str, str]], building_name: Optional[str]) -> Optional[str]:
+    if not building_name:
+        return None
+    match = next((item for item in buildings if item.get("building_name") == building_name), None)
+    return match.get("building_id") if match else None
+
+
+def _latest_year_month(dataset: pd.DataFrame) -> tuple[int, int]:
+    if dataset.empty:
+        now = pd.Timestamp.now()
+    else:
+        now = pd.Timestamp(dataset["timestamp"].max())
+    return int(now.year), int(now.month)
+
+
+def _top_budget_risk(year: int, month: int, building_id: Optional[str] = None) -> Optional[Dict]:
+    analysis = build_budget_analysis(year, month)
+    items = analysis.get("buildings", [])
+    if building_id:
+        items = [item for item in items if item.get("building_id") == building_id]
+    if not items:
+        return None
+    return max(
+        items,
+        key=lambda item: (
+            float(item.get("projected_execution_rate", 0)),
+            int(item.get("anomaly_count", 0)),
+        ),
+    )
+
+
 def build_assistant_reply(question: str) -> Dict[str, List]:
     dataset = get_visible_dataset()
     overview = build_overview(dataset)
@@ -64,6 +97,82 @@ def build_assistant_reply(question: str) -> Dict[str, List]:
     question_text = question.lower().strip()
     target_building = _find_target_building(question_text)
     scoped_dataset = _filter_dataset(dataset, target_building)
+    target_building_id = _building_id_for_name(buildings, target_building)
+
+    if _has_any(question_text, ["预算", "超支", "费用控制", "kpi", "考核", "执行率"]):
+        year, month = _latest_year_month(scoped_dataset if target_building else dataset)
+        risk = _top_budget_risk(year, month, target_building_id)
+        if risk:
+            kpi = build_budget_kpi(str(risk["building_id"]), year)
+            answer = (
+                f"{risk['building_name']} {year}年{month}月预算为 {risk['budget_kwh']:,.0f} kWh，"
+                f"当前已用 {risk['actual_kwh']:,.0f} kWh，月末预计执行率 {risk['projected_execution_rate']}%。"
+                f"KPI 等级为 {kpi.get('grade', '-')}，预算控制率 {kpi.get('budget_control_rate', 0)}%，"
+                f"异常响应及时率 {kpi.get('anomaly_response_timely_rate', 0)}%。"
+            )
+            if risk.get("status") == "over":
+                answer += " 该楼栋存在超预算风险，建议优先执行夜间关机、异常工单复核和重点设备改造评估。"
+            elif risk.get("status") == "warning":
+                answer += " 该楼栋处于预算预警区间，建议提前压降可调负荷并持续观察。"
+            else:
+                answer += " 当前预算风险可控，可以维持常规巡检。"
+        else:
+            answer = "当前可见数据范围内还没有可用预算基线，建议先自动生成本月预算。"
+        return {
+            "answer": answer,
+            "citations": _build_citations(
+                [
+                    ("预算管理接口", "docs/06-api-contract.md"),
+                    ("业务逻辑升级任务", "docs/22-business-logic-upgrade-todo.md"),
+                ]
+            ),
+            "follow_up": [
+                "哪栋楼预算超支风险最高？",
+                "实验楼本月 KPI 怎么样？",
+                "预算风险对应哪些工单？",
+            ],
+        }
+
+    if _has_any(question_text, ["roi", "npv", "irr", "投资", "回本", "回收期", "改造方案", "经济性"]):
+        year, month = _latest_year_month(scoped_dataset if target_building else dataset)
+        risk = _top_budget_risk(year, month, target_building_id)
+        building_id = target_building_id or (risk.get("building_id") if risk else None)
+        if not building_id and buildings:
+            building_id = buildings[0]["building_id"]
+
+        if building_id:
+            audit = build_equipment_audit(str(building_id))
+            candidates = []
+            for equipment in audit.get("equipment_list", []):
+                for option in equipment.get("retrofit_candidates", [])[:3]:
+                    candidates.append({"equipment_type": equipment.get("equipment_type"), **option})
+            best = max(candidates, key=lambda item: float(item.get("npv_yuan", 0))) if candidates else None
+            if best:
+                answer = (
+                    f"{audit['building_name']} 当前最值得优先评估的是 {best['equipment_type']} 的"
+                    f"{best['option']}：投资约 {best['investment_yuan']:,.0f} 元，"
+                    f"年节省约 {best['annual_saving_yuan']:,.0f} 元，"
+                    f"静态回收期 {best['payback_years']} 年，NPV {best['npv_yuan']:,.0f} 元，"
+                    f"IRR {best['irr_pct']}%。"
+                )
+            else:
+                answer = "当前楼栋没有生成可比较的改造候选方案。"
+        else:
+            answer = "当前没有可用于 ROI 分析的楼栋数据。"
+        return {
+            "answer": answer,
+            "citations": _build_citations(
+                [
+                    ("ROI 分析接口", "docs/06-api-contract.md"),
+                    ("业务逻辑升级任务", "docs/22-business-logic-upgrade-todo.md"),
+                ]
+            ),
+            "follow_up": [
+                "比较三种节能改造方案",
+                "哪个方案回本最快？",
+                "实验楼改造的 NPV 是多少？",
+            ],
+        }
 
     if _has_any(question_text, ["楼层", "哪一层", "区域", "分层", "逐层"]):
         floors = sorted(

@@ -225,6 +225,50 @@ export function queryAssistant(question, modelSelection = null) {
   });
 }
 
+export function fetchBudgets(params = {}) {
+  return request("/budget/budgets", {}, params);
+}
+
+export function generateBudgets(year, month) {
+  return request("/budget/budgets/generate", {
+    method: "POST",
+    body: JSON.stringify({})
+  }, { year, month });
+}
+
+export function setBudget(payload) {
+  return request("/budget/budgets", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function fetchBudgetAnalysis(year, month) {
+  return request("/budget/budgets/analysis", {}, { year, month });
+}
+
+export function fetchBudgetKPI(buildingId, year) {
+  return request(`/budget/budgets/kpi/${encodeURIComponent(buildingId)}`, {}, { year });
+}
+
+export function fetchEquipmentAudit(buildingId) {
+  return request(`/roi/audit/${encodeURIComponent(buildingId)}`);
+}
+
+export function analyzeROIProject(payload) {
+  return request("/roi/analyze", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function compareROIScenarios(payload) {
+  return request("/roi/compare", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
 export async function downloadCsvExport(params = {}) {
   const response = await fetch(buildApiUrl("/export/csv", params));
 

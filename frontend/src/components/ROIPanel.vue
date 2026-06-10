@@ -1,0 +1,546 @@
+<template>
+  <div class="roi-panel">
+    <StatusBanner v-if="error" :status="error" type="warning" />
+
+    <div class="roi-toolbar">
+      <label>
+        <span>选择楼栋</span>
+        <select v-model="selectedBuilding" @change="loadAudit">
+          <option v-for="b in buildings" :key="b.building_id" :value="b.building_id">
+            {{ b.building_name }}
+          </option>
+        </select>
+      </label>
+      <button class="primary-button" type="button" :disabled="loading" @click="loadAudit">
+        刷新设备诊断
+      </button>
+    </div>
+
+    <div v-if="loading" class="data-loading">
+      <LoadingSpinner text="正在分析设备能效..." />
+    </div>
+
+    <template v-else-if="audit">
+      <div class="equipment-audit-grid">
+        <div
+          v-for="eq in audit.equipment_list"
+          :key="eq.equipment_type"
+          class="equipment-card"
+          :class="`equipment-card--${eq.cop_status}`"
+          @click="selectEquipment(eq)"
+        >
+          <div class="eq-card-head">
+            <strong>{{ eq.equipment_type }}</strong>
+            <span class="eq-cop-badge" :class="`cop-badge--${eq.cop_status}`">{{ eq.cop_status }}</span>
+          </div>
+          <div class="eq-card-stats">
+            <div><span>设备数量</span><strong>{{ eq.equipment_count }}</strong></div>
+            <div><span>年度用电</span><strong>{{ formatNumber(eq.total_kwh) }} kWh</strong></div>
+            <div><span>年度电费</span><strong>{{ formatNumber(eq.annual_cost_yuan) }} 元</strong></div>
+            <div><span>平均 COP</span><strong>{{ eq.avg_cop }}</strong></div>
+            <div><span>异常次数</span><strong>{{ eq.anomaly_count }}</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="selectedEquipment" class="roi-analyzer">
+        <SectionCard eyebrow="ROI Calculator" :title="`${selectedEquipment.equipment_type} · 改造方案分析`" description="">
+          <div class="roi-preset-grid">
+            <div
+              v-for="option in selectedEquipment.retrofit_candidates"
+              :key="option.option"
+              class="roi-preset-card"
+              :class="{ 'roi-preset--selected': selectedPreset === option.option }"
+              @click="applyPreset(option)"
+            >
+              <strong>{{ option.option }}</strong>
+              <span>投资 {{ formatNumber(option.investment_yuan) }} 元</span>
+              <span>年节省 {{ formatNumber(option.annual_saving_yuan) }} 元</span>
+              <span class="roi-preset-payback">回收期 {{ option.payback_years }} 年</span>
+            </div>
+          </div>
+
+          <div v-if="scenarioComparison" class="scenario-compare">
+            <div class="scenario-compare-head">
+              <div>
+                <span>Scenario Comparison</span>
+                <strong>多方案经济性对比</strong>
+              </div>
+              <p>{{ scenarioComparison.recommendation }}</p>
+            </div>
+            <div class="scenario-table-wrap">
+              <table class="scenario-table">
+                <thead>
+                  <tr>
+                    <th>方案</th>
+                    <th>投资</th>
+                    <th>年节省</th>
+                    <th>回收期</th>
+                    <th>5年ROI</th>
+                    <th>NPV</th>
+                    <th>结论</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="scenario in scenarioComparison.scenarios"
+                    :key="scenario.project_name"
+                    :class="{ 'scenario-row--best': scenario.project_name === scenarioComparison.comparison.best_npv?.name }"
+                  >
+                    <td>{{ scenario.project_name }}</td>
+                    <td>{{ formatNumber(scenario.investment_yuan) }} 元</td>
+                    <td>{{ formatNumber(scenario.annual_saving_yuan) }} 元</td>
+                    <td>{{ scenario.payback_label || `${scenario.payback_years} 年` }}</td>
+                    <td>{{ scenario.roi_5year_pct }}%</td>
+                    <td :class="scenario.npv_yuan > 0 ? 'text-green' : 'text-red'">
+                      {{ formatNumber(scenario.npv_yuan) }} 元
+                    </td>
+                    <td>{{ scenario.assessment }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="roi-custom-form">
+            <label>
+              <span>投资金额 (元)</span>
+              <input v-model.number="roiForm.investment_yuan" type="number" min="1000" step="10000" />
+            </label>
+            <label>
+              <span>预计节能率 (%)</span>
+              <input v-model.number="roiForm.expected_saving_pct" type="range" min="5" max="50" step="1" />
+              <strong>{{ roiForm.expected_saving_pct }}%</strong>
+            </label>
+            <label>
+              <span>项目寿命 (年)</span>
+              <input v-model.number="roiForm.lifespan" type="number" min="3" max="25" />
+            </label>
+            <label>
+              <span>年维护成本 (元)</span>
+              <input v-model.number="roiForm.annual_maintenance" type="number" min="0" step="1000" />
+            </label>
+            <button class="primary-button" type="button" :disabled="analyzing" @click="runAnalysis">
+              计算 ROI
+            </button>
+          </div>
+        </SectionCard>
+
+        <div v-if="roiResult" class="roi-result-grid">
+          <div class="roi-result-card" :class="`roi-result--${roiResult.assessment === '强烈推荐' || roiResult.assessment === '推荐' ? 'good' : 'warn'}`">
+            <span>投资评估</span>
+            <strong>{{ roiResult.assessment }}</strong>
+          </div>
+          <div class="roi-result-card">
+            <span>净现值 NPV</span>
+            <strong :class="roiResult.npv_yuan > 0 ? 'text-green' : 'text-red'">
+              {{ formatNumber(roiResult.npv_yuan) }} 元
+            </strong>
+          </div>
+          <div class="roi-result-card">
+            <span>内部收益率 IRR</span>
+            <strong>{{ roiResult.irr_pct }}%</strong>
+          </div>
+          <div class="roi-result-card">
+            <span>投资回收期</span>
+            <strong>{{ roiResult.payback_label || `${roiResult.payback_years} 年` }}</strong>
+          </div>
+          <div class="roi-result-card">
+            <span>5年 ROI</span>
+            <strong>{{ roiResult.roi_5year_pct }}%</strong>
+          </div>
+          <div class="roi-result-card">
+            <span>年减排 CO₂</span>
+            <strong>{{ formatNumber(roiResult.carbon_reduction_kg_per_year) }} kg</strong>
+          </div>
+        </div>
+
+        <div v-if="roiResult" class="roi-detail-grid">
+          <div class="roi-detail-card">
+            <strong>项目概要</strong>
+            <table class="roi-table">
+              <tr><td>项目名称</td><td>{{ roiResult.project_name }}</td></tr>
+              <tr><td>楼栋</td><td>{{ roiResult.building_name }}</td></tr>
+              <tr><td>设备类型</td><td>{{ roiResult.equipment_type }}</td></tr>
+              <tr><td>投资金额</td><td>{{ formatNumber(roiResult.investment_yuan) }} 元</td></tr>
+              <tr><td>年节省电费</td><td>{{ formatNumber(roiResult.annual_saving_yuan) }} 元</td></tr>
+              <tr><td>年节省电量</td><td>{{ formatNumber(roiResult.annual_saving_kwh) }} kWh</td></tr>
+              <tr><td>节能率</td><td>{{ roiResult.expected_saving_pct }}%</td></tr>
+              <tr><td>当前年度电费</td><td>{{ formatNumber(roiResult.current_annual_cost_yuan) }} 元</td></tr>
+              <tr><td>年化口径</td><td>基于 {{ roiResult.observed_days || selectedEquipment.observed_days }} 天可见数据年化</td></tr>
+            </table>
+          </div>
+          <div class="roi-detail-card">
+            <strong>现金流分析</strong>
+            <div class="cashflow-chart">
+              <div v-for="year in roiResult.project_lifespan_years" :key="year" class="cashflow-bar-wrap">
+                <div
+                  class="cashflow-bar"
+                  :class="year <= roiResult.payback_years ? 'cashflow--negative' : 'cashflow--positive'"
+                  :style="{ height: `${Math.max(8, 120 / roiResult.project_lifespan_years)}px` }"
+                ></div>
+                <span>Y{{ year }}</span>
+              </div>
+            </div>
+            <p class="cashflow-note">
+              {{ cashflowNote }}
+            </p>
+          </div>
+        </div>
+
+        <div v-if="roiResult?.sensitivity?.length" class="sensitivity-card">
+          <strong>敏感性分析</strong>
+          <div class="sensitivity-grid">
+            <div v-for="item in roiResult.sensitivity" :key="item.case" class="sensitivity-item">
+              <span>{{ item.case }}</span>
+              <strong>{{ formatNumber(item.npv_yuan) }} 元</strong>
+              <small>{{ item.expected_saving_pct }}% 节能率 · {{ item.payback_label }}</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="!selectedEquipment && audit.equipment_list.length" class="roi-hint">
+        <EmptyState icon="🔍" title="选择设备类型" description="点击上方设备卡片，查看改造方案并计算投资回报。" />
+      </div>
+    </template>
+
+    <EmptyState v-else-if="!loading" icon="🏗️" title="暂无设备诊断数据" description="请选择楼栋后点击刷新。" />
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, computed, watch, onMounted } from "vue";
+import { fetchEquipmentAudit, analyzeROIProject, compareROIScenarios } from "../lib/api.js";
+import SectionCard from "./SectionCard.vue";
+import StatusBanner from "./StatusBanner.vue";
+import LoadingSpinner from "./LoadingSpinner.vue";
+import EmptyState from "./EmptyState.vue";
+
+const props = defineProps({
+  buildings: { type: Array, default: () => [] },
+});
+
+const selectedBuilding = ref("BLD-A");
+const loading = ref(false);
+const analyzing = ref(false);
+const error = ref("");
+const audit = ref(null);
+const selectedEquipment = ref(null);
+const selectedPreset = ref("");
+const roiResult = ref(null);
+const scenarioComparison = ref(null);
+
+const roiForm = reactive({
+  investment_yuan: 150000,
+  expected_saving_pct: 20,
+  lifespan: 12,
+  annual_maintenance: 5000,
+});
+
+function formatNumber(val) {
+  if (val == null) return "-";
+  const num = Number(val);
+  if (Number.isNaN(num)) return "-";
+  return num.toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+}
+
+async function loadAudit() {
+  loading.value = true;
+  error.value = "";
+  try {
+    const result = await fetchEquipmentAudit(selectedBuilding.value);
+    audit.value = result.item;
+    selectedEquipment.value = null;
+    roiResult.value = null;
+    scenarioComparison.value = null;
+  } catch {
+    error.value = "设备诊断数据加载失败。";
+  } finally {
+    loading.value = false;
+  }
+}
+
+function selectEquipment(eq) {
+  selectedEquipment.value = eq;
+  selectedPreset.value = "";
+  roiResult.value = null;
+  scenarioComparison.value = null;
+  if (eq.retrofit_candidates?.length) {
+    const best = eq.retrofit_candidates[0];
+    roiForm.investment_yuan = best.investment_yuan;
+    roiForm.expected_saving_pct = best.saving_pct;
+    roiForm.lifespan = best.lifespan_years;
+    loadScenarioComparison(eq);
+  }
+}
+
+function applyPreset(option) {
+  selectedPreset.value = option.option;
+  roiForm.investment_yuan = option.investment_yuan;
+  roiForm.expected_saving_pct = option.saving_pct;
+  roiForm.lifespan = option.lifespan_years;
+}
+
+async function runAnalysis() {
+  if (!selectedEquipment.value) return;
+  analyzing.value = true;
+  error.value = "";
+  try {
+    const result = await analyzeROIProject({
+      building_id: selectedBuilding.value,
+      equipment_type: selectedEquipment.value.equipment_type,
+      investment_yuan: roiForm.investment_yuan,
+      expected_saving_pct: roiForm.expected_saving_pct / 100,
+      annual_maintenance_cost: roiForm.annual_maintenance,
+      project_lifespan_years: roiForm.lifespan,
+      project_name: `${selectedEquipment.value.equipment_type}·${selectedPreset.value || "自定义方案"}`,
+    });
+    roiResult.value = result.item;
+  } catch {
+    error.value = "ROI 分析失败。";
+  } finally {
+    analyzing.value = false;
+  }
+}
+
+async function loadScenarioComparison(eq) {
+  if (!eq?.retrofit_candidates?.length) return;
+  const scenarios = eq.retrofit_candidates.slice(0, 4).map((option) => ({
+    building_id: selectedBuilding.value,
+    equipment_type: eq.equipment_type,
+    project_name: option.option,
+    investment_yuan: option.investment_yuan,
+    expected_saving_pct: option.saving_pct / 100,
+    annual_maintenance_cost: 0,
+    project_lifespan_years: option.lifespan_years,
+  }));
+  try {
+    const result = await compareROIScenarios({
+      building_id: selectedBuilding.value,
+      scenarios,
+    });
+    scenarioComparison.value = result.item;
+  } catch {
+    scenarioComparison.value = null;
+  }
+}
+
+const cashflowNote = computed(() => {
+  if (!roiResult.value) return "";
+  if (!roiResult.value.payback_within_lifespan) {
+    return `该方案在 ${roiResult.value.project_lifespan_years} 年寿命期内无法完全回收投资，建议降低初始投资或提高预期节能率。`;
+  }
+  const netYears = Math.max(0, roiResult.value.project_lifespan_years - roiResult.value.payback_years).toFixed(1);
+  return `前 ${roiResult.value.payback_label || `${roiResult.value.payback_years} 年`} 回收投资，之后约 ${netYears} 年为净收益期。`;
+});
+
+watch(
+  () => props.buildings,
+  (list) => {
+    if (list.length) {
+      selectedBuilding.value = list[0].building_id;
+    }
+  },
+  { immediate: true }
+);
+
+defineExpose({ loadAudit });
+
+onMounted(() => {
+  if (props.buildings.length) {
+    loadAudit();
+  }
+});
+</script>
+
+<style scoped>
+.roi-panel { display: grid; gap: 20px; }
+.roi-toolbar {
+  display: flex; gap: 14px; align-items: flex-end; flex-wrap: wrap;
+}
+.roi-toolbar label { display: grid; gap: 6px; font-size: 13px; color: var(--ink-soft); }
+.roi-toolbar select {
+  padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(20,34,48,0.12); font: inherit;
+}
+
+.equipment-audit-grid {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px;
+}
+.equipment-card {
+  background: rgba(255,255,255,0.92); border-radius: 16px; padding: 18px;
+  box-shadow: 0 10px 28px rgba(20,34,48,0.06); cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s; border: 2px solid transparent;
+}
+.equipment-card:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(20,34,48,0.1); }
+.equipment-card--高效 { border-color: rgba(34,160,107,0.3); }
+.equipment-card--正常 { border-color: rgba(15,139,141,0.3); }
+.equipment-card--低效 { border-color: rgba(217,54,79,0.3); }
+
+.eq-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.eq-card-head strong { font-size: 16px; }
+.eq-cop-badge {
+  padding: 4px 10px; border-radius: 999px; font-size: 11px; font-weight: 600;
+}
+.cop-badge--高效 { background: rgba(34,160,107,0.12); color: #1a7d4e; }
+.cop-badge--正常 { background: rgba(15,139,141,0.12); color: #0f6f71; }
+.cop-badge--低效 { background: rgba(217,54,79,0.12); color: #a32035; }
+
+.eq-card-stats { display: grid; gap: 6px; }
+.eq-card-stats div { display: flex; justify-content: space-between; font-size: 13px; }
+.eq-card-stats span { color: var(--ink-soft); }
+
+.roi-preset-grid {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 18px;
+}
+.roi-preset-card {
+  background: rgba(20,34,48,0.03); border-radius: 14px; padding: 14px;
+  cursor: pointer; border: 2px solid transparent; transition: border-color 0.15s;
+  display: grid; gap: 4px;
+}
+.roi-preset-card strong { font-size: 14px; }
+.roi-preset-card span { font-size: 12px; color: var(--ink-soft); }
+.roi-preset--selected { border-color: #0f8b8d; background: rgba(15,139,141,0.06); }
+.roi-preset-payback { font-weight: 600; color: #0f8b8d !important; }
+
+.scenario-compare {
+  border: 1px solid rgba(15,139,141,0.16);
+  background: linear-gradient(135deg, rgba(15,139,141,0.08), rgba(255,255,255,0.94));
+  border-radius: 14px;
+  padding: 16px;
+  margin-bottom: 18px;
+}
+.scenario-compare-head {
+  display: grid;
+  grid-template-columns: minmax(160px, 0.6fr) minmax(0, 1.4fr);
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.scenario-compare-head span {
+  color: #0f8b8d;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.scenario-compare-head strong { display: block; font-size: 17px; margin-top: 3px; }
+.scenario-compare-head p { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.5; }
+.scenario-table-wrap { overflow-x: auto; }
+.scenario-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+  font-size: 13px;
+}
+.scenario-table th,
+.scenario-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid rgba(20,34,48,0.07);
+  text-align: left;
+  white-space: nowrap;
+}
+.scenario-table th {
+  color: var(--ink-soft);
+  font-weight: 600;
+}
+.scenario-row--best {
+  background: rgba(34,160,107,0.08);
+}
+.scenario-row--best td:first-child {
+  color: #0f6f71;
+  font-weight: 700;
+}
+
+.roi-custom-form {
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; align-items: end;
+}
+.roi-custom-form label { display: grid; gap: 6px; font-size: 13px; color: var(--ink-soft); }
+.roi-custom-form input[type="number"], .roi-custom-form input[type="range"] {
+  width: 100%; padding: 10px 12px; border-radius: 12px;
+  border: 1px solid rgba(20,34,48,0.12); font: inherit;
+}
+.roi-custom-form strong { font-size: 16px; text-align: center; }
+
+.roi-result-grid {
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px;
+}
+.roi-result-card {
+  background: rgba(255,255,255,0.92); border-radius: 14px; padding: 16px;
+  text-align: center; box-shadow: 0 8px 22px rgba(20,34,48,0.05);
+}
+.roi-result-card span { color: var(--ink-soft); font-size: 12px; display: block; }
+.roi-result-card strong { font-size: 20px; display: block; margin-top: 4px; }
+.roi-result--good { border-left: 3px solid #22a06b; }
+.roi-result--warn { border-left: 3px solid #f39c12; }
+.text-green { color: #22a06b; }
+.text-red { color: #d9364f; }
+
+.roi-detail-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+}
+.roi-detail-card {
+  background: rgba(255,255,255,0.92); border-radius: 16px; padding: 20px;
+  box-shadow: 0 10px 28px rgba(20,34,48,0.06);
+}
+.roi-detail-card > strong { display: block; margin-bottom: 14px; font-size: 15px; }
+.roi-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.roi-table td { padding: 7px 10px; border-bottom: 1px solid rgba(20,34,48,0.05); }
+.roi-table td:first-child { color: var(--ink-soft); width: 40%; }
+.roi-table td:last-child { font-weight: 500; }
+
+.cashflow-chart {
+  display: flex; gap: 6px; align-items: flex-end; height: 140px; padding: 10px 0;
+}
+.cashflow-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.cashflow-bar {
+  width: 100%; max-width: 36px; border-radius: 6px 6px 0 0; transition: height 0.3s;
+}
+.cashflow--negative { background: linear-gradient(180deg, #e74c3c, #f39c12); }
+.cashflow--positive { background: linear-gradient(180deg, #22a06b, #2ecc71); }
+.cashflow-bar-wrap span { font-size: 10px; color: var(--ink-soft); }
+.cashflow-note { margin-top: 12px; font-size: 13px; color: var(--ink-soft); }
+
+.sensitivity-card {
+  background: rgba(255,255,255,0.92);
+  border-radius: 16px;
+  padding: 18px;
+  box-shadow: 0 10px 28px rgba(20,34,48,0.06);
+}
+.sensitivity-card > strong { display: block; margin-bottom: 12px; font-size: 15px; }
+.sensitivity-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.sensitivity-item {
+  border: 1px solid rgba(20,34,48,0.08);
+  background: rgba(20,34,48,0.025);
+  border-radius: 12px;
+  padding: 12px;
+  display: grid;
+  gap: 4px;
+}
+.sensitivity-item span { color: var(--ink-soft); font-size: 12px; }
+.sensitivity-item strong { font-size: 18px; }
+.sensitivity-item small { color: var(--ink-soft); font-size: 12px; }
+
+.roi-hint { padding: 20px 0; }
+
+.primary-button {
+  padding: 10px 18px; border-radius: 12px; font: inherit; cursor: pointer;
+  border: 0; font-weight: 500;
+  background: linear-gradient(135deg, #0f8b8d, #1ec5a7); color: white;
+}
+.data-loading { display: flex; justify-content: center; padding: 40px; }
+
+@media (max-width: 768px) {
+  .equipment-audit-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .roi-preset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .roi-custom-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .roi-result-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .roi-detail-grid { grid-template-columns: 1fr; }
+  .scenario-compare-head { grid-template-columns: 1fr; }
+  .sensitivity-grid { grid-template-columns: 1fr; }
+}
+</style>
