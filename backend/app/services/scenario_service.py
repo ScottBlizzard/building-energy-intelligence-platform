@@ -149,7 +149,7 @@ def build_counterfactual_scenarios(
         "decision_sentence": (
             f"对 {equipment_id}，立即处理相比延迟 {delay} 天可少浪费约 "
             f"{saved_vs_delay['kwh']:,.1f} kWh、{saved_vs_delay['yuan']:,.0f} 元、"
-            f"{saved_vs_delay['carbon_kg']:,.1f} kg 碳排；相比不处理，7 天内可减少 "
+            f"{saved_vs_delay['carbon_kg']:,.1f} kg 碳排；相比不处理，{horizon} 天内可减少 "
             f"{saved_vs_no_action['anomalies']} 次异常暴露。"
         ),
         "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),

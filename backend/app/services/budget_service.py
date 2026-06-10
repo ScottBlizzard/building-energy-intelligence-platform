@@ -26,6 +26,16 @@ def _budget_path() -> Path:
     return path
 
 
+def clear_budgets() -> int:
+    """Remove every persisted budget. Returns how many were cleared.
+
+    Used by the demo reset so a rehearsal starts without leftover budgets.
+    """
+    count = len(_read_budgets())
+    _write_budgets([])
+    return count
+
+
 def _read_budgets() -> List[Dict]:
     path = _budget_path()
     if not path.exists():

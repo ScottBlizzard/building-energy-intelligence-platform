@@ -54,7 +54,9 @@ import {
   fetchSimState,
   startSimulation,
   advanceSimulation,
-  resetSimulation
+  resetSimulation,
+  resetDemo,
+  setApiOperator
 } from "../lib/api";
 
 const TrendChart = defineAsyncComponent(() => import("../components/TrendChart.vue"));
@@ -140,6 +142,7 @@ const activeTab = ref("overview");
 const persistedAuthState = loadAuthState();
 const currentUser = ref(persistedAuthState.user || null);
 const authToken = ref(persistedAuthState.token || "");
+setApiOperator(currentUser.value?.user_id || null);
 const simClock = ref({ active: false, current_date: null, interventions: [], data_range: {} });
 const simLoading = ref(false);
 const loginForm = reactive({
@@ -992,6 +995,7 @@ function selectDefaultAssistantModel() {
 }
 
 function persistAuthState() {
+  setApiOperator(currentUser.value?.user_id || null);
   if (typeof window !== "undefined") {
     window.localStorage.setItem(
       AUTH_STORAGE_KEY,
@@ -1005,6 +1009,7 @@ function clearAuthState() {
   authToken.value = "";
   adminDashboard.value = null;
   workerDashboard.value = null;
+  setApiOperator(null);
   if (typeof window !== "undefined") {
     window.localStorage.removeItem(AUTH_STORAGE_KEY);
   }
@@ -1151,6 +1156,26 @@ async function handleResetSimulation() {
     await reloadAfterClockChange();
   } catch (error) {
     errors.orders = "重置运营沙盘失败，请检查后端 /sim 接口。";
+  } finally {
+    simLoading.value = false;
+  }
+}
+
+async function handleResetDemo() {
+  if (
+    typeof window !== "undefined" &&
+    !window.confirm("确定要重置演示吗？将清空所有工单与预算、重置时间机器，并预置历史样例后回到初始状态。")
+  ) {
+    return;
+  }
+  simLoading.value = true;
+  try {
+    await resetDemo(true);
+    await loadSimState();
+    await reloadAfterClockChange();
+    await loadRoleDashboards();
+  } catch (error) {
+    errors.orders = "重置演示失败，请检查后端 /demo 接口。";
   } finally {
     simLoading.value = false;
   }
@@ -1847,9 +1872,12 @@ onMounted(async () => {
             ⏭ 下一周
           </button>
           <button class="secondary-button" type="button" :disabled="simLoading" @click="handleResetSimulation">
-            重置
+            重置时钟
           </button>
         </template>
+        <button class="reset-demo-button" type="button" :disabled="simLoading" @click="handleResetDemo" title="清空工单/预算并重置时间机器，回到演示初始状态">
+          ⟲ 重置演示（回到初始）
+        </button>
       </div>
       <p class="sim-hint">
         指针之前为已发生历史，之后为"未来"。关闭工单后该设备会在后续日期恢复正常；不处理则异常持续——推进日期即可看到你的决策如何改变系统未来。
@@ -4717,6 +4745,29 @@ onMounted(async () => {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.reset-demo-button {
+  margin-left: auto;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(220, 53, 69, 0.45);
+  background: rgba(220, 53, 69, 0.08);
+  color: #c0392b;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.reset-demo-button:hover:not(:disabled) {
+  background: rgba(220, 53, 69, 0.16);
+  border-color: rgba(220, 53, 69, 0.7);
+}
+
+.reset-demo-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .sim-hint {

@@ -123,7 +123,7 @@ def build_assistant_reply(question: str) -> Dict[str, List]:
             "citations": _build_citations(
                 [
                     ("预算管理接口", "docs/06-api-contract.md"),
-                    ("业务逻辑升级任务", "docs/22-business-logic-upgrade-todo.md"),
+                    ("业务逻辑升级任务", "docs/26-business-logic-upgrade-todo.md"),
                 ]
             ),
             "follow_up": [
@@ -164,7 +164,7 @@ def build_assistant_reply(question: str) -> Dict[str, List]:
             "citations": _build_citations(
                 [
                     ("ROI 分析接口", "docs/06-api-contract.md"),
-                    ("业务逻辑升级任务", "docs/22-business-logic-upgrade-todo.md"),
+                    ("业务逻辑升级任务", "docs/26-business-logic-upgrade-todo.md"),
                 ]
             ),
             "follow_up": [

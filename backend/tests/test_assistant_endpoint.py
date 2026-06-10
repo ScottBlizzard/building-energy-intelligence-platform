@@ -97,7 +97,7 @@ def test_assistant_query_about_budget_kpi():
     assert response.status_code == 200
     payload = response.json()
     assert "预算" in payload["answer"]
-    assert any("22-business-logic-upgrade-todo.md" in item["path"] for item in payload["citations"])
+    assert any("26-business-logic-upgrade-todo.md" in item["path"] for item in payload["citations"])
 
 
 def test_assistant_query_about_roi():
@@ -108,7 +108,7 @@ def test_assistant_query_about_roi():
     assert response.status_code == 200
     payload = response.json()
     assert "ROI" in payload["answer"] or "回收期" in payload["answer"]
-    assert any("22-business-logic-upgrade-todo.md" in item["path"] for item in payload["citations"])
+    assert any("26-business-logic-upgrade-todo.md" in item["path"] for item in payload["citations"])
 
 
 def test_assistant_providers_does_not_expose_keys():

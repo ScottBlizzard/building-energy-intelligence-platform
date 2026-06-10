@@ -44,6 +44,29 @@ def _open_orders() -> List[Dict]:
     return [item for item in list_work_orders() if item.get("status") in _OPEN_STATUSES]
 
 
+def _anomaly_candidate_orders(limit: int = 12) -> List[Dict]:
+    """Fallback dispatch candidates derived from the currently visible anomalies.
+
+    When no work order has been created yet (e.g. right after starting the time
+    machine in a demo), the priority panel would otherwise be empty. We surface
+    the live anomalies as candidate "orders" so the panel is immediately useful;
+    each item is flagged so the UI can label it as "not yet ticketed".
+    """
+    try:
+        from app.services.analysis_service import build_analysis_frame, build_anomaly_work_orders
+
+        candidates = build_anomaly_work_orders(build_analysis_frame(get_visible_dataset()))
+    except (FileNotFoundError, ValueError, KeyError):
+        return []
+    out = []
+    for candidate in candidates[: max(1, int(limit))]:
+        item = dict(candidate)
+        item["status"] = item.get("status") or "pending_confirm"
+        item["from_anomaly_candidate"] = True
+        out.append(item)
+    return out
+
+
 def _equipment_repeat_counts(orders: List[Dict]) -> Dict[str, int]:
     counts: Dict[str, int] = defaultdict(int)
     for order in orders:
@@ -106,10 +129,14 @@ def _saving_estimate(order: Dict, loss_yuan: float) -> tuple[float, bool]:
 
 def rank_open_work_orders(limit: int = 10) -> List[Dict]:
     orders = _open_orders()
+    from_candidates = False
+    if not orders:
+        orders = _anomaly_candidate_orders(limit=max(10, int(limit)))
+        from_candidates = True
     if not orders:
         return []
 
-    repeat_counts = _equipment_repeat_counts(list_work_orders())
+    repeat_counts = _equipment_repeat_counts(list_work_orders() if not from_candidates else orders)
     loss_pairs = [_loss_estimate(item) for item in orders]
     carbon_pairs = [_carbon_estimate(item, loss) for item, (loss, _) in zip(orders, loss_pairs)]
     max_loss = max(loss for loss, _ in loss_pairs) or 1.0
@@ -144,6 +171,7 @@ def rank_open_work_orders(limit: int = 10) -> List[Dict]:
                 "status": order.get("status", ""),
                 "status_label": order.get("status_label", ""),
                 "priority": order.get("priority", ""),
+                "is_candidate": from_candidates,
                 "decision_score": score,
                 "score_breakdown": {
                     "risk": round(risk_component, 1),

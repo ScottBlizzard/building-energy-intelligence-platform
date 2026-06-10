@@ -1,5 +1,14 @@
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
+// Current logged-in operator id. Admin-gated endpoints (budget/roi/decisions/...)
+// read `operator_id` from the query string for a lightweight role check, so we
+// attach it to every request once the user logs in.
+let currentOperatorId = null;
+
+export function setApiOperator(operatorId) {
+  currentOperatorId = operatorId || null;
+}
+
 function buildQueryString(params = {}) {
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -15,7 +24,8 @@ export function buildApiUrl(path, params = {}) {
 }
 
 async function request(path, options = {}, params = {}) {
-  const response = await fetch(buildApiUrl(path, params), {
+  const mergedParams = currentOperatorId ? { operator_id: currentOperatorId, ...params } : params;
+  const response = await fetch(buildApiUrl(path, mergedParams), {
     headers: {
       "Content-Type": "application/json",
       ...(options.headers || {})
@@ -206,6 +216,10 @@ export function resetSimulation() {
   return request("/sim/reset", {
     method: "POST"
   });
+}
+
+export function resetDemo(seed = true) {
+  return request("/demo/reset", { method: "POST" }, { seed });
 }
 
 export function fetchCounterfactualScenario(payload) {

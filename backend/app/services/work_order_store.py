@@ -251,6 +251,172 @@ def create_work_order(payload: Dict) -> Dict:
     return _normalize_order(order)
 
 
+def clear_work_orders() -> int:
+    """Remove every persisted work order. Returns how many were cleared.
+
+    Used by the demo reset so a rehearsal can start from a clean slate.
+    """
+    count = len(_read_orders())
+    _write_orders([])
+    return count
+
+
+def _reference_seed_payloads() -> List[Dict]:
+    """A small set of historical CLOSED work orders used to seed a demo.
+
+    They give the worker workbench's "similar cases" and the operation report
+    realistic prior content instead of an empty list on the very first close.
+    """
+    return [
+        {
+            "work_order_id": "WO-SEED-AHU-001",
+            "source_record_id": "SEED-AHU-001",
+            "priority": "中",
+            "status": "closed",
+            "building_id": "BLD-A",
+            "building_name": "综合教学楼A",
+            "floor_label": "3F",
+            "zone_name": "3F",
+            "equipment_id": "AHU-A-3F-04",
+            "equipment_type": "空气处理机组",
+            "timestamp": "2026-04-12 10:00:00",
+            "anomaly_reason": "电耗高于同建筑基线",
+            "possible_cause": "新风阀卡滞导致风量偏大",
+            "recommended_action": "复位风阀并校准新风比例",
+            "owner_role": "worker",
+            "assignee_id": "worker_ahu",
+            "assignee_name": "空调机组巡检员",
+            "created_by": "admin",
+            "reviewed_by": "admin",
+            "actual_cause": "新风阀执行器卡滞，新风过量",
+            "resolution_note": "更换执行器并校准新风比例，电耗回落至基线",
+            "before_kwh": 320.0,
+            "after_kwh": 249.6,
+            "after_is_estimated": True,
+            "recovery_confirmed": True,
+            "estimated_saving_yuan": 57.7,
+            "wasted_cost_yuan": 73.9,
+            "carbon_kg": 51.4,
+            "risk_score": 62,
+            "sla_hours": 24,
+            "review_note": "现场处理到位，准予关闭",
+            "closed_at": "2026-04-12 15:30:00",
+            "created_at": "2026-04-12 09:50:00",
+            "updated_at": "2026-04-12 15:30:00",
+        },
+        {
+            "work_order_id": "WO-SEED-FCU-002",
+            "source_record_id": "SEED-FCU-002",
+            "priority": "低",
+            "status": "closed",
+            "building_id": "BLD-C",
+            "building_name": "图书信息楼C",
+            "floor_label": "2F",
+            "zone_name": "2F",
+            "equipment_id": "FCU-C-2F-04",
+            "equipment_type": "风机盘管",
+            "timestamp": "2026-04-18 14:00:00",
+            "anomaly_reason": "电耗高于同建筑基线",
+            "possible_cause": "盘管滤网堵塞、末端温控失准",
+            "recommended_action": "清洗滤网并校准末端温控器",
+            "owner_role": "worker",
+            "assignee_id": "worker_ahu",
+            "assignee_name": "空调机组巡检员",
+            "created_by": "admin",
+            "reviewed_by": "admin",
+            "actual_cause": "盘管滤网堵塞导致风机长时间高速运行",
+            "resolution_note": "清洗滤网、复位温控设定，运行电耗恢复",
+            "before_kwh": 180.0,
+            "after_kwh": 140.4,
+            "after_is_estimated": True,
+            "recovery_confirmed": True,
+            "estimated_saving_yuan": 32.5,
+            "wasted_cost_yuan": 41.0,
+            "carbon_kg": 28.6,
+            "risk_score": 41,
+            "sla_hours": 48,
+            "review_note": "已恢复，关闭归档",
+            "closed_at": "2026-04-18 17:10:00",
+            "created_at": "2026-04-18 13:40:00",
+            "updated_at": "2026-04-18 17:10:00",
+        },
+        {
+            "work_order_id": "WO-SEED-CH-003",
+            "source_record_id": "SEED-CH-003",
+            "priority": "高",
+            "status": "closed",
+            "building_id": "BLD-C",
+            "building_name": "图书信息楼C",
+            "floor_label": "B1",
+            "zone_name": "B1",
+            "equipment_id": "CH-C-B1-04",
+            "equipment_type": "冷水机组",
+            "timestamp": "2026-04-25 09:00:00",
+            "anomaly_reason": "COP 低于健康阈值",
+            "possible_cause": "冷凝器换热效率下降、冷却水温偏高",
+            "recommended_action": "清洗冷凝器并核对冷却塔联动",
+            "owner_role": "worker",
+            "assignee_id": "worker_chiller",
+            "assignee_name": "制冷机房值班员",
+            "created_by": "admin",
+            "reviewed_by": "admin",
+            "actual_cause": "冷凝器结垢导致换热效率下降，COP 偏低",
+            "resolution_note": "化学清洗冷凝器并调整冷却塔出水温度，COP 回升",
+            "before_kwh": 540.0,
+            "after_kwh": 421.2,
+            "before_cop": 2.1,
+            "after_cop": 2.4,
+            "after_is_estimated": True,
+            "recovery_confirmed": True,
+            "estimated_saving_yuan": 97.4,
+            "wasted_cost_yuan": 121.8,
+            "carbon_kg": 84.8,
+            "risk_score": 78,
+            "sla_hours": 12,
+            "review_note": "COP 恢复，准予关闭",
+            "closed_at": "2026-04-25 16:00:00",
+            "created_at": "2026-04-25 08:30:00",
+            "updated_at": "2026-04-25 16:00:00",
+        },
+    ]
+
+
+def seed_reference_orders() -> int:
+    """Add historical closed reference orders if they are not present yet.
+
+    Idempotent by ``work_order_id``; returns how many new seeds were added.
+    """
+    seeds = _reference_seed_payloads()
+    orders = _read_orders()
+    existing_ids = {item.get("work_order_id") for item in orders}
+    added = 0
+    for seed in seeds:
+        if seed["work_order_id"] in existing_ids:
+            continue
+        seed = dict(seed)
+        seed["timeline"] = [
+            _timeline_event(
+                action="create",
+                from_status=None,
+                to_status="assigned",
+                operator_id="admin",
+                note="历史样例工单（演示种子）",
+            ),
+            _timeline_event(
+                action="review_approve",
+                from_status="pending_review",
+                to_status="closed",
+                operator_id="admin",
+                note=seed.get("review_note") or "复核通过，工单关闭",
+            ),
+        ]
+        orders.append(seed)
+        added += 1
+    if added:
+        _write_orders(orders)
+    return added
+
+
 def create_work_order_from_anomaly(payload: Dict, operator_id: str = "admin") -> Dict:
     assignee = get_user(payload.get("assignee_id")) if payload.get("assignee_id") else None
     if not assignee:

@@ -10,6 +10,7 @@ from app.api.routes import (
     building_detail,
     data,
     decision,
+    demo,
     export,
     health,
     roi,
@@ -33,4 +34,5 @@ api_router.include_router(simulation.router, prefix="/sim", tags=["simulation"])
 api_router.include_router(budget.router, prefix="/budget", tags=["budget"])
 api_router.include_router(roi.router, prefix="/roi", tags=["roi"])
 api_router.include_router(decision.router, prefix="/decisions", tags=["decisions"])
+api_router.include_router(demo.router, prefix="/demo", tags=["demo"])
 
