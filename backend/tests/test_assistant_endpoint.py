@@ -89,6 +89,28 @@ def test_assistant_query_about_data_sources():
     assert any("data_quality_report_round1.md" in item["path"] for item in payload["citations"])
 
 
+def test_assistant_query_about_budget_kpi():
+    response = client.post(
+        "/api/v1/assistant/query",
+        json={"question": "本月预算执行率和KPI怎么样？"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert "预算" in payload["answer"]
+    assert any("22-business-logic-upgrade-todo.md" in item["path"] for item in payload["citations"])
+
+
+def test_assistant_query_about_roi():
+    response = client.post(
+        "/api/v1/assistant/query",
+        json={"question": "哪个节能改造方案ROI最好，多久回本？"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert "ROI" in payload["answer"] or "回收期" in payload["answer"]
+    assert any("22-business-logic-upgrade-todo.md" in item["path"] for item in payload["citations"])
+
+
 def test_assistant_providers_does_not_expose_keys():
     response = client.get("/api/v1/assistant/providers")
     assert response.status_code == 200

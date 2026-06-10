@@ -6,10 +6,12 @@ from app.api.routes import (
     anomaly_events,
     assistant,
     auth,
+    budget,
     building_detail,
     data,
     export,
     health,
+    roi,
     simulation,
     work_orders,
 )
@@ -27,4 +29,6 @@ api_router.include_router(assistant.router, prefix="/assistant", tags=["assistan
 api_router.include_router(export.router, prefix="/export", tags=["export"])
 api_router.include_router(work_orders.router, prefix="/work-orders", tags=["work-orders"])
 api_router.include_router(simulation.router, prefix="/sim", tags=["simulation"])
+api_router.include_router(budget.router, prefix="/budget", tags=["budget"])
+api_router.include_router(roi.router, prefix="/roi", tags=["roi"])
 

@@ -25,12 +25,30 @@ class WorkOrderCreate(BaseModel):
     note: Optional[str] = ""
     before_kwh: Optional[float] = None
     before_cop: Optional[float] = None
+    severity: Optional[str] = None
+    risk_score: Optional[float] = None
+    triggered_rule_count: Optional[int] = None
+    wasted_kwh: Optional[float] = None
+    wasted_cost_yuan: Optional[float] = None
+    carbon_kg: Optional[float] = None
+    estimated_saving_yuan: Optional[float] = None
+    sla_hours: Optional[int] = None
+    business_impact_summary: Optional[str] = None
+    verification_method: Optional[str] = None
+    verification_status: Optional[str] = None
+    dispatch_action: Optional[str] = None
+    resolution_action: Optional[str] = None
+    verification_result: Optional[str] = None
 
 
 class WorkOrderUpdate(BaseModel):
     status: Optional[str] = None
     note: Optional[str] = None
     owner_role: Optional[str] = None
+    dispatch_action: Optional[str] = None
+    resolution_action: Optional[str] = None
+    verification_result: Optional[str] = None
+    verification_status: Optional[str] = None
 
 
 class WorkOrderAssign(BaseModel):

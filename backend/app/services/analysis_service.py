@@ -36,6 +36,9 @@ _EQUIPMENT_TYPE_LABELS = {
 
 
 _PRIORITY_ORDER = {"高": 0, "中": 1, "低": 2}
+_ELECTRICITY_PRICE_YUAN_PER_KWH = 0.82
+_CARBON_KG_PER_KWH = 0.5703
+_SAVING_CAPTURE_RATE = 0.65
 
 
 def _equipment_code(equipment_id: str) -> str:
@@ -151,6 +154,93 @@ def _reason_for_row(row: pd.Series) -> str:
     if row.get("night_high_load", False):
         return "夜间负荷偏高"
     return "电耗高于同建筑基线"
+
+
+def _as_float(value, default: float = 0.0) -> float:
+    try:
+        if pd.isna(value):
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _triggered_rule_count(row: pd.Series) -> int:
+    electricity = _as_float(row.get("electricity_kwh"))
+    upper_bound = _as_float(row.get("upper_bound"))
+    return sum(
+        [
+            str(row.get("equipment_status")).lower() != "normal",
+            electricity > upper_bound,
+            bool(row.get("low_cop", False)),
+            bool(row.get("night_high_load", False)),
+        ]
+    )
+
+
+def _verification_method(row: pd.Series) -> str:
+    reason = row.get("anomaly_reason")
+    if reason == "设备状态异常":
+        return "设备状态恢复为 normal，并由现场人员复核控制信号与运行声音。"
+    if reason == "COP低于告警阈值":
+        return "处置后连续 2 个采样点 COP 回升至 2.40 以上，且空调电耗不再高于动态阈值。"
+    if reason == "夜间负荷偏高":
+        return "次日 00:00-06:00 或 22:00 后负荷回落至建筑基线 1.10 倍以内。"
+    return "下一采样周期电耗回落至同建筑动态阈值以内，并记录现场复核结论。"
+
+
+def _business_impact(row: pd.Series) -> Dict:
+    electricity = _as_float(row.get("electricity_kwh"))
+    hvac = _as_float(row.get("hvac_kwh"))
+    building_mean = _as_float(row.get("building_mean"), electricity)
+    upper_bound = _as_float(row.get("upper_bound"), building_mean)
+    cop = _as_float(row.get("average_cop"), 3.0)
+    status_abnormal = str(row.get("equipment_status")).lower() != "normal"
+    low_cop = bool(row.get("low_cop", False))
+    night_high_load = bool(row.get("night_high_load", False))
+
+    threshold_delta = max(0.0, electricity - upper_bound)
+    baseline_delta = max(0.0, electricity - building_mean)
+    night_delta = max(0.0, electricity - building_mean * 1.1) if night_high_load else 0.0
+    cop_delta = 0.0
+    if low_cop:
+        cop_delta = hvac * min(0.22, max(0.0, 2.6 - cop) * 0.12)
+    status_delta = electricity * 0.05 if status_abnormal else 0.0
+    wasted_kwh = max(threshold_delta, night_delta, cop_delta, status_delta, baseline_delta * 0.25)
+    if _triggered_rule_count(row) and wasted_kwh <= 0:
+        wasted_kwh = electricity * 0.03
+
+    wasted_cost = wasted_kwh * _ELECTRICITY_PRICE_YUAN_PER_KWH
+    carbon_kg = wasted_kwh * _CARBON_KG_PER_KWH
+    estimated_saving = wasted_cost * _SAVING_CAPTURE_RATE
+    rule_count = _triggered_rule_count(row)
+    risk_score = min(
+        100.0,
+        30
+        + rule_count * 13
+        + min(22.0, wasted_cost * 0.35)
+        + (12 if status_abnormal else 0)
+        + (8 if low_cop else 0)
+        + (6 if night_high_load else 0),
+    )
+    severity = "高" if risk_score >= 72 else "中" if risk_score >= 48 else "低"
+    sla_hours = 8 if severity == "高" else 24 if severity == "中" else 72
+
+    return {
+        "risk_score": round(risk_score, 1),
+        "severity": severity,
+        "triggered_rule_count": rule_count,
+        "wasted_kwh": round(wasted_kwh, 2),
+        "wasted_cost_yuan": round(wasted_cost, 2),
+        "carbon_kg": round(carbon_kg, 2),
+        "estimated_saving_yuan": round(estimated_saving, 2),
+        "sla_hours": sla_hours,
+        "verification_method": _verification_method(row),
+        "business_impact_summary": (
+            f"本次异常估算浪费 {wasted_kwh:.1f} kWh，"
+            f"约 {wasted_cost:.0f} 元，处置后可回收约 {estimated_saving:.0f} 元。"
+        ),
+    }
 
 
 _ANALYSIS_REQUIRED_COLUMNS = {
@@ -430,9 +520,16 @@ def build_anomaly_summary(frame: pd.DataFrame) -> List[Dict]:
         "equipment_status",
         "anomaly_reason",
     ]
-    return to_serializable_records(
+    records = to_serializable_records(
         anomalies.sort_values("timestamp", ascending=False)[export_columns]
     )
+    impacts = {
+        str(row["record_id"]): _business_impact(row)
+        for _, row in anomalies.iterrows()
+    }
+    for record in records:
+        record.update(impacts.get(str(record.get("record_id")), {}))
+    return records
 
 
 def build_anomaly_explanation(frame: pd.DataFrame, record_id: str) -> Dict:
@@ -495,11 +592,13 @@ def build_anomaly_explanation(frame: pd.DataFrame, record_id: str) -> Dict:
         )
 
     delta_pct = _safe_divide(electricity - building_mean, building_mean) * 100
-    severity = "高" if status_abnormal or high_usage else "中" if low_cop or night_high_load else "低"
+    impact = _business_impact(row)
+    severity = impact["severity"]
     conclusion = (
         f"{row['building_name']} {row['floor_label']} {row['zone_name']} 在 { _format_timestamp(row['timestamp']) } "
         f"触发“{row['anomaly_reason']}”。当前电耗 {electricity:.2f} kWh，"
         f"比同建筑均值高 {delta_pct:.1f}%，平均 COP 为 {cop:.2f}。"
+        f"估算影响约 {impact['wasted_cost_yuan']:.0f} 元，风险分 {impact['risk_score']}。"
     )
 
     return {
@@ -521,10 +620,17 @@ def build_anomaly_explanation(frame: pd.DataFrame, record_id: str) -> Dict:
             "dynamic_threshold_kwh": round(upper_bound, 2),
             "average_cop": round(cop, 2),
             "floor_anomaly_count": floor_anomaly_count,
+            "risk_score": impact["risk_score"],
+            "wasted_kwh": impact["wasted_kwh"],
+            "wasted_cost_yuan": impact["wasted_cost_yuan"],
+            "carbon_kg": impact["carbon_kg"],
+            "estimated_saving_yuan": impact["estimated_saving_yuan"],
         },
         "triggered_rules": triggered_rules,
         "possible_cause": _work_order_cause(row),
         "recommended_action": _work_order_action(row),
+        "business_impact": impact,
+        "verification_method": impact["verification_method"],
     }
 
 
@@ -675,10 +781,33 @@ def build_operation_report(frame: pd.DataFrame, work_orders: List[Dict] | None =
         else 0
     )
     forecast_week_kwh = round(forecast_base * 7, 2)
+    business_impact = {
+        "anomaly_count": len(anomalies),
+        "total_wasted_kwh": round(sum(float(item.get("wasted_kwh", 0)) for item in anomalies), 2),
+        "total_wasted_cost_yuan": round(
+            sum(float(item.get("wasted_cost_yuan", 0)) for item in anomalies),
+            2,
+        ),
+        "total_carbon_kg": round(sum(float(item.get("carbon_kg", 0)) for item in anomalies), 2),
+        "total_estimated_saving_yuan": round(
+            sum(float(item.get("estimated_saving_yuan", 0)) for item in anomalies),
+            2,
+        ),
+    }
     closed_statuses = {"已完成", "closed", "ignored", "已关闭", "已忽略"}
     open_orders = [item for item in work_orders if item.get("status") not in closed_statuses]
     pending_review = [item for item in work_orders if item.get("status") == "pending_review"]
+    pending_verify_orders = [item for item in work_orders if item.get("status") == "待验证"]
     closed_orders = [item for item in work_orders if item.get("status") in {"closed", "已关闭", "已完成"}]
+    high_risk_open_orders = [
+        item
+        for item in open_orders
+        if item.get("priority") == "高" or float(item.get("risk_score") or 0) >= 72
+    ]
+    status_counts: Dict[str, int] = {}
+    for item in work_orders:
+        status = item.get("status") or "待分派"
+        status_counts[status] = status_counts.get(status, 0) + 1
     top_floor = next((item for item in floors if item.get("anomaly_count", 0) > 0), floors[0] if floors else None)
     top_recommendation = recommendations[0] if recommendations else None
     top_anomaly = anomalies[0] if anomalies else None
@@ -725,10 +854,23 @@ def build_operation_report(frame: pd.DataFrame, work_orders: List[Dict] | None =
         else "当前范围未发现异常记录。"
     )
     order_text = (
-        f"当前已有 {len(open_orders)} 个未完成工单，其中 {len(pending_review)} 个等待管理员复核，"
-        "建议优先处理高优先级和设备状态异常工单。"
+        f"当前已有 {len(open_orders)} 个未闭环工单，其中高风险 {len(high_risk_open_orders)} 个、"
+        f"待验证 {len(pending_verify_orders)} 个、待复核 {len(pending_review)} 个。"
         if open_orders
         else "当前没有未完成工单，可维持常规巡检。"
+    )
+    business_text = (
+        f"本周期异常估算浪费 {business_impact['total_wasted_kwh']:,.1f} kWh，"
+        f"约 {business_impact['total_wasted_cost_yuan']:,.0f} 元，"
+        f"处置后预计可回收 {business_impact['total_estimated_saving_yuan']:,.0f} 元。"
+        if anomalies
+        else "当前没有可量化的异常损耗。"
+    )
+    verification_text = (
+        f"已验证关闭 {len(closed_orders)} 个工单，仍有 {len(pending_verify_orders)} 个任务等待复测，"
+        "建议用下一采样周期数据确认是否回落至阈值内。"
+        if work_orders
+        else "尚未形成验证闭环，可先从最高风险异常生成工单。"
     )
     recommendation_text = (
         f"{top_recommendation['building_name']}：{top_recommendation['action']}"
@@ -744,6 +886,7 @@ def build_operation_report(frame: pd.DataFrame, work_orders: List[Dict] | None =
         savings = [c for c in closed_cases if c["saving_summary"]]
         if savings:
             closed_summary += f" 其中 {len(savings)} 个工单预计带来能耗改善（估算值）。"
+    management_decision = _build_management_decision_summary(frame, top_anomaly)
 
     return {
         "title": "建筑能源运营日报",
@@ -762,14 +905,104 @@ def build_operation_report(frame: pd.DataFrame, work_orders: List[Dict] | None =
         "work_order": order_text,
         "work_order_closure": closed_summary,
         "closed_cases": closed_cases,
+        "business_summary": business_text,
+        "verification_summary": verification_text,
+        "business_impact": business_impact,
+        "work_order_status": status_counts,
+        "management_decision": management_decision,
+        "budget_summary": management_decision.get("budget_risk", {}),
+        "roi_recommendation": management_decision.get("roi_recommendation", {}),
         "forecast": f"按最近日度趋势估算，未来 7 天电耗约 {forecast_week_kwh:,.0f} kWh。",
         "recommendation": recommendation_text,
         "action_items": [
-            "先处理未完成工单中的高优先级任务。",
-            "对异常集中楼层执行现场复核，并记录处置备注。",
+            "先分派高风险异常，并在 SLA 内推进到待验证状态。",
+            "对异常集中楼层执行现场复核，并记录处置动作、复测结果和关闭时间。",
             "复盘 COP 偏低设备，确认冷水机组、冷却塔和末端阀门状态。",
         ],
     }
+
+
+def _build_management_decision_summary(frame: pd.DataFrame, top_anomaly: Dict | None = None) -> Dict:
+    if frame.empty:
+        return {
+            "narrative": "当前没有可用于预算和投资决策的数据。",
+            "budget_risk": {},
+            "kpi": {},
+            "roi_recommendation": {},
+        }
+
+    try:
+        from app.services.budget_service import build_budget_analysis, build_budget_kpi
+        from app.services.roi_service import build_equipment_audit
+
+        latest = pd.Timestamp(frame["timestamp"].max())
+        visible_building_ids = set(frame["building_id"].astype(str).unique().tolist())
+        budget = build_budget_analysis(int(latest.year), int(latest.month))
+        building_budgets = [
+            item for item in budget.get("buildings", [])
+            if str(item.get("building_id")) in visible_building_ids
+        ]
+        if not building_budgets:
+            return {
+                "narrative": "当前范围尚未生成可用预算基线。",
+                "budget_risk": {},
+                "kpi": {},
+                "roi_recommendation": {},
+            }
+
+        risk_budget = max(
+            building_budgets,
+            key=lambda item: (
+                float(item.get("projected_execution_rate", 0)),
+                int(item.get("anomaly_count", 0)),
+            ),
+        )
+        kpi = build_budget_kpi(str(risk_budget["building_id"]), int(latest.year))
+        audit = build_equipment_audit(str(risk_budget["building_id"]))
+        candidates = []
+        for equipment in audit.get("equipment_list", []):
+            for option in equipment.get("retrofit_candidates", [])[:3]:
+                candidates.append(
+                    {
+                        "equipment_type": equipment.get("equipment_type"),
+                        "avg_cop": equipment.get("avg_cop"),
+                        "anomaly_count": equipment.get("anomaly_count"),
+                        **option,
+                    }
+                )
+        roi = max(candidates, key=lambda item: float(item.get("npv_yuan", 0))) if candidates else {}
+        anomaly_hint = ""
+        if top_anomaly and top_anomaly.get("building_id") == risk_budget.get("building_id"):
+            anomaly_hint = f"，且最近异常来自 {top_anomaly.get('equipment_id', '')}"
+
+        narrative = (
+            f"{risk_budget['building_name']} 月末预算执行率预计 "
+            f"{risk_budget['projected_execution_rate']}%，KPI 等级 {kpi.get('grade', '-')}"
+            f"{anomaly_hint}。建议优先评估 {roi.get('equipment_type', '高耗能设备')} 的"
+            f"{roi.get('option', '节能改造方案')}，预计 NPV "
+            f"{float(roi.get('npv_yuan', 0)):,.0f} 元。"
+        )
+        return {
+            "narrative": narrative,
+            "budget_risk": risk_budget,
+            "kpi": {
+                "building_id": kpi.get("building_id"),
+                "building_name": kpi.get("building_name"),
+                "grade": kpi.get("grade"),
+                "average_score": kpi.get("average_score"),
+                "budget_control_rate": kpi.get("budget_control_rate"),
+                "cop_pass_rate": kpi.get("cop_pass_rate"),
+                "anomaly_response_timely_rate": kpi.get("anomaly_response_timely_rate"),
+            },
+            "roi_recommendation": roi,
+        }
+    except Exception as exc:  # pragma: no cover - report should degrade gracefully
+        return {
+            "narrative": f"预算与 ROI 决策摘要暂不可用：{exc}",
+            "budget_risk": {},
+            "kpi": {},
+            "roi_recommendation": {},
+        }
 
 
 def build_equipment_summary(frame: pd.DataFrame) -> List[Dict]:
@@ -882,8 +1115,27 @@ def build_anomaly_work_orders(frame: pd.DataFrame) -> List[Dict]:
         lambda row: f"WO-{pd.Timestamp(row['timestamp']).strftime('%Y%m%d%H')}-{row['record_id']}",
         axis=1,
     )
+    impact_records = {
+        row["record_id"]: _business_impact(row)
+        for _, row in anomalies.iterrows()
+    }
+    for field in [
+        "risk_score",
+        "severity",
+        "triggered_rule_count",
+        "wasted_kwh",
+        "wasted_cost_yuan",
+        "carbon_kg",
+        "estimated_saving_yuan",
+        "sla_hours",
+        "verification_method",
+        "business_impact_summary",
+    ]:
+        anomalies[field] = anomalies["record_id"].apply(lambda record_id: impact_records[record_id][field])
+    anomalies["source_record_id"] = anomalies["record_id"]
     anomalies["priority"] = anomalies.apply(_work_order_priority, axis=1)
-    anomalies["status"] = "待确认"
+    anomalies["status"] = "待分派"
+    anomalies["verification_status"] = "未验证"
     anomalies["possible_cause"] = anomalies.apply(_work_order_cause, axis=1)
     anomalies["recommended_action"] = anomalies.apply(_work_order_action, axis=1)
     anomalies["owner_role"] = anomalies["equipment_type"].apply(_owner_role)
@@ -891,8 +1143,11 @@ def build_anomaly_work_orders(frame: pd.DataFrame) -> List[Dict]:
 
     export_columns = [
         "work_order_id",
+        "source_record_id",
         "priority",
         "status",
+        "verification_status",
+        "building_id",
         "building_name",
         "floor_label",
         "zone_name",
@@ -900,8 +1155,17 @@ def build_anomaly_work_orders(frame: pd.DataFrame) -> List[Dict]:
         "equipment_type",
         "timestamp",
         "anomaly_reason",
+        "severity",
+        "risk_score",
+        "wasted_kwh",
+        "wasted_cost_yuan",
+        "carbon_kg",
+        "estimated_saving_yuan",
+        "sla_hours",
+        "business_impact_summary",
         "possible_cause",
         "recommended_action",
+        "verification_method",
         "owner_role",
     ]
     return to_serializable_records(
@@ -951,6 +1215,10 @@ def build_anomaly_work_order_drafts(frame: pd.DataFrame) -> List[Dict]:
 
 
 def _work_order_priority(row: pd.Series) -> str:
+    if row.get("severity") == "高" or _business_impact(row)["severity"] == "高":
+        return "高"
+    if row.get("severity") == "中" or _business_impact(row)["severity"] == "中":
+        return "中"
     if str(row["equipment_status"]).lower() != "normal":
         return "高"
     if row["anomaly_reason"] in {"COP低于告警阈值", "夜间负荷偏高"}:

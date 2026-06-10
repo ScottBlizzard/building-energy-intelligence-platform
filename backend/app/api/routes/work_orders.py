@@ -62,6 +62,10 @@ def patch_work_order(work_order_id: str, payload: WorkOrderUpdate):
         status=payload.status,
         note=payload.note,
         owner_role=payload.owner_role,
+        dispatch_action=payload.dispatch_action,
+        resolution_action=payload.resolution_action,
+        verification_result=payload.verification_result,
+        verification_status=payload.verification_status,
     )
     if not updated:
         raise HTTPException(status_code=404, detail="Work order not found")

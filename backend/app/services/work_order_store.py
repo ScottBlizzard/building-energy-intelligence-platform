@@ -13,6 +13,9 @@ LEGACY_STATUS_MAP = {
     "处理中": "in_progress",
     "已完成": "closed",
     "已忽略": "ignored",
+    "待分派": "pending_confirm",
+    "待验证": "pending_review",
+    "已关闭": "closed",
 }
 
 STATUS_LABELS = {
@@ -36,6 +39,7 @@ STATUS_ORDER = {
 }
 
 PRIORITY_ORDER = {"高": 0, "中": 1, "低": 2}
+_CLOSED_STATUSES = {"closed", "ignored", "已关闭", "已完成", "已忽略"}
 
 # Estimated post-repair recovery factors. There is no measured "after" reading in
 # the sample dataset, so these are used to project an estimated improvement from the
@@ -191,6 +195,7 @@ def create_work_order(payload: Dict) -> Dict:
             if item.get("source_record_id") == source_record_id and _open_status(item.get("status", "")):
                 item.update({key: value for key, value in payload.items() if value not in (None, "")})
                 item["status"] = _canonical_status(item.get("status"), default_status)
+                item["verification_status"] = item.get("verification_status") or "未验证"
                 item["updated_at"] = _now()
                 item["status_label"] = _status_label(item["status"])
                 _write_orders(orders)
@@ -214,6 +219,10 @@ def create_work_order(payload: Dict) -> Dict:
         "created_by": payload.get("created_by") or "admin",
         "reviewed_by": "",
         "note": payload.get("note") or "",
+        "verification_status": payload.get("verification_status") or "未验证",
+        "dispatch_action": payload.get("dispatch_action") or "",
+        "resolution_action": payload.get("resolution_action") or "",
+        "verification_result": payload.get("verification_result") or "",
         "actual_cause": payload.get("actual_cause") or "",
         "resolution_note": payload.get("resolution_note") or "",
         "review_note": payload.get("review_note") or "",
@@ -263,6 +272,10 @@ def update_work_order(
     status: Optional[str] = None,
     note: Optional[str] = None,
     owner_role: Optional[str] = None,
+    dispatch_action: Optional[str] = None,
+    resolution_action: Optional[str] = None,
+    verification_result: Optional[str] = None,
+    verification_status: Optional[str] = None,
 ) -> Optional[Dict]:
     orders = _read_orders()
     item = _find_order(orders, work_order_id)
@@ -277,7 +290,22 @@ def update_work_order(
         item["note"] = note
     if owner_role is not None:
         item["owner_role"] = owner_role
+    if dispatch_action is not None:
+        item["dispatch_action"] = dispatch_action
+    if resolution_action is not None:
+        item["resolution_action"] = resolution_action
+    if verification_result is not None:
+        item["verification_result"] = verification_result
+    if verification_status is not None:
+        item["verification_status"] = verification_status
+    if new_status == "in_progress":
+        item["dispatched_at"] = item.get("dispatched_at") or _now()
+    if new_status == "pending_review":
+        item["verification_status"] = verification_status or item.get("verification_status") or "待验证"
+        item["verification_requested_at"] = item.get("verification_requested_at") or _now()
     if new_status == "closed":
+        item["verification_status"] = verification_status or "通过"
+        item["verified_at"] = item.get("verified_at") or _now()
         item["closed_at"] = item.get("closed_at") or _now()
     item.setdefault("timeline", []).append(
         _timeline_event(
