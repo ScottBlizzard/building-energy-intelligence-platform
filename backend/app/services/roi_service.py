@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Dict, List
 
+from app.services import simulation_service
 from app.services.analysis_service import _add_operational_dimensions, _safe_divide
 from app.services.data_loader import get_visible_dataset
 
@@ -180,7 +180,7 @@ def build_equipment_audit(building_id: str) -> Dict:
         "building_name": building_name,
         "equipment_list": results,
         "data_scope": "simulation_visible",
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_at": simulation_service.now_str(),
     }
 
 
@@ -278,7 +278,7 @@ def analyze_roi_project(payload: Dict, include_sensitivity: bool = True) -> Dict
         "observed_days": stats.get("observed_days", 0),
         "annualization_factor": stats.get("annualization_factor", 0),
         "data_scope": "simulation_visible",
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_at": simulation_service.now_str(),
     }
     if include_sensitivity:
         result["sensitivity"] = _sensitivity_cases(payload, expected_saving_pct)
@@ -319,5 +319,5 @@ def compare_scenarios(payload: Dict) -> Dict:
             if best["npv_yuan"] > 0
             else "当前方案均不具备经济可行性，建议降低投资成本或提高预期节能率后重新评估。"
         ),
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_at": simulation_service.now_str(),
     }

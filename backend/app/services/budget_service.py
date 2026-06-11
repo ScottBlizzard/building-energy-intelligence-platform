@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.core.config import get_settings
+from app.services import simulation_service
 from app.services.analysis_service import _add_operational_dimensions, _safe_divide
 from app.services.data_loader import get_visible_dataset
 from app.services.work_order_store import list_work_orders
@@ -55,6 +56,30 @@ def _write_budgets(items: List[Dict]) -> None:
     temp.replace(path)
 
 
+def _sim_period() -> Optional[tuple]:
+    """(year, month) of the sandbox current date, or None when inactive."""
+    current = simulation_service.get_current_date()
+    if current is None:
+        return None
+    return current.year, current.month
+
+
+def _period_status(year: int, month: int) -> str:
+    """Classify a budget period against the sandbox clock.
+
+    Returns 'settled' (fully elapsed), 'in_progress' (the current sandbox month)
+    or 'future'. Always 'settled' when the sandbox is inactive (no gating).
+    """
+    sim = _sim_period()
+    if sim is None:
+        return "settled"
+    if (year, month) > sim:
+        return "future"
+    if (year, month) == sim:
+        return "in_progress"
+    return "settled"
+
+
 def _operational_frame():
     """Dataset view used by business decisions.
 
@@ -88,6 +113,10 @@ def _building_budget_baseline(frame, building_id: str, month: int) -> tuple[floa
 
 
 def auto_generate_budgets(year: int, month: int) -> List[Dict]:
+    # Do not fabricate budgets for periods the sandbox has not reached yet.
+    if _period_status(year, month) == "future":
+        return _read_budgets()
+
     frame = _operational_frame()
     buildings = frame["building_id"].unique()
     existing = _read_budgets()
@@ -110,8 +139,8 @@ def auto_generate_budgets(year: int, month: int) -> List[Dict]:
             "note": f"基于{basis}自动生成，季节系数 {coefficient}",
             "basis": basis,
             "seasonal_coefficient": coefficient,
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "created_at": simulation_service.now_str(),
+            "updated_at": simulation_service.now_str(),
         }
         new_items.append(item)
 
@@ -140,7 +169,7 @@ def set_budget(payload: Dict) -> Dict:
         ),
         None,
     )
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    now = simulation_service.now_str()
     if existing:
         existing["budget_kwh"] = payload["budget_kwh"]
         existing["note"] = payload.get("note", existing.get("note", ""))
@@ -166,6 +195,26 @@ def set_budget(payload: Dict) -> Dict:
 
 
 def build_budget_analysis(year: int, month: int) -> Dict:
+    period_status = _period_status(year, month)
+    if period_status == "future":
+        # The sandbox has not reached this month yet — nothing to assess.
+        return {
+            "year": year,
+            "month": month,
+            "period_status": "future",
+            "message": f"{year} 年 {month} 月尚未开始（当前演示日期之后），暂无预算执行数据。",
+            "total_budget_kwh": 0.0,
+            "total_actual_kwh": 0.0,
+            "total_month_end_estimate_kwh": 0.0,
+            "total_execution_rate": 0.0,
+            "total_projected_execution_rate": 0.0,
+            "buildings": [],
+            "over_budget_count": 0,
+            "warning_count": 0,
+            "healthy_count": 0,
+            "generated_at": simulation_service.now_str(),
+        }
+
     frame = _add_operational_dimensions(_operational_frame())
     budgets = {item["building_id"]: item for item in _read_budgets() if item["year"] == year and item["month"] == month}
 
@@ -227,6 +276,7 @@ def build_budget_analysis(year: int, month: int) -> Dict:
     return {
         "year": year,
         "month": month,
+        "period_status": period_status,
         "total_budget_kwh": round(total_budget, 2),
         "total_actual_kwh": round(total_actual, 2),
         "total_month_end_estimate_kwh": round(total_month_end_estimate, 2),
@@ -236,7 +286,7 @@ def build_budget_analysis(year: int, month: int) -> Dict:
         "over_budget_count": sum(1 for b in building_details if b["status"] == "over"),
         "warning_count": sum(1 for b in building_details if b["status"] == "warning"),
         "healthy_count": sum(1 for b in building_details if b["status"] == "healthy"),
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_at": simulation_service.now_str(),
     }
 
 
@@ -244,6 +294,13 @@ def build_budget_kpi(building_id: str, year: int) -> Dict:
     frame = _add_operational_dimensions(_operational_frame())
     budgets = _read_budgets()
     building_budgets = [b for b in budgets if b["building_id"] == building_id and b["year"] == year]
+    # Annual assessment only counts *settled* months. When the sandbox is active,
+    # the current (in-progress) and future months are excluded so the scorecard
+    # never presents unsettled periods as final scores.
+    building_budgets = [
+        b for b in building_budgets if _period_status(b["year"], b["month"]) == "settled"
+    ]
+    building_budgets = sorted(building_budgets, key=lambda b: b["month"])
 
     monthly_scores = []
     total_budget = 0.0
@@ -301,15 +358,26 @@ def build_budget_kpi(building_id: str, year: int) -> Dict:
         )
 
     overall_exec_rate = _safe_divide(total_actual, total_budget) * 100
-    avg_score = round(sum(m["score"] for m in monthly_scores) / len(monthly_scores), 1) if monthly_scores else 0
+    has_settled = bool(monthly_scores)
+    avg_score = round(sum(m["score"] for m in monthly_scores) / len(monthly_scores), 1) if has_settled else 0
 
-    grade = "A"
-    if avg_score < 60:
+    if not has_settled:
+        grade = "—"
+    elif avg_score < 60:
         grade = "D"
     elif avg_score < 75:
         grade = "C"
     elif avg_score < 85:
         grade = "B"
+    else:
+        grade = "A"
+
+    sim = _sim_period()
+    settled_note = (
+        f"截至当前演示日期，{year} 年已结算 {len(monthly_scores)} 个月（仅统计已结算月份）。"
+        if sim is not None
+        else ""
+    )
 
     building_name = str(frame[frame["building_id"] == building_id]["building_name"].iloc[0]) if not frame.empty else building_id
 
@@ -317,6 +385,8 @@ def build_budget_kpi(building_id: str, year: int) -> Dict:
         "building_id": building_id,
         "building_name": building_name,
         "year": year,
+        "settled_month_count": len(monthly_scores),
+        "settled_note": settled_note,
         "overall_execution_rate": round(overall_exec_rate, 1),
         "total_actual_kwh": round(total_actual, 2),
         "total_budget_kwh": round(total_budget, 2),

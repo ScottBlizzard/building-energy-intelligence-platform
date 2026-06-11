@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.core.config import get_settings
+from app.services import simulation_service
 from app.services.auth_service import get_user, resolve_worker_for_equipment
 
 
@@ -54,7 +55,13 @@ def _store_path() -> Path:
 
 
 def _now() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    # Follow the sandbox clock so created/closed/timeline times stay on the
+    # simulated date during a demo (falls back to real time when inactive).
+    return simulation_service.now_str()
+
+
+def _now_dt() -> datetime:
+    return simulation_service.now()
 
 
 def _read_orders() -> List[Dict]:
@@ -104,7 +111,7 @@ def _timeline_event(
     operator = _operator(operator_id)
     created_at = _now()
     return {
-        "event_id": f"TL-{datetime.now().strftime('%Y%m%d%H%M%S%f')}",
+        "event_id": f"TL-{_now_dt().strftime('%Y%m%d%H%M%S%f')}",
         "action": action,
         "from_status": from_status,
         "from_status_label": _status_label(from_status or ""),
@@ -211,7 +218,7 @@ def create_work_order(payload: Dict) -> Dict:
 
     order = {
         **payload,
-        "work_order_id": payload.get("work_order_id") or f"WO-{datetime.now().strftime('%Y%m%d%H%M%S')}",
+        "work_order_id": payload.get("work_order_id") or f"WO-{_now_dt().strftime('%Y%m%d%H%M%S')}",
         "status": status,
         "status_label": _status_label(status),
         "assignee_id": assignee_id,

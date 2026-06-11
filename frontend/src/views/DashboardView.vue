@@ -3140,7 +3140,7 @@ onMounted(async () => {
 
     <template v-else-if="activeTab === 'budget'">
       <div class="content-grid content-grid--single">
-        <BudgetPanel :buildings="buildings" />
+        <BudgetPanel :buildings="buildings" :sim-clock="simClock" />
       </div>
     </template>
 

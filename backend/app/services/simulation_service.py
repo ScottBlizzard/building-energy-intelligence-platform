@@ -107,6 +107,23 @@ def get_state() -> Dict:
     }
 
 
+def now() -> datetime:
+    """The current moment *as seen inside the demo*.
+
+    When the sandbox is active this is the simulated current date combined with
+    the real wall-clock time-of-day (so timestamps land on the sandbox day while
+    still ordering naturally within that day). When inactive it is the real now.
+    """
+    current = get_current_date()
+    if current is None:
+        return datetime.now()
+    return datetime.combine(current, datetime.now().time())
+
+
+def now_str() -> str:
+    return now().strftime("%Y-%m-%d %H:%M:%S")
+
+
 def signature() -> str:
     """A small, deterministic fingerprint of the current simulation state.
 

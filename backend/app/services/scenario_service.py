@@ -1,7 +1,6 @@
 """Counterfactual scenarios for the simulation time machine."""
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Dict, List, Optional
 
 import pandas as pd
@@ -112,7 +111,7 @@ def build_counterfactual_scenarios(
             "delay_days": delay,
             "scenarios": [],
             "decision_sentence": "当前样本窗口内没有该设备的后续数据，无法生成对照实验。",
-            "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "generated_at": simulation_service.now_str(),
         }
 
     scenarios = [
@@ -152,5 +151,5 @@ def build_counterfactual_scenarios(
             f"{saved_vs_delay['carbon_kg']:,.1f} kg 碳排；相比不处理，{horizon} 天内可减少 "
             f"{saved_vs_no_action['anomalies']} 次异常暴露。"
         ),
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_at": simulation_service.now_str(),
     }

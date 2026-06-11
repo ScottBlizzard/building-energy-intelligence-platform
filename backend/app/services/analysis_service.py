@@ -938,9 +938,11 @@ def build_operation_report(frame: pd.DataFrame, work_orders: List[Dict] | None =
             closed_summary += f" 其中 {len(savings)} 个工单预计带来能耗改善（估算值）。"
     management_decision = _build_management_decision_summary(frame, top_anomaly)
 
+    from app.services import simulation_service
+
     return {
         "title": "建筑能源运营日报",
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_at": simulation_service.now_str(),
         "scope": {
             "record_count": overview["total_records"],
             "building_count": overview["building_count"],

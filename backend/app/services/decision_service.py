@@ -7,9 +7,9 @@ and which repeatedly failing equipment should enter an ROI retrofit pool.
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime
 from typing import Dict, List, Optional
 
+from app.services import simulation_service
 from app.services.auth_service import resolve_worker_for_equipment
 from app.services.budget_service import build_budget_analysis
 from app.services.data_loader import get_visible_dataset
@@ -225,7 +225,7 @@ def recommend_dispatch_plan(worker_capacity: int = 3) -> Dict:
             if selected
             else "当前没有待处理工单，可把人力用于巡检和复盘。"
         ),
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_at": simulation_service.now_str(),
     }
 
 
@@ -294,7 +294,7 @@ def summarize_budget_impact_from_closures(year: Optional[int] = None, month: Opt
             if closed
             else "暂无已关闭工单，预算预测尚未获得处置收益修正。"
         ),
-        "generated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "generated_at": simulation_service.now_str(),
     }
 
 

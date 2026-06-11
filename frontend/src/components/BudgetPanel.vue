@@ -32,6 +32,9 @@
     </div>
 
     <template v-else-if="analysis">
+      <StatusBanner v-if="periodNote" :status="periodNote" :type="analysis.period_status === 'future' ? 'warning' : 'info'" />
+
+      <template v-if="analysis.period_status !== 'future'">
       <div class="budget-kpi-grid">
         <div class="budget-kpi-card">
           <span>本月总预算</span>
@@ -119,7 +122,7 @@
       </div>
 
       <div v-if="selectedKPI" class="kpi-detail">
-        <SectionCard eyebrow="KPI Scorecard" :title="`${selectedKPI.building_name} · ${selectedKPI.year} 年度考核`" description="">
+        <SectionCard eyebrow="KPI Scorecard" :title="`${selectedKPI.building_name} · ${selectedKPI.year} 年度考核`" :description="selectedKPI.settled_note || ''">
           <div class="kpi-header">
             <div class="kpi-grade" :class="`kpi-grade--${selectedKPI.grade}`">
               {{ selectedKPI.grade }}
@@ -176,6 +179,7 @@
           </div>
         </SectionCard>
       </div>
+      </template>
 
       <div class="budget-set-form">
         <SectionCard eyebrow="Admin" title="预算调整" description="手动设置或调整楼栋月度预算目标。">
@@ -224,10 +228,23 @@ import EmptyState from "./EmptyState.vue";
 
 const props = defineProps({
   buildings: { type: Array, default: () => [] },
+  simClock: { type: Object, default: () => ({}) },
 });
 
-const selectedYear = ref(2026);
-const selectedMonth = ref(6);
+function simYearMonth() {
+  const raw = props.simClock?.current_date;
+  if (raw) {
+    const dt = new Date(raw);
+    if (!Number.isNaN(dt.getTime())) {
+      return { year: dt.getFullYear(), month: dt.getMonth() + 1 };
+    }
+  }
+  return null;
+}
+
+const _initPeriod = simYearMonth();
+const selectedYear = ref(_initPeriod?.year ?? 2026);
+const selectedMonth = ref(_initPeriod?.month ?? 5);
 const loading = ref(false);
 const error = ref("");
 const analysis = ref(null);
@@ -256,6 +273,17 @@ const projectedRateClass = computed(() => {
   if (rate > 100) return "kpi-card--danger";
   if (rate > 85) return "kpi-card--warn";
   return "kpi-card--safe";
+});
+
+const periodNote = computed(() => {
+  const status = analysis.value?.period_status;
+  if (status === "future") {
+    return analysis.value?.message || `${selectedMonth.value} 月尚未开始，暂无预算执行数据。`;
+  }
+  if (status === "in_progress") {
+    return `${selectedMonth.value} 月为当前演示月份（进行中、未结算），以下为实时执行情况与月末预测。`;
+  }
+  return "";
 });
 
 function formatNumber(val) {
