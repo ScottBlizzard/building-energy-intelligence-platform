@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from datetime import datetime
 from functools import lru_cache
 from typing import Dict, List, Optional
@@ -47,8 +48,22 @@ def read_dataset() -> pd.DataFrame:
     return frame.sort_values("timestamp").reset_index(drop=True)
 
 
+# Simulation transforms (intervention recovery, staged failures, windowing) are
+# pure functions of the cached raw dataset + the current simulation signature.
+# They are relatively expensive (row-wise id synthesis + per-building quantiles)
+# and were previously recomputed on *every* request; a single UI interaction fans
+# out into many requests. We memoise the results keyed by the simulation
+# signature so only the first request after a clock change pays the cost.
+_VISIBLE_CACHE: Dict[str, object] = {"sig": None, "frame": None}
+_FILTERED_CACHE: "OrderedDict[tuple, pd.DataFrame]" = OrderedDict()
+_FILTERED_CACHE_MAX = 24
+
+
 def clear_dataset_cache() -> None:
     read_dataset.cache_clear()
+    _VISIBLE_CACHE["sig"] = None
+    _VISIBLE_CACHE["frame"] = None
+    _FILTERED_CACHE.clear()
 
 
 def get_filtered_dataset(
@@ -57,6 +72,17 @@ def get_filtered_dataset(
     end_time: Optional[datetime] = None,
 ) -> pd.DataFrame:
     from app.services import simulation_service
+
+    key = (
+        simulation_service.signature(),
+        building_id or "",
+        pd.Timestamp(start_time).isoformat() if start_time is not None else "",
+        pd.Timestamp(end_time).isoformat() if end_time is not None else "",
+    )
+    cached = _FILTERED_CACHE.get(key)
+    if cached is not None:
+        _FILTERED_CACHE.move_to_end(key)
+        return cached.copy()
 
     frame = read_dataset().copy()
     # Apply operator interventions (causal recovery) before any windowing.
@@ -70,19 +96,31 @@ def get_filtered_dataset(
         frame = frame[frame["timestamp"] <= pd.Timestamp(end_time)]
 
     # Hide data after the current simulated date (no-op when simulation inactive).
-    frame = simulation_service.apply_window(frame)
+    frame = simulation_service.apply_window(frame).reset_index(drop=True)
 
-    return frame.reset_index(drop=True)
+    _FILTERED_CACHE[key] = frame
+    _FILTERED_CACHE.move_to_end(key)
+    while len(_FILTERED_CACHE) > _FILTERED_CACHE_MAX:
+        _FILTERED_CACHE.popitem(last=False)
+    return frame.copy()
 
 
 def get_visible_dataset() -> pd.DataFrame:
     """Full dataset as seen at the current simulated date (interventions + window).
 
     No-op equivalent to ``read_dataset()`` when the simulation clock is inactive.
+    Result is cached per simulation signature (see module note above).
     """
     from app.services import simulation_service
 
-    return simulation_service.apply(read_dataset().copy()).reset_index(drop=True)
+    sig = simulation_service.signature()
+    if _VISIBLE_CACHE["sig"] == sig and _VISIBLE_CACHE["frame"] is not None:
+        return _VISIBLE_CACHE["frame"].copy()
+
+    frame = simulation_service.apply(read_dataset().copy()).reset_index(drop=True)
+    _VISIBLE_CACHE["sig"] = sig
+    _VISIBLE_CACHE["frame"] = frame
+    return frame.copy()
 
 
 def get_building_options() -> List[Dict[str, str]]:

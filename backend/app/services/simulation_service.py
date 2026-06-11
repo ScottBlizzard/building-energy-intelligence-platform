@@ -107,6 +107,29 @@ def get_state() -> Dict:
     }
 
 
+def signature() -> str:
+    """A small, deterministic fingerprint of the current simulation state.
+
+    Used as a cache key for the (expensive) dataset transforms and annotations:
+    while the clock/interventions are unchanged, every request can reuse the same
+    computed frame instead of recomputing it.
+    """
+    state = _read_state()
+    interventions = sorted(
+        (str(item.get("equipment_id")), str(item.get("from_date")))
+        for item in state.get("interventions", [])
+    )
+    return json.dumps(
+        {
+            "current_date": state.get("current_date"),
+            "start_date": state.get("start_date"),
+            "interventions": interventions,
+        },
+        sort_keys=True,
+        ensure_ascii=False,
+    )
+
+
 def start_simulation(start_date: Optional[str] = None) -> Dict:
     state = _empty_state()
     resolved = start_date or DEFAULT_START_DATE

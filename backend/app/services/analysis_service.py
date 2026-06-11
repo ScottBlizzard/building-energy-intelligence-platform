@@ -1,4 +1,5 @@
 import re
+from collections import OrderedDict
 from datetime import datetime
 from typing import Dict, List
 
@@ -261,12 +262,54 @@ _ANALYSIS_REQUIRED_COLUMNS = {
 }
 
 
+def _frame_signature(frame: pd.DataFrame):
+    """Cheap, collision-resistant fingerprint of a raw input frame.
+
+    Captures row count, the first/last record ids (window + building filter) and
+    the content sums that simulation transforms change (electricity/hvac/cooling
+    and abnormal-status count). Computing it costs a few vectorised reductions,
+    far less than the row-wise ``apply`` annotation it guards.
+    """
+    n = len(frame)
+    if n == 0:
+        return ("empty",)
+    record_ids = frame["record_id"]
+    return (
+        n,
+        str(record_ids.iloc[0]),
+        str(record_ids.iloc[-1]),
+        round(float(frame["electricity_kwh"].sum()), 3),
+        round(float(frame["hvac_kwh"].sum()), 3),
+        round(float(frame["cooling_load_kwh"].sum()), 3),
+        int((frame["equipment_status"].astype(str).str.lower() != "normal").sum()),
+    )
+
+
+_ANNOTATION_CACHE: "OrderedDict[tuple, pd.DataFrame]" = OrderedDict()
+_ANNOTATION_CACHE_MAX = 24
+
+
 def _add_operational_dimensions(frame: pd.DataFrame) -> pd.DataFrame:
     if frame.empty:
         return frame.copy()
 
     if _ANALYSIS_REQUIRED_COLUMNS.issubset(frame.columns):
         return frame.copy()
+
+    # Annotating the operational dimensions (synthesised equipment ids, floors,
+    # zones, anomaly flags) is the single hottest path and is recomputed by nearly
+    # every endpoint. Memoise by input-content signature so a burst of requests on
+    # the same (visible) frame only computes it once.
+    cache_key = None
+    try:
+        cache_key = _frame_signature(frame)
+    except (KeyError, TypeError, ValueError):
+        cache_key = None
+    if cache_key is not None:
+        cached = _ANNOTATION_CACHE.get(cache_key)
+        if cached is not None:
+            _ANNOTATION_CACHE.move_to_end(cache_key)
+            return cached.copy()
 
     working = frame.copy()
     working["source_equipment_id"] = working["equipment_id"]
@@ -298,6 +341,13 @@ def _add_operational_dimensions(frame: pd.DataFrame) -> pd.DataFrame:
         abnormal_status | abnormal_usage | working["low_cop"] | working["night_high_load"]
     )
     working["anomaly_reason"] = working.apply(_reason_for_row, axis=1)
+
+    if cache_key is not None:
+        _ANNOTATION_CACHE[cache_key] = working.copy()
+        _ANNOTATION_CACHE.move_to_end(cache_key)
+        while len(_ANNOTATION_CACHE) > _ANNOTATION_CACHE_MAX:
+            _ANNOTATION_CACHE.popitem(last=False)
+
     return working
 
 
