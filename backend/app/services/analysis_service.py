@@ -1245,6 +1245,7 @@ def build_anomaly_work_order_drafts(frame: pd.DataFrame) -> List[Dict]:
 
     drafts: List[Dict] = []
     for _, row in anomalies.iterrows():
+        impact = _business_impact(row)
         drafts.append({
             "work_order_id": f"WO-DRAFT-{pd.Timestamp(row['timestamp']).strftime('%Y%m%d%H')}-{row['record_id']}",
             "source_record_id": str(row["record_id"]),
@@ -1262,6 +1263,18 @@ def build_anomaly_work_order_drafts(frame: pd.DataFrame) -> List[Dict]:
             "owner_role": _owner_role(str(row["equipment_type"])),
             "before_kwh": round(float(row["electricity_kwh"]), 2),
             "before_cop": round(float(row["average_cop"]), 2),
+            # Carry the business impact so the work-order cards show real
+            # risk/loss/saving/SLA instead of zeros for auto-generated orders.
+            "severity": impact.get("severity"),
+            "risk_score": impact.get("risk_score"),
+            "triggered_rule_count": impact.get("triggered_rule_count"),
+            "wasted_kwh": impact.get("wasted_kwh"),
+            "wasted_cost_yuan": impact.get("wasted_cost_yuan"),
+            "carbon_kg": impact.get("carbon_kg"),
+            "estimated_saving_yuan": impact.get("estimated_saving_yuan"),
+            "sla_hours": impact.get("sla_hours"),
+            "business_impact_summary": impact.get("business_impact_summary"),
+            "verification_method": impact.get("verification_method"),
         })
     return drafts
 

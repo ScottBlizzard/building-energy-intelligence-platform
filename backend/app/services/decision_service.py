@@ -128,15 +128,22 @@ def _saving_estimate(order: Dict, loss_yuan: float) -> tuple[float, bool]:
 
 
 def rank_open_work_orders(limit: int = 10) -> List[Dict]:
-    orders = _open_orders()
-    from_candidates = False
-    if not orders:
-        orders = _anomaly_candidate_orders(limit=max(10, int(limit)))
-        from_candidates = True
+    # Always combine the real open work orders with the remaining live anomaly
+    # candidates that have not been ticketed yet. This keeps the dispatch panel
+    # showing the full prioritized worklist: dispatching one order no longer
+    # collapses the panel down to that single order.
+    open_orders = _open_orders()
+    open_equipment = {str(item.get("equipment_id") or "") for item in open_orders}
+    candidates = [
+        candidate
+        for candidate in _anomaly_candidate_orders(limit=max(20, int(limit) * 3))
+        if str(candidate.get("equipment_id") or "") not in open_equipment
+    ]
+    orders = list(open_orders) + candidates
     if not orders:
         return []
 
-    repeat_counts = _equipment_repeat_counts(list_work_orders() if not from_candidates else orders)
+    repeat_counts = _equipment_repeat_counts(list_work_orders() + candidates)
     loss_pairs = [_loss_estimate(item) for item in orders]
     carbon_pairs = [_carbon_estimate(item, loss) for item, (loss, _) in zip(orders, loss_pairs)]
     max_loss = max(loss for loss, _ in loss_pairs) or 1.0
@@ -149,6 +156,7 @@ def rank_open_work_orders(limit: int = 10) -> List[Dict]:
         sla_hours = max(1, _as_int(order.get("sla_hours"), 24))
         equipment_id = str(order.get("equipment_id") or "")
         repeat_count = repeat_counts.get(equipment_id, 1)
+        is_candidate = bool(order.get("from_anomaly_candidate"))
 
         risk_component = _normalize(risk, 100) * 40
         loss_component = _normalize(loss, max_loss) * 25
@@ -171,7 +179,7 @@ def rank_open_work_orders(limit: int = 10) -> List[Dict]:
                 "status": order.get("status", ""),
                 "status_label": order.get("status_label", ""),
                 "priority": order.get("priority", ""),
-                "is_candidate": from_candidates,
+                "is_candidate": is_candidate,
                 "decision_score": score,
                 "score_breakdown": {
                     "risk": round(risk_component, 1),

@@ -96,7 +96,15 @@ def build_counterfactual_scenarios(
     delay = max(1, int(delay_days or 3))
     end_ts = start_ts + pd.Timedelta(days=horizon)
 
-    frame = _add_operational_dimensions(read_dataset())
+    # Build the counterfactual on the *simulated future*: apply scheduled
+    # failures (injections) and the operator's interventions, but NOT the
+    # visibility window (we need data beyond "today" to project the horizon).
+    # This keeps the experiment consistent with the anomalies the operator
+    # actually sees in the dashboard instead of the raw seed dataset.
+    base = simulation_service.apply_injections(
+        simulation_service.apply_interventions(read_dataset().copy())
+    )
+    frame = _add_operational_dimensions(base)
     subset = frame[
         (frame["equipment_id"] == equipment_id)
         & (frame["timestamp"] >= start_ts)
@@ -145,11 +153,41 @@ def build_counterfactual_scenarios(
         "scenarios": scenarios,
         "savings_vs_delay": saved_vs_delay,
         "savings_vs_no_action": saved_vs_no_action,
-        "decision_sentence": (
-            f"对 {equipment_id}，立即处理相比延迟 {delay} 天可少浪费约 "
-            f"{saved_vs_delay['kwh']:,.1f} kWh、{saved_vs_delay['yuan']:,.0f} 元、"
-            f"{saved_vs_delay['carbon_kg']:,.1f} kg 碳排；相比不处理，{horizon} 天内可减少 "
-            f"{saved_vs_no_action['anomalies']} 次异常暴露。"
+        "decision_sentence": _decision_sentence(
+            equipment_id, horizon, delay, saved_vs_delay, saved_vs_no_action
         ),
         "generated_at": simulation_service.now_str(),
     }
+
+
+def _decision_sentence(
+    equipment_id: str,
+    horizon: int,
+    delay: int,
+    saved_vs_delay: Dict,
+    saved_vs_no_action: Dict,
+) -> str:
+    """Compose a readable decision sentence that does not show a misleading
+    "省 0 元" when the device has not yet entered a sustained-waste phase."""
+    delay_meaningful = saved_vs_delay["yuan"] >= 1 or saved_vs_delay["kwh"] >= 1
+    na = saved_vs_no_action
+    na_meaningful = na["yuan"] >= 1 or na["anomalies"] > 0
+
+    if delay_meaningful:
+        first = (
+            f"立即处理相比延迟 {delay} 天可少浪费约 "
+            f"{saved_vs_delay['kwh']:,.1f} kWh、{saved_vs_delay['yuan']:,.0f} 元、"
+            f"{saved_vs_delay['carbon_kg']:,.1f} kg 碳排；"
+        )
+    else:
+        first = f"未来 {delay} 天内该设备尚未进入持续超耗阶段，立即与延迟处理的短期差异不明显；"
+
+    if na_meaningful:
+        second = (
+            f"相比不处理，{horizon} 天内可减少约 {na['yuan']:,.0f} 元浪费、"
+            f"{na['anomalies']} 次异常暴露。"
+        )
+    else:
+        second = f"相比不处理，{horizon} 天内经济影响有限（以状态/能效告警为主，建议纳入巡检而非紧急派单）。"
+
+    return f"对 {equipment_id}，{first}{second}"

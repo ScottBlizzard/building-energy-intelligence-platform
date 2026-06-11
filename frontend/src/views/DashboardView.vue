@@ -1521,6 +1521,24 @@ async function refreshBusinessState({ includeAnalytics = false } = {}) {
   ]);
 }
 
+function selectAnomalyForDispatch(item) {
+  const equipmentId = item?.equipment_id;
+  if (!equipmentId) {
+    return;
+  }
+  const match = analytics.globalAnomalies.find((row) => row.equipment_id === equipmentId);
+  if (match) {
+    orderDraft.buildingId = match.building_id || "";
+    orderDraft.floorLabel = "";
+    orderDraft.anomalyKey = anomalyKey(match);
+    if (item.recommended_worker_id) {
+      orderDraft.assigneeId = item.recommended_worker_id;
+    }
+  } else {
+    loadCounterfactualForEquipment(equipmentId);
+  }
+}
+
 async function generateWorkOrder() {
   const anomaly = selectedOrderAnomaly.value;
   if (!anomaly) {
@@ -2763,7 +2781,17 @@ onMounted(async () => {
               <LoadingSpinner text="正在计算优先级..." />
             </div>
             <div v-else-if="decisionState.dispatchPlan?.selected?.length" class="dispatch-grid">
-              <article v-for="item in decisionState.dispatchPlan.selected" :key="item.work_order_id" class="dispatch-card">
+              <article
+                v-for="item in decisionState.dispatchPlan.selected"
+                :key="item.work_order_id"
+                class="dispatch-card dispatch-card--clickable"
+                :class="{ 'dispatch-card--active': selectedOrderAnomaly && selectedOrderAnomaly.equipment_id === item.equipment_id }"
+                role="button"
+                tabindex="0"
+                title="点击在上方自动选中这条异常"
+                @click="selectAnomalyForDispatch(item)"
+                @keyup.enter="selectAnomalyForDispatch(item)"
+              >
                 <div>
                   <strong>#{{ item.decision_score }} · {{ item.work_order_id }}</strong>
                   <span>{{ item.building_name }} {{ item.floor_label }} · {{ item.equipment_id }}</span>
@@ -2916,7 +2944,7 @@ onMounted(async () => {
                   />
                 </label>
 
-                <div v-if="['pending_confirm', 'assigned'].includes(order.status)" class="admin-action-grid">
+                <div v-if="order.status === 'pending_confirm'" class="admin-action-grid">
                   <label>
                     <span>调整分配工人</span>
                     <select v-model="workOrderState.assignmentById[order.work_order_id]">
@@ -2932,6 +2960,12 @@ onMounted(async () => {
                     忽略告警
                   </button>
                 </div>
+
+                <StatusBanner
+                  v-if="order.status === 'assigned'"
+                  :status="`已派单给 ${order.assignee_name || '工人'}，等待其接单处理。`"
+                  type="info"
+                />
 
                 <div v-if="order.status === 'pending_review'" class="review-panel">
                   <label>
@@ -3789,6 +3823,22 @@ onMounted(async () => {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.82);
   padding: 14px;
+}
+
+.dispatch-card--clickable {
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.dispatch-card--clickable:hover {
+  border-color: var(--accent-deep);
+  box-shadow: 0 8px 18px rgba(20, 34, 48, 0.12);
+  transform: translateY(-1px);
+}
+
+.dispatch-card--active {
+  border-color: var(--accent-deep);
+  box-shadow: 0 0 0 2px rgba(20, 34, 48, 0.18);
 }
 
 .dispatch-card strong {
