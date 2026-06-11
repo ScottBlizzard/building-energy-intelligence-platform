@@ -115,7 +115,6 @@ const { chartRef } = useEcharts(chartOptions);
       <span>正在加载图表数据...</span>
     </div>
     <div v-else-if="error" class="chart-error">
-      <div class="error-icon">⚠️</div>
       <div class="error-message">{{ error }}</div>
     </div>
     <div v-else ref="chartRef" class="chart-container"></div>

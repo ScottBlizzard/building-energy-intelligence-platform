@@ -170,7 +170,7 @@ function updateModel(event) {
       <p>{{ reply.answer }}</p>
 
       <div v-if="reply.citations?.length" class="citation-section">
-        <h4 class="citation-title">📚 引用来源</h4>
+        <h4 class="citation-title">引用来源</h4>
         <div class="citation-cards">
           <CitationCard 
             v-for="citation in reply.citations" 

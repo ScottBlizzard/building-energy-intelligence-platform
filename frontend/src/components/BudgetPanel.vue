@@ -301,8 +301,19 @@ async function loadBudgetAnalysis() {
     analysis.value = result.item;
     const impact = await fetchDecisionBudgetImpact(selectedYear.value, selectedMonth.value);
     closureImpact.value = impact.item;
-    if (result.item.buildings.length && !selectedKPI.value) {
-      await loadKPI(result.item.buildings[0].building_id);
+    if (result.item.buildings.length) {
+      // Always refresh the KPI scorecard alongside the analysis so the built-in
+      // "刷新数据" button (and the sandbox clock advancing) updates the card
+      // without requiring a manual month switch + hard refresh. Keep the
+      // currently inspected building when possible.
+      const kpiBuildingId =
+        selectedKPI.value?.building_id &&
+        result.item.buildings.some((b) => b.building_id === selectedKPI.value.building_id)
+          ? selectedKPI.value.building_id
+          : result.item.buildings[0].building_id;
+      await loadKPI(kpiBuildingId);
+    } else {
+      selectedKPI.value = null;
     }
   } catch (e) {
     error.value = "预算数据加载失败，请确认后端服务可用。";
@@ -362,6 +373,25 @@ watch(
     }
   },
   { immediate: true }
+);
+
+// Keep the budget period aligned with the sandbox clock: when the demo advances
+// to a new day/month the scorecard and analysis should follow without a manual
+// month switch or hard refresh.
+watch(
+  () => props.simClock?.current_date,
+  () => {
+    const period = simYearMonth();
+    if (!period) return;
+    const changed = period.year !== selectedYear.value || period.month !== selectedMonth.value;
+    if (changed) {
+      selectedYear.value = period.year;
+      selectedMonth.value = period.month;
+    }
+    if (props.buildings.length) {
+      loadBudgetAnalysis();
+    }
+  }
 );
 
 defineExpose({ loadBudgetAnalysis });

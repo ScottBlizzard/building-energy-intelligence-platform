@@ -16,28 +16,24 @@ const props = defineProps({
 const statusConfig = computed(() => {
   const configs = {
     info: {
-      icon: 'ℹ️',
       class: 'status-info',
       background: 'rgba(15, 139, 141, 0.12)',
       border: 'rgba(15, 139, 141, 0.18)',
       color: 'var(--accent-deep)'
     },
     success: {
-      icon: '✅',
       class: 'status-success',
       background: 'rgba(76, 175, 80, 0.12)',
       border: 'rgba(76, 175, 80, 0.18)',
       color: '#2e7d32'
     },
     warning: {
-      icon: '⚠️',
       class: 'status-warning',
       background: 'rgba(255, 159, 28, 0.12)',
       border: 'rgba(255, 159, 28, 0.18)',
       color: '#8f5100'
     },
     error: {
-      icon: '❌',
       class: 'status-error',
       background: 'rgba(244, 67, 54, 0.12)',
       border: 'rgba(244, 67, 54, 0.18)',
@@ -58,7 +54,6 @@ const statusConfig = computed(() => {
       color: statusConfig.color
     }"
   >
-    <span class="status-icon">{{ statusConfig.icon }}</span>
     <span class="status-text">{{ status }}</span>
   </div>
 </template>

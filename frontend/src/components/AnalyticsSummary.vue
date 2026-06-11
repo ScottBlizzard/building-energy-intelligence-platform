@@ -40,7 +40,6 @@ const topComparison = computed(() =>
     </div>
     
     <div v-else-if="!hasAnalyticsData" class="empty-state">
-      <div class="empty-icon">📊</div>
       <p>暂无分析数据</p>
       <small>请检查后端连接或数据源配置</small>
     </div>

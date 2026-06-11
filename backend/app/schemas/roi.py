@@ -12,6 +12,8 @@ class ROIProjectRequest(BaseModel):
     project_lifespan_years: Optional[int] = None
     project_name: Optional[str] = ""
     annual_maintenance_cost: Optional[float] = 0
+    discount_rate: Optional[float] = None
+    investment_basis: Optional[str] = None
 
 
 class ROIScenarioCompare(BaseModel):

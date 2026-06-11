@@ -586,6 +586,19 @@ const sortedWorkOrders = computed(() => {
     return String(b.timestamp || "").localeCompare(String(a.timestamp || ""));
   });
 });
+const WORK_ORDER_PAGE_SIZE = 6;
+const visibleWorkOrderCount = ref(WORK_ORDER_PAGE_SIZE);
+const visibleWorkOrders = computed(() => sortedWorkOrders.value.slice(0, visibleWorkOrderCount.value));
+const hasMoreWorkOrders = computed(() => sortedWorkOrders.value.length > visibleWorkOrderCount.value);
+function showMoreWorkOrders() {
+  visibleWorkOrderCount.value += WORK_ORDER_PAGE_SIZE;
+}
+watch(
+  () => sortedWorkOrders.value.length,
+  () => {
+    visibleWorkOrderCount.value = WORK_ORDER_PAGE_SIZE;
+  }
+);
 const orderStats = computed(() => {
   const stats = Object.fromEntries(orderStatusOptions.map((item) => [item.key, 0]));
   roleScopedWorkOrders.value.forEach((item) => {
@@ -650,9 +663,15 @@ const selectedOrderDecision = computed(() => {
   if (!selectedOrderAnomaly.value) {
     return null;
   }
-  return decisionState.priorities.find(
-    (item) => item.equipment_id === selectedOrderAnomaly.value.equipment_id
-  ) || null;
+  const recordId = String(selectedOrderAnomaly.value.record_id || "");
+  // Match the decision entry to the exact selected record so the hint numbers
+  // (risk / loss / SLA) are consistent with the preview strip above. Only show
+  // the hint when this record is actually part of the prioritized worklist.
+  return (
+    decisionState.priorities.find(
+      (item) => String(item.source_record_id || "") === recordId
+    ) || null
+  );
 });
 const highPriorityOrders = computed(() =>
   enrichedWorkOrders.value.filter((item) => item.priority === "高").slice(0, 6)
@@ -1522,11 +1541,22 @@ async function refreshBusinessState({ includeAnalytics = false } = {}) {
 }
 
 function selectAnomalyForDispatch(item) {
+  const recordId = item?.source_record_id;
   const equipmentId = item?.equipment_id;
-  if (!equipmentId) {
+  if (!recordId && !equipmentId) {
     return;
   }
-  const match = analytics.globalAnomalies.find((row) => row.equipment_id === equipmentId);
+  // Prefer the exact source record so the preview strip and the decision hint
+  // describe the same anomaly the user clicked on (not just any record of the
+  // same equipment). Fall back to equipment-level match when the record is not
+  // present in the visible anomaly list.
+  let match = null;
+  if (recordId) {
+    match = analytics.globalAnomalies.find((row) => String(row.record_id) === String(recordId));
+  }
+  if (!match && equipmentId) {
+    match = analytics.globalAnomalies.find((row) => row.equipment_id === equipmentId);
+  }
   if (match) {
     orderDraft.buildingId = match.building_id || "";
     orderDraft.floorLabel = "";
@@ -1534,7 +1564,7 @@ function selectAnomalyForDispatch(item) {
     if (item.recommended_worker_id) {
       orderDraft.assigneeId = item.recommended_worker_id;
     }
-  } else {
+  } else if (equipmentId) {
     loadCounterfactualForEquipment(equipmentId);
   }
 }
@@ -1884,17 +1914,17 @@ onMounted(async () => {
         </button>
         <template v-else>
           <button class="primary-button" type="button" :disabled="simLoading" @click="handleAdvanceDay(1)">
-            ▶ 下一天
+            下一天
           </button>
           <button class="secondary-button" type="button" :disabled="simLoading" @click="handleAdvanceDay(7)">
-            ⏭ 下一周
+            下一周
           </button>
           <button class="secondary-button" type="button" :disabled="simLoading" @click="handleResetSimulation">
             重置时钟
           </button>
         </template>
         <button class="reset-demo-button" type="button" :disabled="simLoading" @click="handleResetDemo" title="清空工单/预算并重置时间机器，回到演示初始状态">
-          ⟲ 重置演示（回到初始）
+          重置演示（回到初始）
         </button>
       </div>
       <p class="sim-hint">
@@ -2033,21 +2063,18 @@ onMounted(async () => {
         <SectionCard eyebrow="Features" title="核心功能" description="系统提供的主要功能模块">
           <div class="feature-list">
             <div class="feature-item">
-              <div class="feature-icon">📊</div>
               <div class="feature-content">
                 <h4>能耗监测</h4>
                 <p>实时监测建筑能耗数据，提供详细的用电分析</p>
               </div>
             </div>
             <div class="feature-item">
-              <div class="feature-icon">🚨</div>
               <div class="feature-content">
                 <h4>异常检测</h4>
                 <p>智能识别异常用电模式，及时发现潜在问题</p>
               </div>
             </div>
             <div class="feature-item">
-              <div class="feature-icon">💡</div>
               <div class="feature-content">
                 <h4>智能问答</h4>
                 <p>基于知识库的AI助手，解答能源管理相关问题</p>
@@ -2059,19 +2086,16 @@ onMounted(async () => {
         <SectionCard eyebrow="Insights" title="数据洞察" description="基于当前数据的初步分析结论">
           <div class="insights-content">
             <div class="insight-item">
-              <span class="insight-icon">📈</span>
               <div class="insight-text">
                 <strong>能耗趋势：</strong>系统持续监测各建筑能耗变化，为节能优化提供数据支撑
               </div>
             </div>
             <div class="insight-item">
-              <span class="insight-icon">🔍</span>
               <div class="insight-text">
                 <strong>异常识别：</strong>通过智能算法识别异常用电模式，帮助及时发现设备问题
               </div>
             </div>
             <div class="insight-item">
-              <span class="insight-icon">⚡</span>
               <div class="insight-text">
                 <strong>能效优化：</strong>基于COP等指标分析，为建筑能效提升提供专业建议
               </div>
@@ -2103,7 +2127,6 @@ onMounted(async () => {
 
           <div v-if="exportState.lastFile || errors.export" class="export-notifications">
             <div v-if="exportState.lastFile" class="export-success">
-              <div class="export-icon">✅</div>
               <div class="export-content">
                 <div class="export-title">导出成功</div>
                 <div class="export-filename">{{ exportState.lastFile }}</div>
@@ -2111,7 +2134,6 @@ onMounted(async () => {
               </div>
             </div>
             <div v-if="errors.export" class="export-error">
-              <div class="export-icon">❌</div>
               <div class="export-content">
                 <div class="export-title">导出失败</div>
                 <div class="export-message">{{ errors.export }}</div>
@@ -2154,15 +2176,15 @@ onMounted(async () => {
         <SectionCard eyebrow="Export" title="数据导出" description="支持将筛选后的数据导出为CSV格式文件">
           <div class="export-info">
             <div class="export-feature">
-              <h4>📊 灵活导出</h4>
+              <h4>灵活导出</h4>
               <p>根据筛选条件导出特定时间段和建筑的能耗数据</p>
             </div>
             <div class="export-feature">
-              <h4>📋 标准格式</h4>
+              <h4>标准格式</h4>
               <p>导出文件采用标准CSV格式，兼容Excel等常用工具</p>
             </div>
             <div class="export-feature">
-              <h4>⚡ 快速下载</h4>
+              <h4>快速下载</h4>
               <p>一键导出，文件自动生成并下载到本地</p>
             </div>
           </div>
@@ -2523,7 +2545,7 @@ onMounted(async () => {
           </div>
           <div v-else class="work-order-board work-order-board--single">
             <article
-              v-for="order in sortedWorkOrders"
+              v-for="order in visibleWorkOrders"
               :key="order.work_order_id"
               class="work-order-card"
               :class="[
@@ -2631,7 +2653,7 @@ onMounted(async () => {
               </div>
               <!-- Attachment Info -->
               <div v-if="order.attachment_name" class="attachment-info">
-                <span>📎 现场附件：</span>
+                <span>现场附件：</span>
                 <strong>{{ order.attachment_name }}</strong>
                 <span v-if="order.attachment_note"> · {{ order.attachment_note }}</span>
               </div>
@@ -2644,6 +2666,11 @@ onMounted(async () => {
                 </li>
               </ol>
             </article>
+          </div>
+          <div v-if="hasMoreWorkOrders" class="work-order-more">
+            <button class="secondary-button" type="button" @click="showMoreWorkOrders">
+              查看更多（还有 {{ sortedWorkOrders.length - visibleWorkOrderCount }} 条）
+            </button>
           </div>
         </SectionCard>
       </div>
@@ -2712,7 +2739,7 @@ onMounted(async () => {
                 生成并派单
               </button>
               <button class="secondary-button" type="button" :disabled="loading.orders" @click="handleAutoConfirmQueue" style="grid-column: 1 / -1; border-color: var(--accent-deep); color: var(--accent-deep);">
-                🔄 一键生成待确认工单队列（从所有异常自动创建待确认工单）
+                一键生成待确认工单队列（从所有异常自动创建待确认工单）
               </button>
             </div>
             <p class="order-create-hint">
@@ -2737,8 +2764,10 @@ onMounted(async () => {
               </div>
             </div>
             <p v-if="selectedOrderDecision" class="order-create-hint">
-              已有同设备未闭环工单的经济决策分为 {{ selectedOrderDecision.decision_score }}：
+              本条异常的经济优先级总分 {{ selectedOrderDecision.decision_score }} 分（满分 100，由下列原始指标按权重折算相加得出）：
               {{ selectedOrderDecision.reason }}
+              <br />
+              <small>说明：上方“风险分 {{ selectedOrderAnomaly?.risk_score }}”是 0-100 的原始风险评分；它按 40% 权重折算后才计入优先级总分，因此两个数字不同属正常。</small>
             </p>
           </div>
 
@@ -2785,7 +2814,7 @@ onMounted(async () => {
                 v-for="item in decisionState.dispatchPlan.selected"
                 :key="item.work_order_id"
                 class="dispatch-card dispatch-card--clickable"
-                :class="{ 'dispatch-card--active': selectedOrderAnomaly && selectedOrderAnomaly.equipment_id === item.equipment_id }"
+                :class="{ 'dispatch-card--active': selectedOrderAnomaly && String(selectedOrderAnomaly.record_id) === String(item.source_record_id) }"
                 role="button"
                 tabindex="0"
                 title="点击在上方自动选中这条异常"
@@ -2793,15 +2822,20 @@ onMounted(async () => {
                 @keyup.enter="selectAnomalyForDispatch(item)"
               >
                 <div>
-                  <strong>#{{ item.decision_score }} · {{ item.work_order_id }}</strong>
+                  <strong title="经济优先级总分（满分 100），由风险/损失/SLA/碳排/复发加权得出">优先级 {{ item.decision_score }} 分</strong>
                   <span>{{ item.building_name }} {{ item.floor_label }} · {{ item.equipment_id }}</span>
                 </div>
-                <p>{{ item.reason }}</p>
+                <p class="dispatch-wo-id">工单号 {{ item.work_order_id }}</p>
+                <p>测算依据：{{ item.reason }}</p>
                 <div class="dispatch-breakdown">
-                  <span>风险 {{ item.score_breakdown.risk }}</span>
-                  <span>损失 {{ item.score_breakdown.estimated_loss }}</span>
-                  <span>SLA {{ item.score_breakdown.sla }}</span>
-                  <span>碳排 {{ item.score_breakdown.carbon }}</span>
+                  <span class="dispatch-breakdown-label" title="以下为各维度按权重折算后的得分（满分括号内），相加即上方“优先级总分”。原始风险分(0-100)单独显示在上方预览区。">
+                    加权得分构成（合计 {{ item.decision_score }}/100）
+                  </span>
+                  <span :title="`原始风险分 ${item.risk_score} × 权重 40% = ${item.score_breakdown.risk}`">风险 {{ item.score_breakdown.risk }}/40</span>
+                  <span title="按损失金额在本批中归一 × 权重 25%">损失 {{ item.score_breakdown.estimated_loss }}/25</span>
+                  <span title="SLA 越紧得分越高 × 权重 15%">SLA {{ item.score_breakdown.sla }}/15</span>
+                  <span title="按碳排在本批中归一 × 权重 10%">碳排 {{ item.score_breakdown.carbon }}/10</span>
+                  <span title="历史同设备异常复发次数 × 权重 10%">复发 {{ item.score_breakdown.repeat_anomaly }}/10</span>
                 </div>
               </article>
             </div>
@@ -2862,7 +2896,7 @@ onMounted(async () => {
           </div>
           <div v-else class="work-order-board">
             <article
-              v-for="order in sortedWorkOrders"
+              v-for="order in visibleWorkOrders"
               :key="order.work_order_id"
               class="work-order-card"
               :class="[
@@ -3018,7 +3052,7 @@ onMounted(async () => {
               </div>
               <!-- Attachment Info -->
               <div v-if="order.attachment_name" class="attachment-info">
-                <span>📎 现场附件：</span>
+                <span>现场附件：</span>
                 <strong>{{ order.attachment_name }}</strong>
                 <span v-if="order.attachment_note"> · {{ order.attachment_note }}</span>
               </div>
@@ -3031,6 +3065,11 @@ onMounted(async () => {
                 </li>
               </ol>
             </article>
+          </div>
+          <div v-if="hasMoreWorkOrders" class="work-order-more">
+            <button class="secondary-button" type="button" @click="showMoreWorkOrders">
+              查看更多（还有 {{ sortedWorkOrders.length - visibleWorkOrderCount }} 条）
+            </button>
           </div>
         </SectionCard>
       </div>
@@ -3864,6 +3903,27 @@ onMounted(async () => {
   background: rgba(15, 139, 141, 0.1);
   color: #0f6f71;
   padding: 4px 8px;
+}
+
+.dispatch-breakdown .dispatch-breakdown-label {
+  background: transparent;
+  color: var(--ink-soft);
+  padding: 4px 0;
+  flex-basis: 100%;
+  font-size: 11px;
+}
+
+.dispatch-wo-id {
+  color: var(--ink-soft);
+  font-size: 12px;
+  margin: 2px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.work-order-more {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
 }
 
 .counterfactual-head strong {

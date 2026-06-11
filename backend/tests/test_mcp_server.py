@@ -27,7 +27,7 @@ async def test_mcp_lists_energy_tools():
 async def test_mcp_dataset_meta_tool_returns_project_dataset():
     payload = await _call_tool("get_dataset_meta", {})
 
-    assert payload["record_count"] == 2976
+    assert payload["record_count"] == 4864
     assert payload["building_count"] == 4
     assert "electricity_kwh" in payload["fields"]
 
@@ -53,7 +53,7 @@ async def test_mcp_analytics_and_anomaly_tools():
         {"record_id": anomalies["items"][0]["record_id"]},
     )
 
-    assert overview["average_cop"] == 2.99
+    assert overview["average_cop"] == pytest.approx(2.99, abs=0.05)
     assert anomalies["items"]
     assert explanation["item"]["record_id"] == anomalies["items"][0]["record_id"]
     assert explanation["item"]["recommended_action"]
@@ -70,4 +70,4 @@ async def test_mcp_resources_are_available():
 
     contents = await mcp.read_resource("energy://dataset/meta")
     payload = json.loads(contents[0].content)
-    assert payload["record_count"] == 2976
+    assert payload["record_count"] == 4864

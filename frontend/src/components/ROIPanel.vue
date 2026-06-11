@@ -61,6 +61,7 @@
             <div><span>平均 COP</span><strong>{{ eq.avg_cop }}</strong></div>
             <div><span>异常次数</span><strong>{{ eq.anomaly_count }}</strong></div>
           </div>
+          <p v-if="eq.data_note" class="eq-data-note">{{ eq.data_note }}</p>
         </div>
       </div>
 
@@ -77,7 +78,8 @@
               <strong>{{ option.option }}</strong>
               <span>投资 {{ formatNumber(option.investment_yuan) }} 元</span>
               <span>年节省 {{ formatNumber(option.annual_saving_yuan) }} 元</span>
-              <span class="roi-preset-payback">回收期 {{ option.payback_years }} 年</span>
+              <span>EAA {{ formatNumber(option.eaa_yuan) }} 元/年</span>
+              <span class="roi-preset-payback">动态回收 {{ paybackText(option.discounted_payback_years) }}</span>
             </div>
           </div>
 
@@ -96,9 +98,9 @@
                     <th>方案</th>
                     <th>投资</th>
                     <th>年节省</th>
-                    <th>回收期</th>
-                    <th>5年ROI</th>
-                    <th>NPV</th>
+                    <th>动态回收期</th>
+                    <th>NPV(8%)</th>
+                    <th>EAA(元/年)</th>
                     <th>结论</th>
                   </tr>
                 </thead>
@@ -106,21 +108,24 @@
                   <tr
                     v-for="scenario in scenarioComparison.scenarios"
                     :key="scenario.project_name"
-                    :class="{ 'scenario-row--best': scenario.project_name === scenarioComparison.comparison.best_npv?.name }"
+                    :class="{ 'scenario-row--best': scenario.project_name === scenarioComparison.comparison.best_eaa?.name }"
                   >
                     <td>{{ scenario.project_name }}</td>
                     <td>{{ formatNumber(scenario.investment_yuan) }} 元</td>
                     <td>{{ formatNumber(scenario.annual_saving_yuan) }} 元</td>
-                    <td>{{ scenario.payback_label || `${scenario.payback_years} 年` }}</td>
-                    <td>{{ scenario.roi_5year_pct }}%</td>
+                    <td>{{ scenario.payback_label || paybackText(scenario.discounted_payback_years) }}</td>
                     <td :class="scenario.npv_yuan > 0 ? 'text-green' : 'text-red'">
                       {{ formatNumber(scenario.npv_yuan) }} 元
+                    </td>
+                    <td :class="scenario.eaa_yuan > 0 ? 'text-green' : 'text-red'">
+                      {{ formatNumber(scenario.eaa_yuan) }}
                     </td>
                     <td>{{ scenario.assessment }}</td>
                   </tr>
                 </tbody>
               </table>
             </div>
+            <p class="scenario-foot">主判据：先筛 NPV(8% 社会折现率)&gt;0，再按等额年值 EAA 最大择优（寿命不同，EAA 才公平）；动态回收期仅作辅助。</p>
           </div>
 
           <div class="roi-custom-form">
@@ -163,12 +168,14 @@
             <strong>{{ roiResult.irr_pct }}%</strong>
           </div>
           <div class="roi-result-card">
-            <span>投资回收期</span>
-            <strong>{{ roiResult.payback_label || `${roiResult.payback_years} 年` }}</strong>
+            <span>动态回收期</span>
+            <strong>{{ roiResult.payback_label || paybackText(roiResult.discounted_payback_years) }}</strong>
           </div>
           <div class="roi-result-card">
-            <span>5年 ROI</span>
-            <strong>{{ roiResult.roi_5year_pct }}%</strong>
+            <span>等额年值 EAA</span>
+            <strong :class="roiResult.eaa_yuan > 0 ? 'text-green' : 'text-red'">
+              {{ formatNumber(roiResult.eaa_yuan) }} 元/年
+            </strong>
           </div>
           <div class="roi-result-card">
             <span>年减排 CO₂</span>
@@ -187,7 +194,12 @@
               <tr><td>年节省电费</td><td>{{ formatNumber(roiResult.annual_saving_yuan) }} 元</td></tr>
               <tr><td>年节省电量</td><td>{{ formatNumber(roiResult.annual_saving_kwh) }} kWh</td></tr>
               <tr><td>节能率</td><td>{{ roiResult.expected_saving_pct }}%</td></tr>
+              <tr><td>5年 ROI</td><td>{{ roiResult.roi_5year_pct }}%</td></tr>
               <tr><td>当前年度电费</td><td>{{ formatNumber(roiResult.current_annual_cost_yuan) }} 元</td></tr>
+              <tr><td>折现率 / 电价递增</td><td>{{ roiResult.discount_rate }}% / {{ roiResult.price_escalation }}%·年</td></tr>
+              <tr><td>含碳价 NPV</td><td>{{ formatNumber(roiResult.npv_with_carbon_yuan) }} 元（碳价 {{ roiResult.carbon_price_yuan_per_ton }} 元/吨）</td></tr>
+              <tr><td>节能率口径</td><td>{{ roiResult.saving_basis }}</td></tr>
+              <tr><td>投资口径</td><td>{{ roiResult.investment_basis }}</td></tr>
               <tr><td>年化口径</td><td>基于 {{ roiResult.observed_days || selectedEquipment.observed_days }} 天可见数据年化</td></tr>
             </table>
           </div>
@@ -222,11 +234,11 @@
       </div>
 
       <div v-if="!selectedEquipment && audit.equipment_list.length" class="roi-hint">
-        <EmptyState icon="🔍" title="选择设备类型" description="点击上方设备卡片，查看改造方案并计算投资回报。" />
+        <EmptyState title="选择设备类型" description="点击上方设备卡片，查看改造方案并计算投资回报。" />
       </div>
     </template>
 
-    <EmptyState v-else-if="!loading" icon="🏗️" title="暂无设备诊断数据" description="请选择楼栋后点击刷新。" />
+    <EmptyState v-else-if="!loading" title="暂无设备诊断数据" description="请选择楼栋后点击刷新。" />
   </div>
 </template>
 
@@ -270,6 +282,11 @@ function formatNumber(val) {
   const num = Number(val);
   if (Number.isNaN(num)) return "-";
   return num.toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+}
+
+function paybackText(years) {
+  if (years == null || Number(years) >= 999) return "寿命期内无法回本";
+  return `${Number(years).toFixed(1)} 年`;
 }
 
 async function loadAudit() {
@@ -495,6 +512,8 @@ onMounted(() => {
 .equipment-card--高效 { border-color: rgba(34,160,107,0.3); }
 .equipment-card--正常 { border-color: rgba(15,139,141,0.3); }
 .equipment-card--低效 { border-color: rgba(217,54,79,0.3); }
+.equipment-card--无数据 { border-color: rgba(20,34,48,0.12); opacity: 0.85; }
+.eq-data-note { margin: 10px 0 0; font-size: 12px; color: var(--ink-soft); }
 
 .eq-card-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
 .eq-card-head strong { font-size: 16px; }
@@ -504,6 +523,7 @@ onMounted(() => {
 .cop-badge--高效 { background: rgba(34,160,107,0.12); color: #1a7d4e; }
 .cop-badge--正常 { background: rgba(15,139,141,0.12); color: #0f6f71; }
 .cop-badge--低效 { background: rgba(217,54,79,0.12); color: #a32035; }
+.cop-badge--无数据 { background: rgba(20,34,48,0.08); color: var(--ink-soft); }
 
 .eq-card-stats { display: grid; gap: 6px; }
 .eq-card-stats div { display: flex; justify-content: space-between; font-size: 13px; }
@@ -570,6 +590,7 @@ onMounted(() => {
   color: #0f6f71;
   font-weight: 700;
 }
+.scenario-foot { margin: 10px 2px 0; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
 
 .roi-custom-form {
   display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; align-items: end;

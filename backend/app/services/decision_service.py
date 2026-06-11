@@ -67,6 +67,33 @@ def _anomaly_candidate_orders(limit: int = 12) -> List[Dict]:
     return out
 
 
+def _live_impact_by_record() -> Dict[str, Dict]:
+    """Map source_record_id -> live business-impact fields for currently visible
+    anomalies. Used so a dispatch card's score reason matches exactly what the
+    work-order preview strip shows for the same record (no preview/hint drift)."""
+    try:
+        from app.services.analysis_service import build_analysis_frame, build_anomaly_summary
+
+        records = build_anomaly_summary(build_analysis_frame(get_visible_dataset()))
+    except (FileNotFoundError, ValueError, KeyError):
+        return {}
+    impact_fields = (
+        "risk_score",
+        "wasted_cost_yuan",
+        "estimated_saving_yuan",
+        "carbon_kg",
+        "wasted_kwh",
+        "sla_hours",
+    )
+    out: Dict[str, Dict] = {}
+    for record in records:
+        record_id = str(record.get("record_id") or "")
+        if not record_id:
+            continue
+        out[record_id] = {field: record[field] for field in impact_fields if field in record}
+    return out
+
+
 def _equipment_repeat_counts(orders: List[Dict]) -> Dict[str, int]:
     counts: Dict[str, int] = defaultdict(int)
     for order in orders:
@@ -143,6 +170,18 @@ def rank_open_work_orders(limit: int = 10) -> List[Dict]:
     if not orders:
         return []
 
+    # Refresh each order with the live impact of its source anomaly record (when
+    # still visible) so the dispatch reason equals the preview strip values.
+    live_impact = _live_impact_by_record()
+    if live_impact:
+        enriched_orders = []
+        for order in orders:
+            record_id = str(order.get("source_record_id") or "")
+            if record_id and record_id in live_impact:
+                order = {**order, **live_impact[record_id]}
+            enriched_orders.append(order)
+        orders = enriched_orders
+
     repeat_counts = _equipment_repeat_counts(list_work_orders() + candidates)
     loss_pairs = [_loss_estimate(item) for item in orders]
     carbon_pairs = [_carbon_estimate(item, loss) for item, (loss, _) in zip(orders, loss_pairs)]
@@ -171,6 +210,7 @@ def rank_open_work_orders(limit: int = 10) -> List[Dict]:
         ranked.append(
             {
                 "work_order_id": order.get("work_order_id"),
+                "source_record_id": order.get("source_record_id"),
                 "equipment_id": equipment_id,
                 "equipment_type": order.get("equipment_type", ""),
                 "building_id": order.get("building_id", ""),
@@ -327,6 +367,20 @@ def _visible_anomaly_counts() -> Dict[str, Dict]:
     return result
 
 
+def _roi_candidate_reason(item: Dict, repeat_count: int) -> str:
+    open_count = int(item.get("open_count", 0))
+    visible = int(item.get("visible_anomaly_count", 0))
+    cumulative_loss = float(item.get("cumulative_loss_yuan", 0) or 0)
+    parts = [f"累计异常/工单 {repeat_count} 次"]
+    if cumulative_loss > 0:
+        parts.append(f"已建单累计损失约 {cumulative_loss:,.0f} 元")
+    elif visible > 0:
+        parts.append(f"当前可见异常 {visible} 条（尚未建单，损失按实时估算）")
+    if open_count > 0:
+        parts.append(f"仍有 {open_count} 个未闭环工单")
+    return "，".join(parts) + "。"
+
+
 def find_roi_candidates_from_repeated_anomalies(limit: int = 8) -> List[Dict]:
     orders = list_work_orders()
     grouped: Dict[str, Dict] = {}
@@ -401,10 +455,7 @@ def find_roi_candidates_from_repeated_anomalies(limit: int = 8) -> List[Dict]:
                 "retrofit_score": retrofit_score,
                 "recommended_option": option,
                 "budget_effect": "通过后写入下一轮预算基线，降低未来异常概率假设。",
-                "reason": (
-                    f"累计异常/工单 {repeat_count} 次，损失约 {item['cumulative_loss_yuan']:,.0f} 元，"
-                    f"仍有 {item['open_count']} 个未闭环工单。"
-                ),
+                "reason": _roi_candidate_reason(item, repeat_count),
             }
         )
 

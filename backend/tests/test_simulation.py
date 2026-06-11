@@ -57,8 +57,8 @@ def test_intervention_recovers_equipment(tmp_path, monkeypatch):
     target = max(counts, key=counts.get)
     assert counts[target] >= 1
 
-    # repair it for the entire timeline
-    simulation_service.register_intervention(target, from_date="2026-03-01")
+    # repair it for the entire timeline (dataset now starts 2026-01-01)
+    simulation_service.register_intervention(target, from_date="2026-01-01")
 
     after = build_anomaly_summary(build_analysis_frame(get_visible_dataset()))
     remaining = [a for a in after if a["equipment_id"] == target]

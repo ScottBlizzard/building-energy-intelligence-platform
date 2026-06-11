@@ -37,9 +37,28 @@ _EQUIPMENT_TYPE_LABELS = {
 
 
 _PRIORITY_ORDER = {"高": 0, "中": 1, "低": 2}
-_ELECTRICITY_PRICE_YUAN_PER_KWH = 0.82
-_CARBON_KG_PER_KWH = 0.5703
-_SAVING_CAPTURE_RATE = 0.65
+_ELECTRICITY_PRICE_YUAN_PER_KWH = 0.82  # 工商业目录电价（元/kWh）
+_CARBON_KG_PER_KWH = 0.5703  # 全国电网平均碳排因子（kgCO₂/kWh, 生态环境部 2022）
+_SAVING_CAPTURE_RATE = 0.65  # 处置后可回收比例（保守经验值，运维难一次性根治）
+
+# --- L1 异常判定口径（见 docs/29 §2.1）---
+# 基线按「建筑 × 时段(每3小时)」分组，消除白天/夜间混算导致的误判；
+# 阈值取 mean + 2σ（正态下单侧约 2.3% 越界），比旧的 mean+1σ(≈16%) 严谨得多。
+_ANOMALY_SIGMA = 2.0
+_COP_TARGET = 2.2  # COP 告警阈值（全系统统一，替换历史上 2.6/2.2 混用）
+
+# --- L1 风险分权重（0-100，见 docs/29 §2.2）---
+# 透明可加模型：每个信号只计一次、无基础分、权重之和=100，可逐项复算。
+_RISK_W_STATUS = 30.0   # 设备硬故障（equipment_status != normal）
+_RISK_W_OVERUSE = 35.0  # 电耗超出同时段 2σ 阈值的幅度（归一）
+_RISK_W_COP = 20.0      # COP 低于目标的幅度（归一）
+_RISK_W_NIGHT = 15.0    # 夜间/非运行时段高负荷
+_RISK_OVERUSE_FULL_RATIO = 0.35  # 电耗超出同时段期望≥35% 即占满 overuse 分量
+# 严重度阈值按本评分模型分位数标定（COP 在本数据集普遍达标≈0 贡献，有效量程
+# 约 0–80）：高≥70 约占前 10%（故障叠加显著超耗），中≥45，其余为低，
+# 形成"少量高优先 / 多数中等 / 少量低"的合理梯度。
+_SEVERITY_HIGH = 70.0
+_SEVERITY_MID = 45.0
 
 
 def _equipment_code(equipment_id: str) -> str:
@@ -154,7 +173,7 @@ def _reason_for_row(row: pd.Series) -> str:
         return "COP低于告警阈值"
     if row.get("night_high_load", False):
         return "夜间负荷偏高"
-    return "电耗高于同建筑基线"
+    return "电耗高于同时段基线"
 
 
 def _as_float(value, default: float = 0.0) -> float:
@@ -164,6 +183,10 @@ def _as_float(value, default: float = 0.0) -> float:
         return float(value)
     except (TypeError, ValueError):
         return default
+
+
+def _clamp01(value: float) -> float:
+    return max(0.0, min(1.0, value))
 
 
 def _triggered_rule_count(row: pd.Series) -> int:
@@ -193,38 +216,39 @@ def _verification_method(row: pd.Series) -> str:
 def _business_impact(row: pd.Series) -> Dict:
     electricity = _as_float(row.get("electricity_kwh"))
     hvac = _as_float(row.get("hvac_kwh"))
-    building_mean = _as_float(row.get("building_mean"), electricity)
-    upper_bound = _as_float(row.get("upper_bound"), building_mean)
+    cooling_load = _as_float(row.get("cooling_load_kwh"))
+    baseline_mean = _as_float(row.get("baseline_mean"), _as_float(row.get("building_mean"), electricity))
+    upper_bound = _as_float(row.get("upper_bound"), baseline_mean)
     cop = _as_float(row.get("average_cop"), 3.0)
     status_abnormal = str(row.get("equipment_status")).lower() != "normal"
     low_cop = bool(row.get("low_cop", False))
     night_high_load = bool(row.get("night_high_load", False))
 
-    threshold_delta = max(0.0, electricity - upper_bound)
-    baseline_delta = max(0.0, electricity - building_mean)
-    night_delta = max(0.0, electricity - building_mean * 1.1) if night_high_load else 0.0
-    cop_delta = 0.0
-    if low_cop:
-        cop_delta = hvac * min(0.22, max(0.0, 2.6 - cop) * 0.12)
-    status_delta = electricity * 0.05 if status_abnormal else 0.0
-    wasted_kwh = max(threshold_delta, night_delta, cop_delta, status_delta, baseline_delta * 0.25)
-    if _triggered_rule_count(row) and wasted_kwh <= 0:
-        wasted_kwh = electricity * 0.03
+    # --- wasted_kwh：取 MAX，不求和，避免同一度电被计两次（docs/29 §2.3）---
+    # 1) 超出同时段期望基线的电量（电耗 - 时段均值）；这是直接可测的多耗。
+    over_expected = max(0.0, electricity - baseline_mean)
+    # 2) COP 低效造成的多耗，物理推导：若以目标 COP 运行所需电输入为
+    #    cooling_load / COP_TARGET，超出部分即浪费（仅 COP < 目标时计入）。
+    cop_waste = max(0.0, hvac - cooling_load / _COP_TARGET) if (low_cop and cooling_load > 0) else 0.0
+    wasted_kwh = max(over_expected, cop_waste)
 
     wasted_cost = wasted_kwh * _ELECTRICITY_PRICE_YUAN_PER_KWH
     carbon_kg = wasted_kwh * _CARBON_KG_PER_KWH
     estimated_saving = wasted_cost * _SAVING_CAPTURE_RATE
     rule_count = _triggered_rule_count(row)
-    risk_score = min(
-        100.0,
-        30
-        + rule_count * 13
-        + min(22.0, wasted_cost * 0.35)
-        + (12 if status_abnormal else 0)
-        + (8 if low_cop else 0)
-        + (6 if night_high_load else 0),
-    )
-    severity = "高" if risk_score >= 72 else "中" if risk_score >= 48 else "低"
+
+    # --- risk_score：透明可加 0-100，每信号一次、无基础分（docs/29 §2.2）---
+    # overuse 以「超出同时段期望均值的相对幅度」衡量（电耗比该时段典型值高多少），
+    # 比用 2σ 阈值本身更能反映真实严重度。
+    status_component = _RISK_W_STATUS if status_abnormal else 0.0
+    exceed_ratio = (over_expected / baseline_mean) if baseline_mean > 0 else 0.0
+    overuse_component = _RISK_W_OVERUSE * _clamp01(exceed_ratio / _RISK_OVERUSE_FULL_RATIO)
+    cop_gap = max(0.0, (_COP_TARGET - cop) / _COP_TARGET) if cop > 0 else 0.0
+    cop_component = _RISK_W_COP * _clamp01(cop_gap)
+    night_component = _RISK_W_NIGHT if night_high_load else 0.0
+    risk_score = round(status_component + overuse_component + cop_component + night_component, 1)
+
+    severity = "高" if risk_score >= _SEVERITY_HIGH else "中" if risk_score >= _SEVERITY_MID else "低"
     sla_hours = 8 if severity == "高" else 24 if severity == "中" else 72
 
     return {
@@ -253,6 +277,8 @@ _ANALYSIS_REQUIRED_COLUMNS = {
     "hour",
     "building_mean",
     "building_std",
+    "baseline_mean",
+    "baseline_std",
     "upper_bound",
     "average_cop",
     "low_cop",
@@ -321,25 +347,36 @@ def _add_operational_dimensions(frame: pd.DataFrame) -> pd.DataFrame:
     working["equipment_type"] = working["equipment_id"].apply(_infer_equipment_type)
     working["hour"] = pd.to_datetime(working["timestamp"]).dt.hour
 
+    # Building-level average kept for messaging / "高于同建筑基线" context.
     building_mean = working.groupby("building_id")["electricity_kwh"].transform("mean")
     building_std = working.groupby("building_id")["electricity_kwh"].transform("std")
     working["building_mean"] = building_mean
     working["building_std"] = building_std.fillna(0)
-    working["upper_bound"] = working["building_mean"] + working["building_std"]
+
+    # Contextual baseline by building × time-of-day slot (docs/29 §2.1): a daytime
+    # peak is judged against other daytime peaks, not the 24h average. Threshold =
+    # slot mean + 2σ. With ~150 daily samples per (building, hour) the statistics
+    # are stable.
+    slot_group = working.groupby(["building_id", "hour"])["electricity_kwh"]
+    slot_mean = slot_group.transform("mean")
+    slot_std = slot_group.transform("std").fillna(0.0)
+    working["baseline_mean"] = slot_mean
+    working["baseline_std"] = slot_std
+    working["upper_bound"] = slot_mean + _ANOMALY_SIGMA * slot_std
 
     working["average_cop"] = working.apply(
         lambda row: round(_safe_divide(row["cooling_load_kwh"], row["hvac_kwh"]), 2),
         axis=1,
     )
-    working["low_cop"] = working["average_cop"] < 2.2
+    working["low_cop"] = working["average_cop"] < _COP_TARGET
+    abnormal_usage = working["electricity_kwh"] > working["upper_bound"]
+    # Night high load is now a labelled subset of "over contextual threshold" that
+    # happens off-hours (kept for nicer reasons; no longer a looser separate rule).
     working["night_high_load"] = (
         (working["hour"] < 6) | (working["hour"] >= 22)
-    ) & (working["electricity_kwh"] > building_mean * 1.1)
+    ) & abnormal_usage
     abnormal_status = working["equipment_status"].astype(str).str.lower() != "normal"
-    abnormal_usage = working["electricity_kwh"] > working["upper_bound"]
-    working["is_anomaly"] = (
-        abnormal_status | abnormal_usage | working["low_cop"] | working["night_high_load"]
-    )
+    working["is_anomaly"] = abnormal_status | abnormal_usage | working["low_cop"]
     working["anomaly_reason"] = working.apply(_reason_for_row, axis=1)
 
     if cache_key is not None:
@@ -615,9 +652,9 @@ def build_anomaly_explanation(frame: pd.DataFrame, record_id: str) -> Dict:
                 "detail": f"equipment_status={row['equipment_status']}",
             },
             {
-                "name": "高于建筑动态阈值",
+                "name": "高于同时段动态阈值",
                 "triggered": high_usage,
-                "detail": f"{electricity:.2f} kWh > {upper_bound:.2f} kWh",
+                "detail": f"{electricity:.2f} kWh > 同时段均值+2σ {upper_bound:.2f} kWh",
             },
             {
                 "name": "COP 低于阈值",
@@ -627,7 +664,7 @@ def build_anomaly_explanation(frame: pd.DataFrame, record_id: str) -> Dict:
             {
                 "name": "夜间负荷偏高",
                 "triggered": night_high_load,
-                "detail": "00:00-06:00 或 22:00 后负荷高于建筑基线 1.1 倍",
+                "detail": "00:00-06:00 或 22:00 后电耗超出同时段均值+2σ 阈值",
             },
         ]
         if item["triggered"]

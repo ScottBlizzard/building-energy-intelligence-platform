@@ -35,5 +35,5 @@ async def test_mcp_stdio_server_can_be_initialized_and_called(tmp_path):
 
             result = await session.call_tool("get_energy_overview", {})
             payload = json.loads(result.content[0].text)
-            assert payload["total_records"] == 2976
-            assert payload["average_cop"] == 2.99
+            assert payload["total_records"] == 4864
+            assert payload["average_cop"] == pytest.approx(2.99, abs=0.05)

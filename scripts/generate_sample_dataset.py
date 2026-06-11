@@ -9,8 +9,36 @@ from pathlib import Path
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 OUTPUT_PATH = ROOT_DIR / "data" / "samples" / "energy_records.csv"
-DATA_START = datetime(2026, 3, 1, 0, 0, 0)
+
+# Full-year (heating + cooling) synthetic dataset.
+# Span: 2026-01-01 ~ 2026-06-01 (2026 is NOT a leap year → Feb has 28 days).
+# The seasonal energy curve is bimodal: a winter heating peak (Jan/Feb) and a
+# rising summer cooling load (May/Jun), with an April shoulder trough — so the
+# month-over-month trend, environment temperature and load are physically
+# self-consistent end to end (see docs/29 §1.3).
+DATA_START = datetime(2026, 1, 1, 0, 0, 0)
 DATA_END = datetime(2026, 6, 1, 0, 0, 0)
+
+# Heating / cooling balance-point model: load rises when it is colder than
+# HEAT_BALANCE_C (space heating) or hotter than COOL_BALANCE_C (cooling).
+HEAT_BALANCE_C = 18.0
+COOL_BALANCE_C = 23.0
+HEAT_SENSITIVITY = 0.018
+COOL_SENSITIVITY = 0.030
+
+# Smooth seasonal temperature anchors (day_index_from_Jan1, monthly-mean °C),
+# anchored on each month's mid-point and linearly interpolated by day.
+TEMP_ANCHORS = [
+    (14, 4.0),    # mid-Jan, deep winter
+    (44, 6.5),    # mid-Feb
+    (73, 11.0),   # mid-Mar
+    (104, 17.0),  # mid-Apr (shoulder)
+    (134, 23.0),  # mid-May
+    (151, 27.5),  # Jun 1
+]
+
+# Intra-day temperature swing (°C offset by 3-hour slot); warmest mid-afternoon.
+DIURNAL_OFFSET = {0: -3.0, 3: -4.0, 6: -2.5, 9: 1.0, 12: 4.0, 15: 5.0, 18: 2.0, 21: -2.0}
 
 
 BUILDINGS = [
@@ -77,6 +105,38 @@ def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
 
 
+def _seasonal_temp(day_index: int) -> float:
+    """Linearly interpolate the monthly-mean temperature curve by day index."""
+    anchors = TEMP_ANCHORS
+    if day_index <= anchors[0][0]:
+        (d0, t0), (d1, t1) = anchors[0], anchors[1]
+        slope = (t1 - t0) / (d1 - d0)
+        return t0 + slope * (day_index - d0)
+    if day_index >= anchors[-1][0]:
+        return anchors[-1][1]
+    for (d0, t0), (d1, t1) in zip(anchors, anchors[1:]):
+        if d0 <= day_index <= d1:
+            ratio = (day_index - d0) / (d1 - d0)
+            return t0 + (t1 - t0) * ratio
+    return anchors[-1][1]
+
+
+def _winter_break_factors(building_type: str, month: int) -> tuple[float, float]:
+    """(occupancy_factor, load_factor) for the Jan/Feb winter vacation.
+
+    During winter break / Spring Festival occupancy drops sharply, but heating
+    keeps running for frost protection so the energy load is only mildly reduced
+    (occupancy ≠ load). Labs stay near-normal.
+    """
+    if month not in {1, 2}:
+        return 1.0, 1.0
+    if building_type in {"teaching", "office"}:
+        return 0.5, 0.9
+    if building_type == "library":
+        return 0.75, 0.95
+    return 0.9, 1.0  # lab
+
+
 def main() -> None:
     random.seed(42)
     total_days = (DATA_END.date() - DATA_START.date()).days + 1
@@ -85,16 +145,25 @@ def main() -> None:
 
     for day_offset in range(total_days):
         current_day = DATA_START + timedelta(days=day_offset)
-        season_progress = day_offset / max(total_days - 1, 1)
-        seasonal_temp = 15.8 + 12.8 * season_progress + 1.9 * math.sin(season_progress * math.pi)
+        month = current_day.month
         is_weekend = current_day.weekday() >= 5
+        seasonal_temp = _seasonal_temp(day_offset)
 
         for building_index, building in enumerate(BUILDINGS):
+            occupancy_break, load_break = _winter_break_factors(building["building_type"], month)
             for slot in TIME_SLOTS:
                 timestamp = current_day.replace(hour=slot)
+                environment_temp = round(
+                    seasonal_temp + DIURNAL_OFFSET[slot] + random.uniform(-1.2, 1.2), 1
+                )
+
+                # Bimodal thermal load: heating when cold, cooling when hot.
+                heating_degree = max(0.0, HEAT_BALANCE_C - environment_temp)
+                cooling_degree = max(0.0, environment_temp - COOL_BALANCE_C)
+                thermal_factor = 1 + heating_degree * HEAT_SENSITIVITY + cooling_degree * COOL_SENSITIVITY
+
                 peak_factor = 1.22 if slot in {9, 12, 15} else 0.92 if slot in {0, 3, 21} else 1.0
                 workload_factor = 1 + building_index * 0.06
-                cooling_pressure = 1 + max(seasonal_temp + slot * 0.22 - 24, 0) * 0.018
                 if is_weekend and building["building_type"] in {"teaching", "office"}:
                     schedule_factor = 0.88
                     occupancy_factor = 0.58
@@ -104,15 +173,25 @@ def main() -> None:
                 else:
                     schedule_factor = 1.0
                     occupancy_factor = 1.0
+                schedule_factor *= load_break
                 noise = random.uniform(-0.08, 0.08)
 
-                environment_temp = round(seasonal_temp + slot * 0.22 + random.uniform(-1.2, 1.2), 1)
-                humidity = round(_clamp(62 - season_progress * 12 + random.uniform(-7, 7), 32, 88), 1)
+                humidity = round(
+                    _clamp(48 + (environment_temp - 10) * 0.7 + random.uniform(-7, 7), 35, 90), 1
+                )
                 occupancy = round(
                     _clamp(
-                        ((20 + slot * 3.5 + building_index * 7 + random.uniform(-8, 10)) * occupancy_factor)
+                        (
+                            (20 + slot * 3.5 + building_index * 7 + random.uniform(-8, 10))
+                            * occupancy_factor
+                            * occupancy_break
+                        )
                         if slot in {6, 9, 12, 15, 18}
-                        else ((5 + building_index * 2 + random.uniform(-2, 3)) * occupancy_factor),
+                        else (
+                            (5 + building_index * 2 + random.uniform(-2, 3))
+                            * occupancy_factor
+                            * occupancy_break
+                        ),
                         0,
                         95,
                     ),
@@ -124,7 +203,7 @@ def main() -> None:
                     * peak_factor
                     * workload_factor
                     * schedule_factor
-                    * cooling_pressure
+                    * thermal_factor
                     * (1 + noise)
                 )
                 electricity = (
@@ -132,7 +211,7 @@ def main() -> None:
                     * peak_factor
                     * workload_factor
                     * schedule_factor
-                    * cooling_pressure
+                    * thermal_factor
                     * (1 + noise * 0.9)
                 )
                 water = (
@@ -141,16 +220,17 @@ def main() -> None:
                     * (0.92 + occupancy_factor * 0.08)
                     * (1 + noise * 0.4)
                 )
+                # Thermal energy served / hvac ≈ COP (kept ≈3 for self-consistency).
                 cooling_load = hvac * (3.0 + random.uniform(-0.18, 0.24))
 
-                abnormal = (day_offset + slot + building_index) % 23 == 0 or (
+                abnormal = (day_offset + slot + building_index) % 17 == 0 or (
                     building["building_id"] == "BLD-D" and slot == 15 and day_offset % 9 == 0
                 )
                 abnormal = abnormal or (
                     current_day.month == 5 and 24 <= current_day.day <= 28 and slot in {12, 15}
                 )
                 abnormal = abnormal or (
-                    building["building_id"] == "BLD-C" and slot == 21 and day_offset % 17 == 0
+                    building["building_id"] == "BLD-C" and slot == 21 and day_offset % 23 == 0
                 )
                 abnormal = abnormal or (
                     building["building_id"] == "BLD-B" and is_weekend and slot in {9, 12} and day_offset % 19 == 0

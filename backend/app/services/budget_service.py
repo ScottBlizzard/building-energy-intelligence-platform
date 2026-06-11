@@ -12,7 +12,18 @@ from app.services.analysis_service import _add_operational_dimensions, _safe_div
 from app.services.data_loader import get_visible_dataset
 from app.services.work_order_store import list_work_orders
 
-_SEASONAL_COEFFICIENTS = {1: 1.15, 2: 1.10, 3: 0.95, 4: 0.85, 5: 0.80, 6: 0.90, 7: 1.10, 8: 1.15, 9: 0.95, 10: 0.80, 11: 0.90, 12: 1.10}
+# 季节系数（月度负荷相对全年中性水平）。1-6 月由本数据集实测各月日均/全样本日均
+# 标定（见 docs/29 §3）：冬季供暖略高、4 月为谷、初夏回升；7-12 月为合理估计
+# （夏季制冷峰、秋季回落、冬季供暖），数据补齐后应同样以实测重标。
+_SEASONAL_COEFFICIENTS = {
+    1: 1.06, 2: 1.02, 3: 1.01, 4: 0.94, 5: 0.97, 6: 1.04,
+    7: 1.15, 8: 1.18, 9: 1.02, 10: 0.95, 11: 0.98, 12: 1.08,
+}
+
+# 预算目标系数：在"季节中性期望运行水平"上再设 3% 的节能目标线。
+# 含义：维持现状（不处置异常/不改造）约会到 1/0.97≈103% 而略微超标；
+# 处置异常、推进改造可把实际压到目标线以内。这是预算"超额"的可解释来源。
+_TARGET_FACTOR = 0.97
 
 
 def _budget_path() -> Path:
@@ -97,17 +108,33 @@ def _monthly_projection(subset) -> float:
     return float(subset["electricity_kwh"].sum() / observed_days * 30)
 
 
-def _building_budget_baseline(frame, building_id: str, month: int) -> tuple[float, str]:
-    same_month = frame[(frame["building_id"] == building_id) & (frame["timestamp"].dt.month == month)]
-    if not same_month.empty:
-        return _monthly_projection(same_month), "同月历史均值"
+def _season_neutral_daily(rows) -> float:
+    """季节中性日均：把每天的总电耗除以其所属月份的季节系数后取均值。
 
+    这样基线**独立于被考核月份本身的实测**（用全部可见天数、去季节后求得），
+    避免"用同月实测当预算再去和同月实测比"的循环，也使各楼执行率不再恒等。
+    """
+    if rows.empty:
+        return 0.0
+    daily = rows.groupby(rows["timestamp"].dt.normalize())["electricity_kwh"].sum()
+    coeffs = [_SEASONAL_COEFFICIENTS.get(int(day.month), 1.0) for day in daily.index]
+    neutralised = [value / coeff for value, coeff in zip(daily.values, coeffs)]
+    return float(sum(neutralised) / len(neutralised)) if neutralised else 0.0
+
+
+def _building_budget_baseline(frame, building_id: str, month: int) -> tuple[float, str]:
+    """该楼该月的**期望运行水平**（kWh，已含季节性，未含目标系数）。"""
+    coeff = _SEASONAL_COEFFICIENTS.get(month, 1.0)
     building_rows = frame[frame["building_id"] == building_id]
     if not building_rows.empty:
-        return _monthly_projection(building_rows), "楼栋可见数据均值"
+        neutral_daily = _season_neutral_daily(building_rows)
+        if neutral_daily > 0:
+            return neutral_daily * coeff * 30, "季节中性日均×季节系数×30天"
 
     if not frame.empty:
-        return _monthly_projection(frame), "全局样本均值"
+        neutral_daily = _season_neutral_daily(frame) / max(1, frame["building_id"].nunique())
+        if neutral_daily > 0:
+            return neutral_daily * coeff * 30, "全局季节中性均值（楼栋无数据兜底）"
 
     return 80000.0, "默认兜底基线"
 
@@ -127,18 +154,24 @@ def auto_generate_budgets(year: int, month: int) -> List[Dict]:
         key = (str(building_id), year, month)
         if key in existing_keys:
             continue
-        baseline, basis = _building_budget_baseline(frame, str(building_id), month)
+        expected_kwh, basis = _building_budget_baseline(frame, str(building_id), month)
         coefficient = _SEASONAL_COEFFICIENTS.get(month, 1.0)
-        budget = round(baseline * coefficient * 0.92, 0)
+        # 预算 = 期望运行水平 × 目标系数（基线已含季节性，不再二次乘季节系数）。
+        budget = round(expected_kwh * _TARGET_FACTOR, 0)
         item = {
             "building_id": str(building_id),
             "building_name": str(frame[frame["building_id"] == building_id]["building_name"].iloc[0]),
             "year": year,
             "month": month,
             "budget_kwh": budget if budget > 0 else 80000.0,
-            "note": f"基于{basis}自动生成，季节系数 {coefficient}",
+            "expected_kwh": round(expected_kwh, 0),
+            "note": (
+                f"预算=期望运行水平×目标系数{_TARGET_FACTOR}；"
+                f"期望运行水平按「{basis}」、季节系数 {coefficient}。"
+            ),
             "basis": basis,
             "seasonal_coefficient": coefficient,
+            "target_factor": _TARGET_FACTOR,
             "created_at": simulation_service.now_str(),
             "updated_at": simulation_service.now_str(),
         }

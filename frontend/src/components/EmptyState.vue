@@ -10,7 +10,7 @@
 defineProps({
   icon: {
     type: String,
-    default: '📭'
+    default: ''
   },
   title: {
     type: String,
@@ -31,7 +31,6 @@ const emit = defineEmits(['action']);
 
 <template>
   <div class="empty-state">
-    <div class="empty-icon">{{ icon }}</div>
     <h3 class="empty-title">{{ title }}</h3>
     <p class="empty-description">{{ description }}</p>
     <button 

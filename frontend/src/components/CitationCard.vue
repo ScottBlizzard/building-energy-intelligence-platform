@@ -12,13 +12,6 @@ const props = defineProps({
   }
 });
 
-const getFileIcon = (path) => {
-  if (path.includes('manuals')) return "📖";
-  if (path.includes('faq')) return "❓";
-  if (path.includes('glossary')) return "📚";
-  return "📄";
-};
-
 const getFileType = (path) => {
   if (path.includes('manuals')) return "操作手册";
   if (path.includes('faq')) return "常见问题";
@@ -42,7 +35,6 @@ const sourceUrl = computed(() => {
 <template>
   <div class="citation-card" :class="{ 'citation-card--compact': compact }">
     <div class="citation-header">
-      <span class="citation-icon">{{ getFileIcon(citation.path) }}</span>
       <div class="citation-info">
         <div class="citation-title" :title="citation.title">
           {{ truncateTitle(citation.title) }}
