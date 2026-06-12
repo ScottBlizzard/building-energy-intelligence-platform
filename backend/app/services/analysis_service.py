@@ -1283,9 +1283,10 @@ def build_anomaly_work_order_drafts(frame: pd.DataFrame) -> List[Dict]:
     pool = (recent if not recent.empty else anomalies).copy()
     impacts = {idx: _business_impact(row) for idx, row in pool.iterrows()}
     pool["_risk"] = [impacts[idx]["risk_score"] for idx in pool.index]
-    anomalies = pool.sort_values(
-        ["_risk", "electricity_kwh"], ascending=[False, False]
-    ).head(10)
+    # 设备级去重：修复以设备为单位，一台设备进队列只取风险最高的那条异常，
+    # 避免同一台设备在待确认队列里重复占用多个名额。
+    ranked_pool = pool.sort_values(["_risk", "electricity_kwh"], ascending=[False, False])
+    anomalies = ranked_pool.drop_duplicates("equipment_id", keep="first").head(10)
 
     drafts: List[Dict] = []
     for idx, row in anomalies.iterrows():

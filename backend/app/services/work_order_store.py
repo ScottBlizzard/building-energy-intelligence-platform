@@ -50,6 +50,15 @@ class WorkerBusyError(Exception):
     """Raised when assigning a new active order to an already-busy worker."""
 
 
+class EquipmentAlreadyHandledError(Exception):
+    """Raised when创建/派单 targets设备 that is already being handled or已修复。
+
+    设备是“修复”的最小单元：一台设备同一时刻只应存在一张未关闭工单；一旦其维修
+    工单被复核关闭（触发因果干预，整台设备从修复日起恢复正常），就不应再对它的其它
+    历史异常重复建单/派单。
+    """
+
+
 def _active_order_for_worker(
     orders: List[Dict],
     assignee_id: str,
@@ -222,6 +231,90 @@ def _open_status(status: str) -> bool:
     return _canonical_status(status) not in {"closed", "ignored"}
 
 
+def _open_order_for_equipment(
+    orders: List[Dict],
+    equipment_id: str,
+    *,
+    exclude_work_order_id: Optional[str] = None,
+    exclude_record_id: Optional[str] = None,
+) -> Optional[Dict]:
+    """Return an existing *open* work order for the same physical equipment.
+
+    设备级去重的核心：同一台设备同一时刻只允许一张未关闭工单。创建/派单时若已存在
+    （针对其它异常读数的）未关闭工单，应复用/拒绝，而不是再开一张。
+    """
+    if not equipment_id:
+        return None
+    for order in orders:
+        if str(order.get("equipment_id") or "") != str(equipment_id):
+            continue
+        if not _open_status(order.get("status", "")):
+            continue
+        if exclude_work_order_id and order.get("work_order_id") == exclude_work_order_id:
+            continue
+        if exclude_record_id and order.get("source_record_id") == exclude_record_id:
+            continue
+        return order
+    return None
+
+
+def _equipment_repaired_from(equipment_id: str) -> Optional[str]:
+    """若该设备已登记维修干预（已修复），返回其修复生效日期，否则 None。
+
+    已修复设备从修复日起在“未来”不再异常，因此不应再对它派发新工单。
+    """
+    if not equipment_id:
+        return None
+    for item in simulation_service.get_interventions():
+        if str(item.get("equipment_id") or "") == str(equipment_id):
+            return item.get("from_date")
+    return None
+
+
+def _close_sibling_orders_for_equipment(
+    orders: List[Dict],
+    equipment_id: str,
+    *,
+    keep_work_order_id: str,
+    operator_id: str = "admin",
+) -> int:
+    """关闭同一台设备的其它未关闭工单（在 ``orders`` 上原地修改）。
+
+    设备一旦修复，针对它其它异常读数的待确认/已派/处理中/待复核工单都失去意义，
+    统一标记为已关闭并写入时间线，返回联动关闭的数量。
+    """
+    if not equipment_id:
+        return 0
+    closed = 0
+    for sibling in orders:
+        if sibling.get("work_order_id") == keep_work_order_id:
+            continue
+        if str(sibling.get("equipment_id") or "") != str(equipment_id):
+            continue
+        old_status = _canonical_status(sibling.get("status"))
+        if old_status in {"closed", "ignored"}:
+            continue
+        sibling["status"] = "closed"
+        sibling["status_label"] = _status_label("closed")
+        sibling["verification_status"] = "随同设备修复关闭"
+        sibling["closed_at"] = sibling.get("closed_at") or _now()
+        sibling["updated_at"] = _now()
+        sibling.setdefault("timeline", []).append(
+            _timeline_event(
+                action="auto_close_sibling",
+                from_status=old_status,
+                to_status="closed",
+                operator_id=operator_id,
+                note=(
+                    f"设备 {equipment_id} 已随工单 {keep_work_order_id} 修复，"
+                    f"本工单（同设备其它异常）一并归档关闭。"
+                ),
+            )
+        )
+        closed += 1
+    return closed
+
+
 def list_work_orders(
     *,
     assignee_id: Optional[str] = None,
@@ -254,6 +347,16 @@ def create_work_order(payload: Dict) -> Dict:
                 item["status_label"] = _status_label(item["status"])
                 _write_orders(orders)
                 return _normalize_order(item)
+
+    # 设备级去重（兜底）：异常派生的工单，若该设备已有“另一条异常”的未关闭工单，
+    # 直接复用既有工单而非再开一张，保证“一台设备同一时刻只有一张活动工单”。
+    equipment_id = str(payload.get("equipment_id") or "")
+    if source_record_id and equipment_id:
+        existing = _open_order_for_equipment(
+            orders, equipment_id, exclude_record_id=source_record_id
+        )
+        if existing:
+            return _normalize_order(existing)
 
     created_at = _now()
     status = _canonical_status(payload.get("status"), default_status)
@@ -472,6 +575,29 @@ def seed_reference_orders() -> int:
 
 
 def create_work_order_from_anomaly(payload: Dict, operator_id: str = "admin") -> Dict:
+    equipment_id = str(payload.get("equipment_id") or "")
+    source_record_id = payload.get("source_record_id")
+    orders = _read_orders()
+
+    # 设备级去重（核心修复）：修复以“设备”为单位。
+    # 1) 该设备若已被维修干预（已修复），其未来不再异常，禁止再对历史异常重复派单。
+    repaired_from = _equipment_repaired_from(equipment_id)
+    if repaired_from:
+        raise EquipmentAlreadyHandledError(
+            f"设备 {equipment_id} 已于 {repaired_from} 完成维修并恢复正常，"
+            f"无需再针对其历史异常重复派单。"
+        )
+    # 2) 该设备若已有未关闭工单（即便对应的是另一条异常读数），同样不允许再开第二张。
+    existing = _open_order_for_equipment(
+        orders, equipment_id, exclude_record_id=source_record_id
+    )
+    if existing:
+        raise EquipmentAlreadyHandledError(
+            f"设备 {equipment_id} 已有未关闭工单 {existing.get('work_order_id')}"
+            f"（状态：{_status_label(_canonical_status(existing.get('status')))}），"
+            f"请先处理该工单，勿对同一设备重复派单。"
+        )
+
     assignee = get_user(payload.get("assignee_id")) if payload.get("assignee_id") else None
     if not assignee:
         assignee = resolve_worker_for_equipment(
@@ -708,6 +834,15 @@ def review_work_order(
         equipment_id = item.get("equipment_id")
         if equipment_id:
             simulation_service.register_intervention(equipment_id)
+            # 设备级联动：整台设备已修复，其它“同设备”未关闭工单（对应该设备的其它
+            # 异常读数）应一并归档关闭——修一台设备 = 解决它当前的全部异常，而不是
+            # 只消掉被复核的那一条。
+            _close_sibling_orders_for_equipment(
+                orders,
+                equipment_id,
+                keep_work_order_id=work_order_id,
+                operator_id=operator_id,
+            )
     item.setdefault("timeline", []).append(
         _timeline_event(
             action="review_approve" if approved else "review_reject",
@@ -789,11 +924,24 @@ def create_pending_confirm_drafts(anomaly_payloads: List[Dict], operator_id: str
         for item in orders
         if item.get("source_record_id") and _open_status(item.get("status", ""))
     }
+    # 设备级去重：已有未关闭工单的设备、已修复的设备，都不再为其异常生成新工单；
+    # 同一批草稿里同一台设备也只取第一条（最高风险），避免一台设备占多个名额。
+    handled_equipment = {
+        str(item.get("equipment_id") or "")
+        for item in orders
+        if item.get("equipment_id") and _open_status(item.get("status", ""))
+    }
     created = []
     skipped = 0
     for anomaly in anomaly_payloads:
         record_id = anomaly.get("source_record_id")
+        equipment_id = str(anomaly.get("equipment_id") or "")
         if record_id and record_id in existing_ids:
+            skipped += 1
+            continue
+        if equipment_id and (
+            equipment_id in handled_equipment or _equipment_repaired_from(equipment_id)
+        ):
             skipped += 1
             continue
         payload = {
@@ -806,10 +954,12 @@ def create_pending_confirm_drafts(anomaly_payloads: List[Dict], operator_id: str
         created.append(order)
         if record_id:
             existing_ids.add(record_id)
+        if equipment_id:
+            handled_equipment.add(equipment_id)
 
     return {
         "created": created,
         "created_count": len(created),
         "skipped_count": skipped,
-        "message": f"已生成 {len(created)} 个待确认工单，跳过 {skipped} 个已有工单的异常。",
+        "message": f"已生成 {len(created)} 个待确认工单，跳过 {skipped} 个（同设备已有工单/已修复/重复）。",
     }

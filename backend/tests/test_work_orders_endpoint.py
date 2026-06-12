@@ -147,3 +147,81 @@ def test_busy_worker_cannot_take_second_active_order(tmp_path, monkeypatch):
     third = client.post("/api/v1/work-orders", json=_ahu_payload("R-BUSY-3", "AHU-C-4F-03"))
     assert third.status_code == 200
     assert third.json()["status"] == "assigned"
+
+
+def test_same_equipment_cannot_be_dispatched_twice(tmp_path, monkeypatch):
+    """设备级去重：同一台设备已有未关闭工单时，针对它其它异常再派单应被拒绝。"""
+    monkeypatch.setenv("WORK_ORDER_FILE", str(tmp_path / "work_orders.json"))
+    get_settings.cache_clear()
+
+    first = client.post("/api/v1/work-orders", json=_ahu_payload("R-EQ-1", "AHU-C-4F-09"))
+    assert first.status_code == 200
+
+    # 同一设备、另一条异常读数 -> 409，且提示是“同设备已有未关闭工单”而非工人忙碌。
+    second = client.post("/api/v1/work-orders", json=_ahu_payload("R-EQ-2", "AHU-C-4F-09"))
+    assert second.status_code == 409
+    assert "已有未关闭工单" in second.json()["detail"]
+
+
+def test_repaired_equipment_blocks_new_order_and_closes_siblings(tmp_path, monkeypatch):
+    """关单（修复整台设备）后：不能再对该设备派新单；同设备其它未关闭工单联动关闭。"""
+    monkeypatch.setenv("WORK_ORDER_FILE", str(tmp_path / "work_orders.json"))
+    get_settings.cache_clear()
+
+    from app.services import work_order_store as store
+
+    equipment_id = "FCU-D-3F-06"
+    # 直接在存储层埋入同一设备的两张未关闭工单（模拟历史/导入数据），验证联动关闭。
+    store._write_orders([
+        {
+            "work_order_id": "WO-MAIN",
+            "source_record_id": "R-MAIN",
+            "equipment_id": equipment_id,
+            "equipment_type": "风机盘管",
+            "building_id": "BLD-D",
+            "status": "pending_review",
+            "assignee_id": "worker_fcu",
+            "priority": "高",
+        },
+        {
+            "work_order_id": "WO-SIBLING",
+            "source_record_id": "R-SIB",
+            "equipment_id": equipment_id,
+            "equipment_type": "风机盘管",
+            "building_id": "BLD-D",
+            "status": "pending_confirm",
+            "priority": "中",
+        },
+    ])
+
+    reviewed = client.patch(
+        "/api/v1/work-orders/WO-MAIN/review",
+        json={"operator_id": "admin", "approved": True, "review_note": "修复完成"},
+    )
+    assert reviewed.status_code == 200
+    assert reviewed.json()["status"] == "closed"
+
+    # 同设备的其它未关闭工单被联动关闭。
+    sibling = next(o for o in store.list_work_orders() if o["work_order_id"] == "WO-SIBLING")
+    assert sibling["status"] == "closed"
+    assert sibling["verification_status"] == "随同设备修复关闭"
+
+    # 设备已修复，再对它派新单 -> 409，提示已完成维修。
+    blocked = client.post("/api/v1/work-orders", json={
+        "source_record_id": "R-AFTER",
+        "priority": "高",
+        "building_id": "BLD-D",
+        "building_name": "实训楼D",
+        "floor_label": "3F",
+        "zone_name": "实训区",
+        "equipment_id": equipment_id,
+        "equipment_type": "风机盘管",
+        "timestamp": "2026-05-02 10:00:00",
+        "anomaly_reason": "电耗高于同时段基线",
+        "possible_cause": "末端阀门卡滞",
+        "recommended_action": "现场复位末端阀门",
+        "owner_role": "空调系统运维员",
+        "assignee_id": "worker_fcu",
+    })
+    assert blocked.status_code == 409
+    assert "完成维修" in blocked.json()["detail"]

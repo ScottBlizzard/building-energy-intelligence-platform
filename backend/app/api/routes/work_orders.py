@@ -13,6 +13,7 @@ from app.schemas.work_order import (
 )
 from app.services.permission_service import PermissionDenied, require_admin_operator, require_worker_operator
 from app.services.work_order_store import (
+    EquipmentAlreadyHandledError,
     WorkerBusyError,
     accept_work_order,
     assign_work_order,
@@ -53,7 +54,7 @@ def post_work_order(payload: WorkOrderCreate):
     if data.get("assignee_id"):
         try:
             return create_work_order_from_anomaly(data, operator_id=data.get("created_by") or "admin")
-        except WorkerBusyError as exc:
+        except (WorkerBusyError, EquipmentAlreadyHandledError) as exc:
             raise HTTPException(status_code=409, detail=str(exc))
     return create_work_order(data)
 

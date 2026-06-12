@@ -166,11 +166,24 @@ def rank_open_work_orders(limit: int = 10) -> List[Dict]:
     # collapses the panel down to that single order.
     open_orders = _open_orders()
     open_equipment = {str(item.get("equipment_id") or "") for item in open_orders}
-    candidates = [
-        candidate
-        for candidate in _anomaly_candidate_orders(limit=max(20, int(limit) * 3))
-        if str(candidate.get("equipment_id") or "") not in open_equipment
-    ]
+    # 已修复设备（已登记维修干预）不再作为派单候选——整台设备已恢复，其历史异常
+    # 不应再被派工。同时同一台设备在候选里只保留一条（最高优先级那条），避免一台
+    # 设备占用多个派单名额。
+    repaired_equipment = {
+        str(item.get("equipment_id") or "")
+        for item in simulation_service.get_interventions()
+    }
+    candidates = []
+    seen_candidate_equipment = set()
+    for candidate in _anomaly_candidate_orders(limit=max(20, int(limit) * 3)):
+        equipment_id = str(candidate.get("equipment_id") or "")
+        if equipment_id in open_equipment or equipment_id in repaired_equipment:
+            continue
+        if equipment_id and equipment_id in seen_candidate_equipment:
+            continue
+        candidates.append(candidate)
+        if equipment_id:
+            seen_candidate_equipment.add(equipment_id)
     orders = list(open_orders) + candidates
     if not orders:
         return []
