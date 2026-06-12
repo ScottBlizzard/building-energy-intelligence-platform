@@ -148,6 +148,16 @@ def build_counterfactual_scenarios(
         "carbon_kg": round(na_kwh * _CARBON_KG_PER_KWH, 2),
         "anomalies": int(no_action["total_anomaly_count"] - immediate["total_anomaly_count"]),
     }
+    # 当未来窗口内既无超耗损失、又无新增异常，三种处置在经济上没有差异——
+    # 这属于状态/能效类告警，应明确告知“无可量化差异、建议巡检”，而不是
+    # 展示三张一模一样的“0 元/0 碳/0 异常”卡片让人误以为出错。
+    no_economic_difference = (
+        all(item["total_loss_yuan"] <= 0 for item in scenarios)
+        and all(item["total_anomaly_count"] <= 0 for item in scenarios)
+        and abs(saved_vs_delay["kwh"]) < 1
+        and abs(na_kwh) < 1
+    )
+
     return {
         "equipment_id": equipment_id,
         "building_name": str(subset["building_name"].iloc[0]),
@@ -155,6 +165,7 @@ def build_counterfactual_scenarios(
         "start_date": start_ts.strftime("%Y-%m-%d"),
         "horizon_days": horizon,
         "delay_days": delay,
+        "no_economic_difference": no_economic_difference,
         "scenarios": scenarios,
         "savings_vs_delay": saved_vs_delay,
         "savings_vs_no_action": saved_vs_no_action,

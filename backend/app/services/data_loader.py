@@ -29,13 +29,24 @@ REQUIRED_COLUMNS = {
 }
 
 
-@lru_cache(maxsize=1)
-def read_dataset() -> pd.DataFrame:
+def _load_raw_frame() -> pd.DataFrame:
+    """读取原始能耗数据：优先数据库 energy_readings 表，否则回退 CSV。"""
+    from app.db import repository as db_repo
+
+    if db_repo.is_enabled():
+        frame = db_repo.read_energy_dataframe()
+        if frame is not None:
+            return frame
+
     settings = get_settings()
     if not settings.data_file.exists():
         raise FileNotFoundError("Data file not found: {0}".format(settings.data_file))
+    return pd.read_csv(settings.data_file)
 
-    frame = pd.read_csv(settings.data_file)
+
+@lru_cache(maxsize=1)
+def read_dataset() -> pd.DataFrame:
+    frame = _load_raw_frame()
     missing_columns = REQUIRED_COLUMNS.difference(frame.columns)
     if missing_columns:
         raise ValueError(

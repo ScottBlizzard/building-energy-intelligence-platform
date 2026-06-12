@@ -71,6 +71,8 @@ class WorkOrderSubmit(BaseModel):
     safety_note: Optional[str] = ""
     attachment_name: Optional[str] = ""
     attachment_note: Optional[str] = ""
+    # 现场照片（前端压缩后的 base64 data URL，便于管理员直接查看）。
+    attachment_data: Optional[str] = ""
 
 
 class WorkOrderReview(BaseModel):

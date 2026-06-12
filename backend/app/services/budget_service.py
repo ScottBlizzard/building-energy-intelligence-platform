@@ -49,6 +49,11 @@ def clear_budgets() -> int:
 
 
 def _read_budgets() -> List[Dict]:
+    from app.db import repository as db_repo
+
+    if db_repo.is_enabled():
+        return db_repo.read_budgets()
+
     path = _budget_path()
     if not path.exists():
         return []
@@ -60,6 +65,12 @@ def _read_budgets() -> List[Dict]:
 
 
 def _write_budgets(items: List[Dict]) -> None:
+    from app.db import repository as db_repo
+
+    if db_repo.is_enabled():
+        db_repo.write_budgets(items)
+        return
+
     path = _budget_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(".tmp")
@@ -324,6 +335,13 @@ def build_budget_analysis(year: int, month: int) -> Dict:
 
 
 def build_budget_kpi(building_id: str, year: int) -> Dict:
+    # 年度考核需要看到“已结算月份”的完整明细。预算是按月惰性生成的，若只打开过 5 月，
+    # 1-4 月没有预算记录就会缺席。这里在出考核卡前，先为该年所有“非未来”月份补齐预算，
+    # 让进入页面即可看到前几个月的结算，而无需手动切月再硬刷新。
+    for month in range(1, 13):
+        if _period_status(year, month) != "future":
+            auto_generate_budgets(year, month)
+
     frame = _add_operational_dimensions(_operational_frame())
     budgets = _read_budgets()
     building_budgets = [b for b in budgets if b["building_id"] == building_id and b["year"] == year]
@@ -344,8 +362,10 @@ def build_budget_kpi(building_id: str, year: int) -> Dict:
         actual = float(month_frame["electricity_kwh"].sum()) if not month_frame.empty else 0.0
         budget_kwh = float(budget_item["budget_kwh"])
         exec_rate = _safe_divide(actual, budget_kwh)
-        observed_days = int(month_frame["timestamp"].dt.normalize().nunique()) if not month_frame.empty else 0
-        projected_exec_rate = _safe_divide(_safe_divide(actual, max(observed_days, 1)) * 30, budget_kwh) if observed_days else exec_rate
+        # 这些月份均已结算（in-progress / future 已在上面被过滤），其“月末执行率”就是
+        # 实际执行率本身，不再做 30 天归一——否则 31 天月份被低估、28 天月份被高估，
+        # 会出现“实际 102.8% 超预算、归一后 99.5% 评分却给满分”的口径矛盾。
+        projected_exec_rate = exec_rate
         cop_pass_rate = (
             _safe_divide(int((month_frame["average_cop"] >= 2.4).sum()), len(month_frame)) * 100
             if not month_frame.empty and "average_cop" in month_frame.columns
@@ -354,11 +374,13 @@ def build_budget_kpi(building_id: str, year: int) -> Dict:
         total_budget += budget_kwh
         total_actual += actual
 
+        # 评分口径（满分 100，扣分项可解释）：
+        #   预算控制（主项，权重 40）：实际执行率每超目标线 1% 扣 4 分，超 10% 即扣满 40；
+        #   能效 COP 达标（权重 15）、异常高发（权重 15）、异常响应及时率（权重 10）。
+        # 这样“整月超预算”不会再拿到 A，而处置异常/改造把实际压回目标线内才能保住高分。
         score = 100.0
-        if projected_exec_rate > 1.0:
-            score -= min(30, (projected_exec_rate - 1.0) * 100)
-        if projected_exec_rate < 0.5:
-            score -= 5
+        if exec_rate > 1.0:
+            score -= min(40, (exec_rate - 1.0) * 400)
 
         anomaly_count = int(month_frame["is_anomaly"].sum()) if not month_frame.empty and "is_anomaly" in month_frame.columns else 0
         response_metrics = _work_order_response_metrics(building_id, year, month)

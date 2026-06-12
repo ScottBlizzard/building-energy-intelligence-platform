@@ -23,6 +23,9 @@ class Settings:
         self.work_order_file = self._resolve_path(
             os.getenv("WORK_ORDER_FILE", "data/runtime/work_orders.json")
         )
+        # 数据库：配置了 DATABASE_URL（如 mysql+pymysql://user:pwd@host:3306/db）即启用
+        # MySQL 持久化；留空则回退到 JSON/CSV 文件存储（保持离线运行与测试不受影响）。
+        self.database_url = os.getenv("DATABASE_URL", "").strip()
         self.allowed_origins = [
             origin.strip()
             for origin in os.getenv("ALLOWED_ORIGINS", "*").split(",")

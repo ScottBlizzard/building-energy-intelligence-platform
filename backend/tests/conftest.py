@@ -29,6 +29,9 @@ def isolate_runtime_state(tmp_path, monkeypatch):
     directory. A developer may have the time machine active while running tests,
     so point every test at a temporary store and reset the clock there.
     """
+    # 测试始终走文件隔离存储，与本地 .env 是否配置了 MySQL 无关，
+    # 避免测试污染真实数据库（或被其残留状态干扰）。
+    monkeypatch.setenv("DATABASE_URL", "")
     monkeypatch.setenv("WORK_ORDER_FILE", str(tmp_path / "work_orders.json"))
     monkeypatch.setenv("BUDGET_FILE", str(tmp_path / "budgets.json"))
 

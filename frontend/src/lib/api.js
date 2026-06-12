@@ -34,7 +34,17 @@ async function request(path, options = {}, params = {}) {
   });
 
   if (!response.ok) {
-    throw new Error(`Request failed: ${response.status}`);
+    let detail = "";
+    try {
+      const body = await response.json();
+      detail = body && body.detail ? body.detail : "";
+    } catch (_) {
+      detail = "";
+    }
+    const error = new Error(detail || `Request failed: ${response.status}`);
+    error.status = response.status;
+    error.detail = detail;
+    throw error;
   }
 
   return response.json();

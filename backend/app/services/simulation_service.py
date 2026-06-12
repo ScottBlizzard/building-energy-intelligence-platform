@@ -51,14 +51,7 @@ def _empty_state() -> Dict:
     return {"current_date": None, "start_date": None, "interventions": []}
 
 
-def _read_state() -> Dict:
-    path = _state_path()
-    if not path.exists():
-        return _empty_state()
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return _empty_state()
+def _normalize_state(payload: Dict) -> Dict:
     if not isinstance(payload, dict):
         return _empty_state()
     payload.setdefault("current_date", None)
@@ -67,7 +60,30 @@ def _read_state() -> Dict:
     return payload
 
 
+def _read_state() -> Dict:
+    from app.db import repository as db_repo
+
+    if db_repo.is_enabled():
+        payload = db_repo.read_sim_state()
+        return _normalize_state(payload) if payload is not None else _empty_state()
+
+    path = _state_path()
+    if not path.exists():
+        return _empty_state()
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return _empty_state()
+    return _normalize_state(payload)
+
+
 def _write_state(state: Dict) -> None:
+    from app.db import repository as db_repo
+
+    if db_repo.is_enabled():
+        db_repo.write_sim_state(state)
+        return
+
     path = _state_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_suffix(".tmp")

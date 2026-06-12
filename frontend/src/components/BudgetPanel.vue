@@ -122,6 +122,19 @@
       </div>
 
       <div v-if="selectedKPI" class="kpi-detail">
+        <div v-if="analysis.buildings.length > 1" class="kpi-building-tabs">
+          <button
+            v-for="b in analysis.buildings"
+            :key="b.building_id"
+            type="button"
+            class="kpi-building-tab"
+            :class="{ 'kpi-building-tab--active': selectedKPI.building_id === b.building_id }"
+            :disabled="loading"
+            @click="loadKPI(b.building_id)"
+          >
+            {{ b.building_name }}
+          </button>
+        </div>
         <SectionCard eyebrow="KPI Scorecard" :title="`${selectedKPI.building_name} · ${selectedKPI.year} 年度考核`" :description="selectedKPI.settled_note || ''">
           <div class="kpi-header">
             <div class="kpi-grade" :class="`kpi-grade--${selectedKPI.grade}`">
@@ -523,6 +536,17 @@ onMounted(() => {
 }
 
 .kpi-detail { margin-top: 8px; }
+.kpi-building-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.kpi-building-tab {
+  padding: 7px 14px; border-radius: 999px; font: inherit; font-size: 13px; cursor: pointer;
+  border: 1px solid rgba(20,34,48,0.14); background: rgba(255,255,255,0.8); color: var(--ink-soft);
+  transition: all 0.15s;
+}
+.kpi-building-tab:hover { border-color: rgba(15,139,141,0.4); }
+.kpi-building-tab--active {
+  background: linear-gradient(135deg, #0f8b8d, #1ec5a7); color: #fff;
+  border-color: transparent; font-weight: 600;
+}
 .kpi-header { display: flex; gap: 24px; align-items: center; margin-bottom: 16px; }
 .kpi-grade {
   width: 72px; height: 72px; border-radius: 50%; display: flex;

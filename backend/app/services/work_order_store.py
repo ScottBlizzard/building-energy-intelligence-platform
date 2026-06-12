@@ -41,6 +41,41 @@ STATUS_ORDER = {
 
 PRIORITY_ORDER = {"高": 0, "中": 1, "低": 2}
 _CLOSED_STATUSES = {"closed", "ignored", "已关闭", "已完成", "已忽略"}
+# 工人“占用”状态：手上有已派/处理中工单即视为忙碌、被锁定，不能再接第二单。
+# 提交复核(pending_review)后视为完工、转回空闲，可承接下一单。
+_ACTIVE_STATUSES = {"assigned", "in_progress"}
+
+
+class WorkerBusyError(Exception):
+    """Raised when assigning a new active order to an already-busy worker."""
+
+
+def _active_order_for_worker(
+    orders: List[Dict],
+    assignee_id: str,
+    *,
+    exclude_work_order_id: Optional[str] = None,
+    exclude_record_id: Optional[str] = None,
+) -> Optional[Dict]:
+    """Return the worker's current active (assigned/in_progress) order, if any.
+
+    Used to enforce the busy-lock: a worker may only hold one active order at a
+    time. The order currently being created/assigned is excluded so re-saving
+    the same order is not treated as a conflict.
+    """
+    if not assignee_id:
+        return None
+    for order in orders:
+        if order.get("assignee_id") != assignee_id:
+            continue
+        if _canonical_status(order.get("status")) not in _ACTIVE_STATUSES:
+            continue
+        if exclude_work_order_id and order.get("work_order_id") == exclude_work_order_id:
+            continue
+        if exclude_record_id and order.get("source_record_id") == exclude_record_id:
+            continue
+        return order
+    return None
 
 # Estimated post-repair recovery factors. There is no measured "after" reading in
 # the sample dataset, so these are used to project an estimated improvement from the
@@ -65,6 +100,11 @@ def _now_dt() -> datetime:
 
 
 def _read_orders() -> List[Dict]:
+    from app.db import repository as db_repo
+
+    if db_repo.is_enabled():
+        return db_repo.read_work_orders()
+
     path = _store_path()
     if not path.exists():
         return []
@@ -78,6 +118,12 @@ def _read_orders() -> List[Dict]:
 
 
 def _write_orders(items: List[Dict]) -> None:
+    from app.db import repository as db_repo
+
+    if db_repo.is_enabled():
+        db_repo.write_work_orders(items)
+        return
+
     path = _store_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     temp_path = path.with_suffix(".tmp")
@@ -143,6 +189,7 @@ def _normalize_order(item: Dict) -> Dict:
     normalized["review_note"] = normalized.get("review_note") or ""
     normalized["attachment_name"] = normalized.get("attachment_name") or ""
     normalized["attachment_note"] = normalized.get("attachment_note") or ""
+    normalized["attachment_data"] = normalized.get("attachment_data") or ""
     normalized["recovery_confirmed"] = bool(normalized.get("recovery_confirmed", False))
     normalized["before_kwh"] = normalized.get("before_kwh")
     normalized["before_cop"] = normalized.get("before_cop")
@@ -433,6 +480,18 @@ def create_work_order_from_anomaly(payload: Dict, operator_id: str = "admin") ->
         payload["assignee_id"] = assignee["user_id"]
         payload["assignee_name"] = assignee["display_name"]
 
+    # 忙碌锁定：该对口工人若已有处理中的工单，则不能再派第二单。
+    busy = _active_order_for_worker(
+        _read_orders(),
+        payload.get("assignee_id", ""),
+        exclude_record_id=payload.get("source_record_id"),
+    )
+    if busy:
+        raise WorkerBusyError(
+            f"{assignee['display_name']}当前正在处理工单 {busy.get('work_order_id')}"
+            f"（{busy.get('equipment_id')}），完工后才能再派单。"
+        )
+
     payload["created_by"] = operator_id
     payload["status"] = "assigned"
     payload["note"] = payload.get("note") or f"管理员已派单给{payload['assignee_name']}"
@@ -501,6 +560,16 @@ def assign_work_order(work_order_id: str, assignee_id: str, operator_id: str = "
     if not item or not assignee or assignee["role"] != "worker":
         return None
 
+    # 忙碌锁定：目标工人若已有处理中的其他工单，则不能再派给他。
+    busy = _active_order_for_worker(
+        orders, assignee["user_id"], exclude_work_order_id=work_order_id
+    )
+    if busy:
+        raise WorkerBusyError(
+            f"{assignee['display_name']}当前正在处理工单 {busy.get('work_order_id')}"
+            f"（{busy.get('equipment_id')}），完工后才能再派单。"
+        )
+
     old_status = _canonical_status(item.get("status"))
     item["status"] = "assigned"
     item["status_label"] = _status_label("assigned")
@@ -558,6 +627,7 @@ def submit_work_order(
     safety_note: str = "",
     attachment_name: str = "",
     attachment_note: str = "",
+    attachment_data: str = "",
 ) -> Optional[Dict]:
     orders = _read_orders()
     item = _find_order(orders, work_order_id)
@@ -577,6 +647,8 @@ def submit_work_order(
     item["safety_note"] = safety_note
     item["attachment_name"] = attachment_name
     item["attachment_note"] = attachment_note
+    if attachment_data:
+        item["attachment_data"] = attachment_data
     # ---- estimated before / after comparison ----
     # No post-repair measurement exists in the dataset, so the "after" values are
     # projected estimates derived from the captured baseline (real "before") using

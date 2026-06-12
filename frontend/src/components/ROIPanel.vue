@@ -152,7 +152,12 @@
           </div>
         </SectionCard>
 
-        <div v-if="roiResult" class="roi-result-grid">
+        <div v-if="roiResult" class="roi-result-summary">
+          <div class="roi-result-summary-head">
+            <span>投资评估结果</span>
+            <strong>{{ roiResult.project_name }}</strong>
+          </div>
+          <div class="roi-result-grid">
           <div class="roi-result-card" :class="`roi-result--${roiResult.assessment === '强烈推荐' || roiResult.assessment === '推荐' ? 'good' : 'warn'}`">
             <span>投资评估</span>
             <strong>{{ roiResult.assessment }}</strong>
@@ -181,6 +186,7 @@
             <span>年减排 CO₂</span>
             <strong>{{ formatNumber(roiResult.carbon_reduction_kg_per_year) }} kg</strong>
           </div>
+          </div>
         </div>
 
         <div v-if="roiResult" class="roi-detail-grid">
@@ -205,14 +211,19 @@
           </div>
           <div class="roi-detail-card">
             <strong>现金流分析</strong>
+            <p class="cashflow-axis-note">柱高 = 累计净现金流（含电价递增、未折现）；红色为回本前累计为负，绿色为转正后净收益。</p>
             <div class="cashflow-chart">
-              <div v-for="year in roiResult.project_lifespan_years" :key="year" class="cashflow-bar-wrap">
+              <div v-for="point in cashflowSeries" :key="point.year" class="cashflow-bar-wrap">
+                <span class="cashflow-value" :class="point.cumulative_yuan >= 0 ? 'text-green' : 'text-red'">
+                  {{ formatCompact(point.cumulative_yuan) }}
+                </span>
                 <div
                   class="cashflow-bar"
-                  :class="year <= roiResult.payback_years ? 'cashflow--negative' : 'cashflow--positive'"
-                  :style="{ height: `${Math.max(8, 120 / roiResult.project_lifespan_years)}px` }"
+                  :class="point.cumulative_yuan >= 0 ? 'cashflow--positive' : 'cashflow--negative'"
+                  :style="{ height: `${cashflowBarHeight(point.cumulative_yuan)}px` }"
+                  :title="`第 ${point.year} 年：累计 ${formatNumber(point.cumulative_yuan)} 元`"
                 ></div>
-                <span>Y{{ year }}</span>
+                <span>Y{{ point.year }}</span>
               </div>
             </div>
             <p class="cashflow-note">
@@ -386,6 +397,40 @@ async function loadScenarioComparison(eq) {
   } catch {
     scenarioComparison.value = null;
   }
+}
+
+const cashflowSeries = computed(() => {
+  const series = roiResult.value?.cumulative_cashflows;
+  if (Array.isArray(series) && series.length) {
+    return series;
+  }
+  // 兜底：后端未提供时，用寿命/年节省在前端推算一条累计曲线（不含递增）。
+  const result = roiResult.value;
+  if (!result?.project_lifespan_years) return [];
+  const out = [];
+  let cumulative = -(result.investment_yuan || 0);
+  for (let year = 1; year <= result.project_lifespan_years; year += 1) {
+    cumulative += result.annual_saving_yuan || 0;
+    out.push({ year, cumulative_yuan: Math.round(cumulative) });
+  }
+  return out;
+});
+
+const cashflowMaxAbs = computed(() => {
+  const values = cashflowSeries.value.map((p) => Math.abs(p.cumulative_yuan || 0));
+  return Math.max(1, ...values);
+});
+
+function cashflowBarHeight(value) {
+  const ratio = Math.abs(value || 0) / cashflowMaxAbs.value;
+  return Math.round(Math.max(6, ratio * 96));
+}
+
+function formatCompact(val) {
+  const num = Number(val) || 0;
+  const abs = Math.abs(num);
+  if (abs >= 10000) return `${(num / 10000).toFixed(1)}万`;
+  return num.toLocaleString("zh-CN", { maximumFractionDigits: 0 });
 }
 
 const cashflowNote = computed(() => {
@@ -602,6 +647,17 @@ onMounted(() => {
 }
 .roi-custom-form strong { font-size: 16px; text-align: center; }
 
+.roi-result-summary {
+  border: 1px solid rgba(15,139,141,0.16);
+  background: linear-gradient(135deg, rgba(15,139,141,0.06), rgba(255,255,255,0.94));
+  border-radius: 16px;
+  padding: 16px;
+}
+.roi-result-summary-head { margin-bottom: 12px; }
+.roi-result-summary-head span {
+  color: #0f8b8d; font-size: 11px; font-weight: 700; text-transform: uppercase;
+}
+.roi-result-summary-head strong { display: block; font-size: 16px; margin-top: 3px; }
 .roi-result-grid {
   display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px;
 }
@@ -629,16 +685,18 @@ onMounted(() => {
 .roi-table td:first-child { color: var(--ink-soft); width: 40%; }
 .roi-table td:last-child { font-weight: 500; }
 
+.cashflow-axis-note { margin: 0 0 10px; font-size: 12px; color: var(--ink-soft); line-height: 1.5; }
 .cashflow-chart {
-  display: flex; gap: 6px; align-items: flex-end; height: 140px; padding: 10px 0;
+  display: flex; gap: 6px; align-items: flex-end; height: 150px; padding: 10px 0;
 }
-.cashflow-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.cashflow-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; }
 .cashflow-bar {
-  width: 100%; max-width: 36px; border-radius: 6px 6px 0 0; transition: height 0.3s;
+  width: 100%; max-width: 32px; border-radius: 6px 6px 0 0; transition: height 0.3s;
 }
-.cashflow--negative { background: linear-gradient(180deg, #e74c3c, #f39c12); }
-.cashflow--positive { background: linear-gradient(180deg, #22a06b, #2ecc71); }
-.cashflow-bar-wrap span { font-size: 10px; color: var(--ink-soft); }
+.cashflow--negative { background: linear-gradient(180deg, #f39c12, #e74c3c); }
+.cashflow--positive { background: linear-gradient(180deg, #2ecc71, #22a06b); }
+.cashflow-bar-wrap > span { font-size: 10px; color: var(--ink-soft); }
+.cashflow-value { font-size: 9px; font-weight: 600; }
 .cashflow-note { margin-top: 12px; font-size: 13px; color: var(--ink-soft); }
 
 .sensitivity-card {

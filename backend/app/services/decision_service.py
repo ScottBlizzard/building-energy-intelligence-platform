@@ -334,7 +334,7 @@ def recommend_dispatch_plan(worker_capacity: int = 3) -> Dict:
             )
         else:
             if worker_id in idle_ids:
-                defer_reason = f"{worker_name}本轮已分配 1 单，需等其完工后再派"
+                defer_reason = f"{worker_name}本轮建议名额已满（每人先派 1 单），同工种其余工单排队"
             else:
                 defer_reason = f"{worker_name}当前正在处理工单，需等其完工后再派"
             deferred.append({**item, "defer_reason": defer_reason})

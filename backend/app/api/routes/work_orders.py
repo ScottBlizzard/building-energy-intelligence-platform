@@ -13,6 +13,7 @@ from app.schemas.work_order import (
 )
 from app.services.permission_service import PermissionDenied, require_admin_operator, require_worker_operator
 from app.services.work_order_store import (
+    WorkerBusyError,
     accept_work_order,
     assign_work_order,
     create_work_order,
@@ -50,7 +51,10 @@ def post_work_order(payload: WorkOrderCreate):
     except PermissionDenied as exc:
         _raise_for_permission(exc)
     if data.get("assignee_id"):
-        return create_work_order_from_anomaly(data, operator_id=data.get("created_by") or "admin")
+        try:
+            return create_work_order_from_anomaly(data, operator_id=data.get("created_by") or "admin")
+        except WorkerBusyError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
     return create_work_order(data)
 
 
@@ -87,12 +91,15 @@ def patch_assign_work_order(work_order_id: str, payload: WorkOrderAssign):
         require_admin_operator(payload.operator_id, "派单")
     except PermissionDenied as exc:
         _raise_for_permission(exc)
-    updated = assign_work_order(
-        work_order_id,
-        assignee_id=payload.assignee_id,
-        operator_id=payload.operator_id,
-        note=payload.note or "",
-    )
+    try:
+        updated = assign_work_order(
+            work_order_id,
+            assignee_id=payload.assignee_id,
+            operator_id=payload.operator_id,
+            note=payload.note or "",
+        )
+    except WorkerBusyError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
     if not updated:
         raise HTTPException(status_code=404, detail="Work order or worker not found")
     return updated
@@ -130,6 +137,7 @@ def patch_submit_work_order(work_order_id: str, payload: WorkOrderSubmit):
         safety_note=payload.safety_note or "",
         attachment_name=payload.attachment_name or "",
         attachment_note=payload.attachment_note or "",
+        attachment_data=payload.attachment_data or "",
     )
     if not updated:
         raise HTTPException(status_code=409, detail="Work order cannot be submitted")

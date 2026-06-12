@@ -124,6 +124,26 @@ def _cashflows(annual_saving_year1: float, lifespan: int, escalation: float) -> 
     return [annual_saving_year1 * ((1 + escalation) ** (year - 1)) for year in range(1, lifespan + 1)]
 
 
+def _cumulative_cashflow_series(initial_investment: float, cashflows: List[float]) -> List[Dict]:
+    """累计（未折现）净现金流序列：Y0 起从 -投资 起步，逐年加回净节省。
+
+    用于前端现金流图：早期累计为负（回本前），跨过 0 后转正（净收益期），
+    每根柱子高度真实反映累计盈亏，而非等高占位。
+    """
+    series: List[Dict] = []
+    cumulative = -initial_investment
+    for year, cf in enumerate(cashflows, start=1):
+        cumulative += cf
+        series.append(
+            {
+                "year": year,
+                "net_cashflow_yuan": round(cf, 0),
+                "cumulative_yuan": round(cumulative, 0),
+            }
+        )
+    return series
+
+
 def _npv_from_cashflows(initial_investment: float, cashflows: List[float], discount_rate: float) -> float:
     total = -initial_investment
     for year, cf in enumerate(cashflows, start=1):
@@ -355,6 +375,7 @@ def analyze_roi_project(payload: Dict, include_sensitivity: bool = True) -> Dict
             "investment_basis": "—",
             "observed_days": stats.get("observed_days", 0),
             "annualization_factor": stats.get("annualization_factor", 0),
+            "cumulative_cashflows": [],
             "data_scope": "simulation_visible",
             "generated_at": simulation_service.now_str(),
             "sensitivity": [] if include_sensitivity else None,
@@ -422,6 +443,7 @@ def analyze_roi_project(payload: Dict, include_sensitivity: bool = True) -> Dict
         "investment_basis": investment_basis,
         "observed_days": stats.get("observed_days", 0),
         "annualization_factor": stats.get("annualization_factor", 0),
+        "cumulative_cashflows": _cumulative_cashflow_series(investment, cashflows),
         "data_scope": "simulation_visible",
         "generated_at": simulation_service.now_str(),
     }

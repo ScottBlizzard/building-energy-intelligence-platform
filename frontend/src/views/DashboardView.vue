@@ -520,10 +520,34 @@ const isAuthenticated = computed(() => Boolean(currentUser.value && authToken.va
 const isAdmin = computed(() => currentUser.value?.role === "admin");
 const isWorker = computed(() => currentUser.value?.role === "worker");
 const workerUsers = computed(() => demoUsers.value.filter((item) => item.role === "worker"));
+// 工人忙碌锁定：手上有“已派单/处理中”工单的工人，不可被再次选中派单。
+const busyWorkerIds = computed(() => {
+  const ids = new Set();
+  for (const order of enrichedWorkOrders.value) {
+    if (order.assignee_id && (order.status === "assigned" || order.status === "in_progress")) {
+      ids.add(order.assignee_id);
+    }
+  }
+  return ids;
+});
+const availableWorkerUsers = computed(() =>
+  workerUsers.value.filter((item) => !busyWorkerIds.value.has(item.user_id))
+);
+// 客户端按工种对口（与后端 resolve_worker_for_equipment 一致），用于派单默认值。
+function resolveWorkerIdForEquipment(equipmentType = "", equipmentId = "") {
+  const et = equipmentType || "";
+  if (et.includes("冷水") || et.includes("冷却")) return "worker_chiller";
+  if (et.includes("风机盘管")) return "worker_fcu";
+  if (et.includes("空气")) return "worker_ahu";
+  const text = `${equipmentId} ${equipmentType}`.toUpperCase();
+  if (text.includes("CH") || text.includes("CT")) return "worker_chiller";
+  if (text.includes("FCU")) return "worker_fcu";
+  return "worker_ahu";
+}
 const selectedAssignee = computed(
   () =>
-    workerUsers.value.find((item) => item.user_id === orderDraft.assigneeId) ||
-    workerUsers.value[0] ||
+    availableWorkerUsers.value.find((item) => item.user_id === orderDraft.assigneeId) ||
+    availableWorkerUsers.value[0] ||
     null
 );
 const analysisHealthState = computed(() => {
@@ -586,15 +610,26 @@ const sortedWorkOrders = computed(() => {
     return String(b.timestamp || "").localeCompare(String(a.timestamp || ""));
   });
 });
+// 工单中心按状态筛选（"all" = 全部）。让管理员不必滚动整张列表即可定位“待复核”等。
+const workOrderStatusFilter = ref("all");
+const filteredWorkOrders = computed(() => {
+  if (workOrderStatusFilter.value === "all") {
+    return sortedWorkOrders.value;
+  }
+  return sortedWorkOrders.value.filter((item) => item.status === workOrderStatusFilter.value);
+});
 const WORK_ORDER_PAGE_SIZE = 6;
 const visibleWorkOrderCount = ref(WORK_ORDER_PAGE_SIZE);
-const visibleWorkOrders = computed(() => sortedWorkOrders.value.slice(0, visibleWorkOrderCount.value));
-const hasMoreWorkOrders = computed(() => sortedWorkOrders.value.length > visibleWorkOrderCount.value);
+const visibleWorkOrders = computed(() => filteredWorkOrders.value.slice(0, visibleWorkOrderCount.value));
+const hasMoreWorkOrders = computed(() => filteredWorkOrders.value.length > visibleWorkOrderCount.value);
 function showMoreWorkOrders() {
   visibleWorkOrderCount.value += WORK_ORDER_PAGE_SIZE;
 }
+function setWorkOrderStatusFilter(key) {
+  workOrderStatusFilter.value = workOrderStatusFilter.value === key ? "all" : key;
+}
 watch(
-  () => sortedWorkOrders.value.length,
+  () => [filteredWorkOrders.value.length, workOrderStatusFilter.value],
   () => {
     visibleWorkOrderCount.value = WORK_ORDER_PAGE_SIZE;
   }
@@ -1311,7 +1346,13 @@ async function loadPersistentWorkOrders() {
       workOrderState.statusById[item.work_order_id] = normalizeOrderStatus(item.status || "pending_confirm");
       workOrderState.notesById[item.work_order_id] = item.note || "";
       if (!workOrderState.assignmentById[item.work_order_id]) {
-        workOrderState.assignmentById[item.work_order_id] = item.assignee_id || orderDraft.assigneeId;
+        // 默认按设备工种选对口工人；若对口工人正忙则退回到一名空闲工人，避免默认选到锁定项。
+        const recommended =
+          item.assignee_id || resolveWorkerIdForEquipment(item.equipment_type, item.equipment_id);
+        workOrderState.assignmentById[item.work_order_id] =
+          recommended && !busyWorkerIds.value.has(recommended)
+            ? recommended
+            : availableWorkerUsers.value[0]?.user_id || recommended;
       }
       ensureOrderDrafts(item);
     });
@@ -1522,13 +1563,25 @@ function ensureOrderDrafts(order) {
       parts_used: order.parts_used || "",
       safety_note: order.safety_note || "",
       attachment_name: order.attachment_name || "",
-      attachment_note: order.attachment_note || ""
+      attachment_note: order.attachment_note || "",
+      attachment_data: order.attachment_data || ""
     };
   }
   if (workOrderState.reviewNotes[id] === undefined) {
     workOrderState.reviewNotes[id] = order.review_note || "";
   }
 }
+
+// 任何时候工单列表变化，都先为每条工单补齐提交草稿。否则当某条工单切到「处理中」时，
+// 现场提交表单会直接读取 submitDrafts[id].actual_cause，若草稿尚未建立会在渲染期抛错、
+// 导致整个工单看板空白（必须硬刷新才恢复）——这正是“接单后工单忽然消失”的根因。
+watch(
+  () => workOrderState.generatedOrders.map((order) => order.work_order_id).join("|"),
+  () => {
+    workOrderState.generatedOrders.forEach((order) => ensureOrderDrafts(order));
+  },
+  { immediate: true }
+);
 
 async function refreshBusinessState({ includeAnalytics = false } = {}) {
   await Promise.allSettled([
@@ -1561,8 +1614,11 @@ function selectAnomalyForDispatch(item) {
     orderDraft.buildingId = match.building_id || "";
     orderDraft.floorLabel = "";
     orderDraft.anomalyKey = anomalyKey(match);
-    if (item.recommended_worker_id) {
+    // 仅当对口工人空闲时才自动选中他；否则退回到一名空闲工人，避免默认锁定项。
+    if (item.recommended_worker_id && !busyWorkerIds.value.has(item.recommended_worker_id)) {
       orderDraft.assigneeId = item.recommended_worker_id;
+    } else if (availableWorkerUsers.value[0]) {
+      orderDraft.assigneeId = availableWorkerUsers.value[0].user_id;
     }
   } else if (equipmentId) {
     loadCounterfactualForEquipment(equipmentId);
@@ -1626,7 +1682,7 @@ async function generateWorkOrder() {
     orderDraft.anomalyKey = "";
     await refreshBusinessState({ includeAnalytics: true });
   } catch (error) {
-    errors.orders = "生成工单失败，请确认后端工单接口可用。";
+    errors.orders = error?.detail || "生成工单失败，请确认后端工单接口可用。";
   } finally {
     loading.orders = false;
   }
@@ -1651,9 +1707,16 @@ async function saveWorkOrderNote(order) {
 }
 
 async function handleAssignWorkOrder(order) {
-  const assigneeId = workOrderState.assignmentById[order.work_order_id] || order.assignee_id || orderDraft.assigneeId;
+  let assigneeId = workOrderState.assignmentById[order.work_order_id] || order.assignee_id || orderDraft.assigneeId;
+  // 选中的工人若正忙（或为空），自动退回到一名空闲工人，避免派单给被锁定的工人。
+  if (!assigneeId || busyWorkerIds.value.has(assigneeId)) {
+    assigneeId = availableWorkerUsers.value[0]?.user_id || "";
+    if (assigneeId) {
+      workOrderState.assignmentById[order.work_order_id] = assigneeId;
+    }
+  }
   if (!assigneeId) {
-    errors.orders = "请选择工人后再派单。";
+    errors.orders = "当前 3 名工人都在处理工单，请等其中一人完工后再派单。";
     return;
   }
   loading.orders = true;
@@ -1667,7 +1730,7 @@ async function handleAssignWorkOrder(order) {
     upsertWorkOrder(updated);
     await refreshBusinessState();
   } catch (error) {
-    errors.orders = "派单失败，请检查后端工单状态。";
+    errors.orders = error?.detail || "派单失败，请检查后端工单状态。";
   } finally {
     loading.orders = false;
   }
@@ -1690,6 +1753,78 @@ async function handleAcceptWorkOrder(order) {
   }
 }
 
+// 读取并压缩现场照片为 base64 data URL（限制最长边，控制体积），便于随工单持久化、
+// 管理员直接查看，无需单独的文件服务器。
+function readImageAsDataUrl(file, maxDim = 1024, quality = 0.72) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > maxDim || height > maxDim) {
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext("2d").drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+async function handleAttachmentSelect(order, event) {
+  const file = event.target?.files?.[0];
+  if (!file) {
+    return;
+  }
+  const draft = workOrderState.submitDrafts[order.work_order_id];
+  if (!draft) {
+    return;
+  }
+  if (!file.type?.startsWith("image/")) {
+    errors.orders = "请选择图片文件（jpg / png 等）。";
+    return;
+  }
+  try {
+    draft.attachment_data = await readImageAsDataUrl(file);
+    draft.attachment_name = file.name;
+    errors.orders = "";
+  } catch {
+    errors.orders = "图片读取失败，请重试。";
+  }
+}
+
+function clearAttachment(order) {
+  const draft = workOrderState.submitDrafts[order.work_order_id];
+  if (draft) {
+    draft.attachment_data = "";
+    draft.attachment_name = "";
+  }
+}
+
+// 现场照片大图预览（点击缩略图 → 居中放大 + 关闭按钮 / 点击遮罩 / Esc 关闭）。
+const lightbox = reactive({ src: "", title: "" });
+function openLightbox(src, title = "") {
+  if (!src) {
+    return;
+  }
+  lightbox.src = src;
+  lightbox.title = title;
+}
+function closeLightbox() {
+  lightbox.src = "";
+  lightbox.title = "";
+}
+
 async function handleSubmitWorkOrder(order) {
   const draft = workOrderState.submitDrafts[order.work_order_id] || {};
   if (!draft.actual_cause?.trim() || !draft.resolution_note?.trim()) {
@@ -1708,7 +1843,8 @@ async function handleSubmitWorkOrder(order) {
       parts_used: draft.parts_used || "",
       safety_note: draft.safety_note || "",
       attachment_name: draft.attachment_name || "",
-      attachment_note: draft.attachment_note || ""
+      attachment_note: draft.attachment_note || "",
+      attachment_data: draft.attachment_data || ""
     });
     upsertWorkOrder(updated);
     await refreshBusinessState();
@@ -1815,6 +1951,27 @@ watch(
   }
 );
 
+// 工人忙/闲变化时，把停留在“锁定工人”上的待确认工单选择自动迁移到一名空闲工人，
+// 避免下拉显示的是被锁定（不可点）的工人。
+watch(
+  busyWorkerIds,
+  () => {
+    const fallback = availableWorkerUsers.value[0]?.user_id;
+    for (const order of enrichedWorkOrders.value) {
+      if (order.status !== "pending_confirm") {
+        continue;
+      }
+      const current = workOrderState.assignmentById[order.work_order_id];
+      if (!current || busyWorkerIds.value.has(current)) {
+        const preferred = resolveWorkerIdForEquipment(order.equipment_type, order.equipment_id);
+        workOrderState.assignmentById[order.work_order_id] =
+          preferred && !busyWorkerIds.value.has(preferred) ? preferred : fallback || current;
+      }
+    }
+  },
+  { flush: "post" }
+);
+
 watch(
   workOrderState,
   (value) => {
@@ -1825,7 +1982,16 @@ watch(
   { deep: true }
 );
 
+function handleGlobalKeydown(event) {
+  if (event.key === "Escape" && lightbox.src) {
+    closeLightbox();
+  }
+}
+
 onMounted(async () => {
+  if (typeof window !== "undefined") {
+    window.addEventListener("keydown", handleGlobalKeydown);
+  }
   await restoreSession();
 });
 </script>
@@ -1843,12 +2009,16 @@ onMounted(async () => {
             <span>admin / admin123</span>
           </button>
           <button type="button" @click="loginForm.username = 'worker_ahu'; loginForm.password = 'worker123'">
-            <strong>空调巡检员</strong>
+            <strong>空调机组巡检员</strong>
             <span>worker_ahu / worker123</span>
           </button>
           <button type="button" @click="loginForm.username = 'worker_chiller'; loginForm.password = 'worker123'">
-            <strong>制冷值班员</strong>
+            <strong>制冷机房值班员</strong>
             <span>worker_chiller / worker123</span>
+          </button>
+          <button type="button" @click="loginForm.username = 'worker_fcu'; loginForm.password = 'worker123'">
+            <strong>风机盘管巡检员</strong>
+            <span>worker_fcu / worker123</span>
           </button>
         </div>
       </div>
@@ -2166,22 +2336,6 @@ onMounted(async () => {
           <DataTable v-else :columns="recordColumns" :rows="records" empty-text="没有查到符合条件的记录" />
         </SectionCard>
 
-        <SectionCard eyebrow="Export" title="数据导出" description="支持将筛选后的数据导出为CSV格式文件">
-          <div class="export-info">
-            <div class="export-feature">
-              <h4>灵活导出</h4>
-              <p>根据筛选条件导出特定时间段和建筑的能耗数据</p>
-            </div>
-            <div class="export-feature">
-              <h4>标准格式</h4>
-              <p>导出文件采用标准CSV格式，兼容Excel等常用工具</p>
-            </div>
-            <div class="export-feature">
-              <h4>快速下载</h4>
-              <p>一键导出，文件自动生成并下载到本地</p>
-            </div>
-          </div>
-        </SectionCard>
       </div>
     </template>
 
@@ -2576,7 +2730,10 @@ onMounted(async () => {
                   接单并开始处理
                 </button>
 
-                <div v-if="order.status === 'in_progress'" class="worker-submit-grid">
+                <div
+                  v-if="order.status === 'in_progress' && workOrderState.submitDrafts[order.work_order_id]"
+                  class="worker-submit-grid"
+                >
                   <label>
                     <span>现场实际原因</span>
                     <textarea v-model="workOrderState.submitDrafts[order.work_order_id].actual_cause" rows="2" placeholder="例如：AHU 过滤网堵塞导致风量不足。" />
@@ -2598,9 +2755,26 @@ onMounted(async () => {
                     <span>现场已恢复正常</span>
                   </label>
                   <label>
-                    <span>现场附件（文件名）</span>
-                    <input v-model="workOrderState.submitDrafts[order.work_order_id].attachment_name" placeholder="例如：现场照片-20260610.jpg" />
+                    <span>现场照片</span>
+                    <input type="file" accept="image/*" @change="handleAttachmentSelect(order, $event)" />
                   </label>
+                  <div
+                    v-if="workOrderState.submitDrafts[order.work_order_id].attachment_data"
+                    class="attachment-upload-preview"
+                  >
+                    <button
+                      type="button"
+                      class="attachment-preview-btn"
+                      title="点击查看大图"
+                      @click="openLightbox(workOrderState.submitDrafts[order.work_order_id].attachment_data, workOrderState.submitDrafts[order.work_order_id].attachment_name)"
+                    >
+                      <img :src="workOrderState.submitDrafts[order.work_order_id].attachment_data" alt="现场照片预览" />
+                    </button>
+                    <div class="attachment-upload-meta">
+                      <span>{{ workOrderState.submitDrafts[order.work_order_id].attachment_name }}</span>
+                      <button type="button" class="link-button" @click="clearAttachment(order)">移除</button>
+                    </div>
+                  </div>
                   <label>
                     <span>附件备注</span>
                     <input v-model="workOrderState.submitDrafts[order.work_order_id].attachment_note" placeholder="例如：过滤网清洗前后对比照片" />
@@ -2645,10 +2819,19 @@ onMounted(async () => {
                 </div>
               </div>
               <!-- Attachment Info -->
-              <div v-if="order.attachment_name" class="attachment-info">
+              <div v-if="order.attachment_name || order.attachment_data" class="attachment-info">
                 <span>现场附件：</span>
-                <strong>{{ order.attachment_name }}</strong>
+                <strong>{{ order.attachment_name || "现场照片" }}</strong>
                 <span v-if="order.attachment_note"> · {{ order.attachment_note }}</span>
+                <button
+                  v-if="order.attachment_data"
+                  type="button"
+                  class="attachment-thumb-link"
+                  title="点击查看大图"
+                  @click="openLightbox(order.attachment_data, order.attachment_name || '现场照片')"
+                >
+                  <img :src="order.attachment_data" alt="现场照片" class="attachment-thumb" />
+                </button>
               </div>
 
               <ol v-if="order.timeline.length" class="timeline-list">
@@ -2722,14 +2905,19 @@ onMounted(async () => {
               <label class="field-label">
                 <span>分配工人</span>
                 <select v-model="orderDraft.assigneeId">
-                  <option v-for="worker in workerUsers" :key="worker.user_id" :value="worker.user_id">
-                    {{ worker.display_name }} · {{ worker.specialty }}
+                  <option
+                    v-for="worker in workerUsers"
+                    :key="worker.user_id"
+                    :value="worker.user_id"
+                    :disabled="busyWorkerIds.has(worker.user_id)"
+                  >
+                    {{ worker.display_name }} · {{ worker.specialty }}<template v-if="busyWorkerIds.has(worker.user_id)"> · 处理中（锁定）</template>
                   </option>
                 </select>
               </label>
 
-              <button class="primary-button" type="button" :disabled="!selectedOrderAnomaly || loading.orders" @click="generateWorkOrder">
-                生成并派单
+              <button class="primary-button" type="button" :disabled="!selectedOrderAnomaly || loading.orders || !availableWorkerUsers.length" @click="generateWorkOrder">
+                {{ availableWorkerUsers.length ? "生成并派单" : "工人全部处理中，暂无法派单" }}
               </button>
               <button class="secondary-button" type="button" :disabled="loading.orders" @click="handleAutoConfirmQueue" style="grid-column: 1 / -1; border-color: var(--accent-deep); color: var(--accent-deep);">
                 一键生成待确认工单队列（从所有异常自动创建待确认工单）
@@ -2851,7 +3039,7 @@ onMounted(async () => {
               description="生成或推进工单后，系统会按风险、损失、SLA 和碳排自动排序。"
             />
             <div v-if="decisionState.dispatchPlan?.deferred?.length" class="dispatch-deferred">
-              <span class="dispatch-deferred-title">因人力受限暂缓（等工人空闲后再派）</span>
+              <span class="dispatch-deferred-title">因人力受限建议暂缓（仅排序建议，尚未实际派单；等工人空闲后再派）</span>
               <ul>
                 <li v-for="item in decisionState.dispatchPlan.deferred" :key="item.work_order_id">
                   <strong>{{ item.building_name }} · {{ item.equipment_id }}</strong>
@@ -2875,6 +3063,14 @@ onMounted(async () => {
               <LoadingSpinner text="正在生成对照实验..." />
             </div>
             <StatusBanner v-else-if="decisionState.counterfactualError" :status="decisionState.counterfactualError" type="warning" />
+            <div v-else-if="decisionState.counterfactual?.no_economic_difference" class="scenario-noimpact">
+              <strong>三种处置无显著经济差异</strong>
+              <p>
+                该设备在未来 {{ decisionState.counterfactual.horizon_days }} 天内无超耗损失、无新增异常，
+                立即处理 / 延迟 {{ decisionState.counterfactual.delay_days }} 天 / 不处理的能耗、损失与碳排基本一致。
+              </p>
+              <p class="scenario-noimpact-hint">属状态/能效类告警，建议安排巡检确认，无需紧急派单抢修。</p>
+            </div>
             <div v-else-if="decisionState.counterfactual?.scenarios?.length" class="scenario-curve-grid">
               <article v-for="scenario in decisionState.counterfactual.scenarios" :key="scenario.key" class="scenario-curve-card">
                 <strong>{{ scenario.label }}</strong>
@@ -2897,10 +3093,26 @@ onMounted(async () => {
           </div>
 
           <div class="order-summary-grid order-summary-grid--wide">
-            <div v-for="status in orderStatusOptions" :key="status.key" class="order-summary-card">
+            <button
+              type="button"
+              class="order-summary-card order-summary-card--all"
+              :class="{ 'order-summary-card--active': workOrderStatusFilter === 'all' }"
+              @click="workOrderStatusFilter = 'all'"
+            >
+              <span>全部</span>
+              <strong>{{ roleScopedWorkOrders.length }}</strong>
+            </button>
+            <button
+              v-for="status in orderStatusOptions"
+              :key="status.key"
+              type="button"
+              class="order-summary-card"
+              :class="{ 'order-summary-card--active': workOrderStatusFilter === status.key }"
+              @click="setWorkOrderStatusFilter(status.key)"
+            >
               <span>{{ status.label }}</span>
               <strong>{{ orderStats[status.key] || 0 }}</strong>
-            </div>
+            </button>
           </div>
 
           <div v-if="loading.analytics || loading.orders" class="data-loading">
@@ -2908,6 +3120,9 @@ onMounted(async () => {
           </div>
           <div v-else-if="!sortedWorkOrders.length" class="data-empty">
             <EmptyState icon="🧾" title="还没有生成工单" description="请先在上方选择异常记录并分配工人，然后生成派单工单。" />
+          </div>
+          <div v-else-if="!filteredWorkOrders.length" class="data-empty">
+            <EmptyState icon="🔍" :title="`没有「${statusLabelMap[workOrderStatusFilter] || ''}」状态的工单`" description="点击上方「全部」可查看所有工单。" />
           </div>
           <div v-else class="work-order-board">
             <article
@@ -2997,13 +3212,18 @@ onMounted(async () => {
                   <label>
                     <span>调整分配工人</span>
                     <select v-model="workOrderState.assignmentById[order.work_order_id]">
-                      <option v-for="worker in workerUsers" :key="worker.user_id" :value="worker.user_id">
-                        {{ worker.display_name }} · {{ worker.specialty }}
+                      <option
+                        v-for="worker in workerUsers"
+                        :key="worker.user_id"
+                        :value="worker.user_id"
+                        :disabled="busyWorkerIds.has(worker.user_id)"
+                      >
+                        {{ worker.display_name }} · {{ worker.specialty }}<template v-if="busyWorkerIds.has(worker.user_id)"> · 处理中（锁定）</template>
                       </option>
                     </select>
                   </label>
-                  <button class="primary-button" type="button" :disabled="loading.orders" @click="handleAssignWorkOrder(order)">
-                    确认派单
+                  <button class="primary-button" type="button" :disabled="loading.orders || !availableWorkerUsers.length" @click="handleAssignWorkOrder(order)">
+                    {{ availableWorkerUsers.length ? "确认派单" : "工人全部处理中" }}
                   </button>
                   <button class="secondary-button" type="button" :disabled="loading.orders" @click="handleIgnoreWorkOrder(order)">
                     忽略告警
@@ -3066,10 +3286,19 @@ onMounted(async () => {
                 </div>
               </div>
               <!-- Attachment Info -->
-              <div v-if="order.attachment_name" class="attachment-info">
+              <div v-if="order.attachment_name || order.attachment_data" class="attachment-info">
                 <span>现场附件：</span>
-                <strong>{{ order.attachment_name }}</strong>
+                <strong>{{ order.attachment_name || "现场照片" }}</strong>
                 <span v-if="order.attachment_note"> · {{ order.attachment_note }}</span>
+                <button
+                  v-if="order.attachment_data"
+                  type="button"
+                  class="attachment-thumb-link"
+                  title="点击查看大图"
+                  @click="openLightbox(order.attachment_data, order.attachment_name || '现场照片')"
+                >
+                  <img :src="order.attachment_data" alt="现场照片" class="attachment-thumb" />
+                </button>
               </div>
 
               <ol v-if="order.timeline.length" class="timeline-list">
@@ -3267,6 +3496,16 @@ onMounted(async () => {
       </div>
     </template>
   </main>
+
+  <div v-if="lightbox.src" class="lightbox-overlay" @click.self="closeLightbox">
+    <div class="lightbox-content">
+      <div class="lightbox-bar">
+        <span class="lightbox-title">{{ lightbox.title || "现场照片" }}</span>
+        <button type="button" class="lightbox-close" title="关闭 (Esc)" @click="closeLightbox">×</button>
+      </div>
+      <img :src="lightbox.src" alt="现场照片大图" class="lightbox-image" />
+    </div>
+  </div>
 </template>
 
 <style scoped>
@@ -3772,7 +4011,15 @@ onMounted(async () => {
 }
 
 .order-summary-grid--wide {
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+}
+
+.order-summary-grid--wide .order-summary-card {
+  padding: 12px 10px;
+}
+
+.order-summary-grid--wide .order-summary-card strong {
+  font-size: 22px;
 }
 
 .order-create-panel {
@@ -4039,6 +4286,32 @@ onMounted(async () => {
   gap: 12px;
 }
 
+.scenario-noimpact {
+  border: 1px dashed rgba(15, 139, 141, 0.35);
+  border-radius: 16px;
+  background: rgba(15, 139, 141, 0.06);
+  padding: 16px 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.scenario-noimpact strong {
+  color: var(--accent-deep);
+  font-size: 15px;
+}
+
+.scenario-noimpact p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.scenario-noimpact-hint {
+  color: #0c6f70 !important;
+  font-weight: 600;
+}
+
 .scenario-curve-card {
   display: grid;
   gap: 10px;
@@ -4151,6 +4424,24 @@ onMounted(async () => {
   color: var(--accent-deep);
   font-size: 26px;
   margin-top: 6px;
+}
+
+button.order-summary-card {
+  font: inherit;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+
+button.order-summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(20, 34, 48, 0.08);
+}
+
+.order-summary-card--active {
+  border-color: rgba(15, 139, 141, 0.55) !important;
+  box-shadow: 0 0 0 2px rgba(15, 139, 141, 0.25) !important;
+  background: linear-gradient(145deg, rgba(236, 247, 243, 0.96), rgba(214, 240, 233, 0.92)) !important;
 }
 
 .work-order-board {
@@ -4832,6 +5123,138 @@ onMounted(async () => {
 
 .attachment-info strong {
   color: var(--accent-deep);
+}
+
+.attachment-thumb-link {
+  display: inline-block;
+  margin-left: 10px;
+  vertical-align: middle;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.attachment-preview-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 16, 24, 0.78);
+  padding: 32px;
+  backdrop-filter: blur(2px);
+}
+
+.lightbox-content {
+  display: flex;
+  flex-direction: column;
+  max-width: min(92vw, 1100px);
+  max-height: 90vh;
+  background: #fff;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+}
+
+.lightbox-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(20, 34, 48, 0.08);
+}
+
+.lightbox-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lightbox-close {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(20, 34, 48, 0.06);
+  color: var(--ink-strong);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.lightbox-close:hover {
+  background: rgba(217, 54, 79, 0.12);
+  color: #d9364f;
+}
+
+.lightbox-image {
+  display: block;
+  max-width: 100%;
+  max-height: calc(90vh - 53px);
+  object-fit: contain;
+  background: #0d1620;
+}
+
+.attachment-thumb {
+  height: 56px;
+  width: 56px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(20, 34, 48, 0.14);
+  transition: transform 0.15s;
+}
+
+.attachment-thumb:hover {
+  transform: scale(1.04);
+}
+
+.attachment-upload-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 2px;
+}
+
+.attachment-upload-preview img {
+  height: 64px;
+  width: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(20, 34, 48, 0.14);
+}
+
+.attachment-upload-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.link-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: #d9364f;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  width: fit-content;
 }
 
 .closed-cases-section {

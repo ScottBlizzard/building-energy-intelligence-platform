@@ -103,3 +103,47 @@ def test_worker_can_only_accept_own_order(tmp_path, monkeypatch):
         json={"operator_id": "worker_ahu"},
     )
     assert accepted.status_code == 200
+
+
+def _ahu_payload(record_id, equipment_id):
+    return {
+        "source_record_id": record_id,
+        "priority": "高",
+        "building_id": "BLD-C",
+        "building_name": "图书信息楼C",
+        "floor_label": "4F",
+        "zone_name": "阅读区",
+        "equipment_id": equipment_id,
+        "equipment_type": "空气处理机组",
+        "timestamp": "2026-05-01 10:00:00",
+        "anomaly_reason": "电耗高于同时段基线",
+        "possible_cause": "新风阀卡滞",
+        "recommended_action": "复位风阀",
+        "owner_role": "空调系统运维员",
+        "assignee_id": "worker_ahu",
+    }
+
+
+def test_busy_worker_cannot_take_second_active_order(tmp_path, monkeypatch):
+    monkeypatch.setenv("WORK_ORDER_FILE", str(tmp_path / "work_orders.json"))
+    get_settings.cache_clear()
+
+    first = client.post("/api/v1/work-orders", json=_ahu_payload("R-BUSY-1", "AHU-C-4F-01"))
+    assert first.status_code == 200
+    assert first.json()["status"] == "assigned"
+
+    # 同一工人忙碌期间再派第二单 -> 409 且返回明确占用信息
+    second = client.post("/api/v1/work-orders", json=_ahu_payload("R-BUSY-2", "AHU-C-4F-02"))
+    assert second.status_code == 409
+    assert "正在处理工单" in second.json()["detail"]
+
+    # 工人提交完工后转为空闲，可以再接单
+    wid = first.json()["work_order_id"]
+    client.patch(f"/api/v1/work-orders/{wid}/accept", json={"operator_id": "worker_ahu"})
+    client.patch(
+        f"/api/v1/work-orders/{wid}/submit",
+        json={"operator_id": "worker_ahu", "actual_cause": "a", "resolution_note": "b", "recovery_confirmed": True},
+    )
+    third = client.post("/api/v1/work-orders", json=_ahu_payload("R-BUSY-3", "AHU-C-4F-03"))
+    assert third.status_code == 200
+    assert third.json()["status"] == "assigned"
