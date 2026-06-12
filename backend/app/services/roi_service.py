@@ -238,18 +238,24 @@ def _retrofit_candidates(equipment_type: str, stats: Dict) -> List[Dict]:
     baseline = _EQUIPMENT_BASELINE.get(equipment_type, {})
     invest_table = baseline.get("invest", {})
     target_cop = baseline.get("target_cop", 3.2)
-    equipment_count = max(1, int(stats.get("equipment_count", 1)))
+    power_kw = baseline.get("typical_power_kw", 30)
+    runtime_h = baseline.get("annual_runtime_h", 3000)
     annual_kwh = float(stats.get("total_kwh", 0))
     annual_cost = annual_kwh * _ELECTRICITY_PRICE_YUAN_PER_KWH
     gap_factor = _efficiency_gap_factor(float(stats.get("avg_cop", 0)), target_cop)
+
+    # 等效设备台数 = 实测年电耗 ÷ 单台典型年电耗。投资按等效台数放大，强制让
+    # "投资规模"与"被改造的电耗规模"匹配——避免小设备（如风机盘管单台 2.5kW）
+    # 摊到整类大电耗时，单台投资极低而回收期≈0 的口径错配（docs/28 §2.1）。
+    per_unit_annual_kwh = max(1.0, power_kw * runtime_h)
+    effective_units = max(1, round(annual_kwh / per_unit_annual_kwh))
 
     candidates = []
     for option_name, option_params in _RETROFIT_OPTIONS.items():
         adj_saving_pct = min(0.60, option_params["base_saving_pct"] * gap_factor)
         lifespan = option_params["lifespan"]
         annual_saving = annual_cost * adj_saving_pct
-        # 投资按该楼该类型的设备台数放大，与全类型电耗口径一致（消除规模错配）。
-        investment = float(invest_table.get(option_name, 0)) * equipment_count
+        investment = float(invest_table.get(option_name, 0)) * effective_units
         cashflows = _cashflows(annual_saving, lifespan, _PRICE_ESCALATION)
         npv_val = _npv_from_cashflows(investment, cashflows, _DISCOUNT_RATE)
         payback = _simple_payback_years(investment, annual_saving)

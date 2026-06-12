@@ -31,6 +31,15 @@ DEMO_USERS: Dict[str, Dict] = {
         "specialty": "CH",
         "enabled": True,
     },
+    "worker_fcu": {
+        "user_id": "worker_fcu",
+        "username": "worker_fcu",
+        "password": "worker123",
+        "display_name": "末端风机盘管巡检员",
+        "role": "worker",
+        "specialty": "FCU",
+        "enabled": True,
+    },
 }
 
 
@@ -82,7 +91,18 @@ def get_user(user_id: Optional[str]) -> Optional[Dict]:
 
 
 def resolve_worker_for_equipment(equipment_id: str = "", equipment_type: str = "") -> Dict:
-    text = f"{equipment_id} {equipment_type}".upper()
-    if "CH" in text or "CT" in text or "冷水" in equipment_type or "冷却" in equipment_type:
+    """三班分工：制冷主机侧 / 空气处理机组 / 末端风机盘管。"""
+    et = equipment_type or ""
+    if "冷水" in et or "冷却" in et:
         return _public_user(DEMO_USERS["worker_chiller"])
+    if "风机盘管" in et:
+        return _public_user(DEMO_USERS["worker_fcu"])
+    if "空气" in et:
+        return _public_user(DEMO_USERS["worker_ahu"])
+    # 兜底：按设备编号 token 兜底匹配
+    text = f"{equipment_id} {equipment_type}".upper()
+    if "CH" in text or "CT" in text:
+        return _public_user(DEMO_USERS["worker_chiller"])
+    if "FCU" in text:
+        return _public_user(DEMO_USERS["worker_fcu"])
     return _public_user(DEMO_USERS["worker_ahu"])

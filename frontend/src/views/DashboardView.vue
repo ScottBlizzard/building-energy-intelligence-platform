@@ -1816,13 +1816,6 @@ watch(
 );
 
 watch(
-  () => decisionState.workerCapacity,
-  () => {
-    loadDecisionState();
-  }
-);
-
-watch(
   workOrderState,
   (value) => {
     if (typeof window !== "undefined") {
@@ -2801,10 +2794,22 @@ onMounted(async () => {
                 <h3>今日资源约束派单建议</h3>
                 <p>{{ decisionState.dispatchPlan?.summary || "等待经济决策接口返回派单建议。" }}</p>
               </div>
-              <label>
-                <span>今日可派工人</span>
-                <input v-model.number="decisionState.workerCapacity" type="number" min="1" max="8" />
-              </label>
+              <div v-if="decisionState.dispatchPlan?.workers?.length" class="dispatch-workers">
+                <span class="dispatch-workers-cap">
+                  空闲工人 {{ decisionState.dispatchPlan.idle_worker_count }} / {{ decisionState.dispatchPlan.workers.length }}
+                </span>
+                <span
+                  v-for="w in decisionState.dispatchPlan.workers"
+                  :key="w.worker_id"
+                  class="worker-chip"
+                  :class="w.busy ? 'worker-chip--busy' : 'worker-chip--idle'"
+                  :title="w.busy
+                    ? `${w.worker_name}（${w.specialty}）正在处理 ${w.current_equipment_id || '工单'}，本轮锁定`
+                    : `${w.worker_name}（${w.specialty}）空闲，可承接派单`"
+                >
+                  {{ w.worker_name }} · {{ w.status_label }}
+                </span>
+              </div>
             </div>
             <div v-if="loading.decision" class="data-loading data-loading--compact">
               <LoadingSpinner text="正在计算优先级..." />
@@ -2845,6 +2850,16 @@ onMounted(async () => {
               title="暂无待排序工单"
               description="生成或推进工单后，系统会按风险、损失、SLA 和碳排自动排序。"
             />
+            <div v-if="decisionState.dispatchPlan?.deferred?.length" class="dispatch-deferred">
+              <span class="dispatch-deferred-title">因人力受限暂缓（等工人空闲后再派）</span>
+              <ul>
+                <li v-for="item in decisionState.dispatchPlan.deferred" :key="item.work_order_id">
+                  <strong>{{ item.building_name }} · {{ item.equipment_id }}</strong>
+                  <span>优先级 {{ item.decision_score }} 分</span>
+                  <em>{{ item.defer_reason }}</em>
+                </li>
+              </ul>
+            </div>
           </div>
 
           <div v-if="selectedOrderAnomaly || decisionState.counterfactual" class="counterfactual-panel">
@@ -3847,6 +3862,90 @@ onMounted(async () => {
   border-radius: 12px;
   font: inherit;
   padding: 9px 10px;
+}
+
+.dispatch-workers {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  min-width: 150px;
+}
+
+.dispatch-workers-cap {
+  color: var(--accent-deep) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+.worker-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  white-space: nowrap;
+}
+
+.worker-chip--idle {
+  background: rgba(15, 139, 141, 0.12);
+  color: #0c6f70 !important;
+}
+
+.worker-chip--busy {
+  background: rgba(214, 122, 26, 0.14);
+  color: #b25e08 !important;
+}
+
+.dispatch-deferred {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(20, 34, 48, 0.16);
+  border-radius: 14px;
+  background: rgba(20, 34, 48, 0.02);
+}
+
+.dispatch-deferred-title {
+  display: block;
+  color: var(--ink-soft) !important;
+  font-size: 12px !important;
+  font-weight: 800 !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+  margin-bottom: 6px;
+}
+
+.dispatch-deferred ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+}
+
+.dispatch-deferred li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+.dispatch-deferred li strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.dispatch-deferred li em {
+  font-style: normal;
+  color: #b25e08;
 }
 
 .dispatch-grid {

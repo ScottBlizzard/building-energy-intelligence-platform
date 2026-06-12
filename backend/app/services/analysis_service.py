@@ -1271,18 +1271,25 @@ def build_anomaly_work_order_drafts(frame: pd.DataFrame) -> List[Dict]:
         return []
 
     working = _add_operational_dimensions(frame)
-    anomalies = (
-        working[working["is_anomaly"]]
-        .copy()
-        .sort_values(["timestamp", "electricity_kwh"], ascending=[False, False])
-        .head(30)
-    )
+    anomalies = working[working["is_anomaly"]].copy()
     if anomalies.empty:
         return []
 
+    # 只取“最近 7 天窗口”内的异常（避免把数月前的历史异常灌进今天的待确认队列），
+    # 在该窗口内按风险分优先排队，再截取前 10 条作为一批待确认草稿（仅 3 名工人，
+    # 一次性灌入过多并无意义；10 条足够覆盖当日重点）。
+    max_ts = anomalies["timestamp"].max()
+    recent = anomalies[anomalies["timestamp"] >= max_ts - pd.Timedelta(days=7)]
+    pool = (recent if not recent.empty else anomalies).copy()
+    impacts = {idx: _business_impact(row) for idx, row in pool.iterrows()}
+    pool["_risk"] = [impacts[idx]["risk_score"] for idx in pool.index]
+    anomalies = pool.sort_values(
+        ["_risk", "electricity_kwh"], ascending=[False, False]
+    ).head(10)
+
     drafts: List[Dict] = []
-    for _, row in anomalies.iterrows():
-        impact = _business_impact(row)
+    for idx, row in anomalies.iterrows():
+        impact = impacts[idx]
         drafts.append({
             "work_order_id": f"WO-DRAFT-{pd.Timestamp(row['timestamp']).strftime('%Y%m%d%H')}-{row['record_id']}",
             "source_record_id": str(row["record_id"]),

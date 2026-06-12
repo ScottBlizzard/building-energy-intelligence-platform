@@ -106,9 +106,15 @@ def test_decision_endpoints_rank_dispatch_and_budget_impact():
     assert priorities[0]["decision_score"] >= priorities[-1]["decision_score"]
     assert "score_breakdown" in priorities[0]
 
-    plan = client.get("/api/v1/decisions/dispatch-plan", params={"worker_capacity": 1}).json()["item"]
-    assert len(plan["selected"]) == 1
+    plan = client.get("/api/v1/decisions/dispatch-plan").json()["item"]
     assert plan["summary"]
+    # 容量改为“当前空闲工人数”动态推导
+    assert len(plan["workers"]) == 3
+    assert plan["idle_worker_count"] + plan["busy_worker_count"] == 3
+    # 选中工单不超过空闲工人数，且每个空闲工人本轮至多承接 1 单（对口、忙则延后）
+    assert len(plan["selected"]) <= plan["idle_worker_count"]
+    worker_ids = [item["assigned_to_worker_id"] for item in plan["selected"]]
+    assert len(worker_ids) == len(set(worker_ids))
 
     impact = client.get("/api/v1/decisions/budget-impact", params={"year": 2026, "month": 5}).json()["item"]
     assert impact["closed_order_count"] >= 1

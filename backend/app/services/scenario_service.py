@@ -131,16 +131,21 @@ def build_counterfactual_scenarios(
     immediate = by_key["immediate"]
     delayed = by_key["delayed"]
     no_action = by_key["no_action"]
+    # 节省的"钱/碳"必须与节省的"电量"同源——立即处理的杠杆就是把能耗压到健康
+    # 水平，省下的电量 × 电价/碳因子即为省下的钱/碳。此前 yuan/carbon 用的是
+    # "超阈值浪费量"差额，会出现"省 37 kWh 却 0 元"的自相矛盾，这里统一为能耗差。
+    delay_kwh = round(delayed["total_energy_kwh"] - immediate["total_energy_kwh"], 2)
+    na_kwh = round(no_action["total_energy_kwh"] - immediate["total_energy_kwh"], 2)
     saved_vs_delay = {
-        "kwh": round(delayed["total_energy_kwh"] - immediate["total_energy_kwh"], 2),
-        "yuan": round(delayed["total_loss_yuan"] - immediate["total_loss_yuan"], 2),
-        "carbon_kg": round(delayed["total_carbon_kg"] - immediate["total_carbon_kg"], 2),
+        "kwh": delay_kwh,
+        "yuan": round(delay_kwh * _PRICE_YUAN_PER_KWH, 2),
+        "carbon_kg": round(delay_kwh * _CARBON_KG_PER_KWH, 2),
         "anomalies": int(delayed["total_anomaly_count"] - immediate["total_anomaly_count"]),
     }
     saved_vs_no_action = {
-        "kwh": round(no_action["total_energy_kwh"] - immediate["total_energy_kwh"], 2),
-        "yuan": round(no_action["total_loss_yuan"] - immediate["total_loss_yuan"], 2),
-        "carbon_kg": round(no_action["total_carbon_kg"] - immediate["total_carbon_kg"], 2),
+        "kwh": na_kwh,
+        "yuan": round(na_kwh * _PRICE_YUAN_PER_KWH, 2),
+        "carbon_kg": round(na_kwh * _CARBON_KG_PER_KWH, 2),
         "anomalies": int(no_action["total_anomaly_count"] - immediate["total_anomaly_count"]),
     }
     return {

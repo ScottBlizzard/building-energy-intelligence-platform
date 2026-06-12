@@ -10,7 +10,7 @@ from collections import defaultdict
 from typing import Dict, List, Optional
 
 from app.services import simulation_service
-from app.services.auth_service import resolve_worker_for_equipment
+from app.services.auth_service import list_demo_users, resolve_worker_for_equipment
 from app.services.budget_service import build_budget_analysis
 from app.services.data_loader import get_visible_dataset
 from app.services.work_order_store import list_work_orders
@@ -18,6 +18,11 @@ from app.services.work_order_store import list_work_orders
 _PRICE_YUAN_PER_KWH = 0.82
 _CARBON_KG_PER_KWH = 0.5703
 _OPEN_STATUSES = {"pending_confirm", "assigned", "in_progress", "pending_review", "rejected"}
+# 工人“占用”状态：手上有已派/处理中的工单即视为忙碌；提交复核(pending_review)后
+# 视为已完工、可接下一单（管理员复核是异步的，不占用工人）。
+_BUSY_STATUSES = {"assigned", "in_progress"}
+# 仍需派单的工单状态（待确认/被驳回的可重新派；已派/处理中/待复核的不再进入派单池）。
+_DISPATCHABLE_STATUSES = {"pending_confirm", "rejected", ""}
 _PRIORITY_RISK_FALLBACK = {"高": 78.0, "中": 55.0, "低": 32.0}
 _PRIORITY_LOSS_FALLBACK = {"高": 180.0, "中": 80.0, "低": 30.0}
 
@@ -252,27 +257,116 @@ def rank_open_work_orders(limit: int = 10) -> List[Dict]:
     return sorted(ranked, key=lambda item: item["decision_score"], reverse=True)[: max(1, int(limit))]
 
 
+def worker_status_overview() -> List[Dict]:
+    """每名工人的忙/闲状态。
+
+    工人在持有 ``assigned``/``in_progress`` 工单期间视为“忙碌（处理中）”；一旦提交
+    复核(``pending_review``)即视为完工、转回“空闲”，可承接下一单——管理员复核是异步
+    动作，不占用工人现场人力。
+    """
+    workers = [user for user in list_demo_users() if user.get("role") == "worker"]
+    orders = list_work_orders()
+    active_by_worker: Dict[str, List[Dict]] = defaultdict(list)
+    awaiting_by_worker: Dict[str, int] = defaultdict(int)
+    for order in orders:
+        worker_id = str(order.get("assignee_id") or "")
+        if not worker_id:
+            continue
+        status = order.get("status")
+        if status in _BUSY_STATUSES:
+            active_by_worker[worker_id].append(order)
+        elif status == "pending_review":
+            awaiting_by_worker[worker_id] += 1
+
+    overview: List[Dict] = []
+    for worker in workers:
+        worker_id = worker["user_id"]
+        active = active_by_worker.get(worker_id, [])
+        current = active[0] if active else None
+        overview.append(
+            {
+                "worker_id": worker_id,
+                "worker_name": worker["display_name"],
+                "specialty": worker.get("specialty", ""),
+                "busy": bool(active),
+                "status": "busy" if active else "idle",
+                "status_label": "处理中" if active else "空闲",
+                "active_order_count": len(active),
+                "awaiting_review_count": awaiting_by_worker.get(worker_id, 0),
+                "current_order_id": current.get("work_order_id") if current else None,
+                "current_equipment_id": current.get("equipment_id") if current else None,
+            }
+        )
+    return overview
+
+
 def recommend_dispatch_plan(worker_capacity: int = 3) -> Dict:
-    capacity = max(1, int(worker_capacity or 3))
-    ranked = rank_open_work_orders(limit=max(capacity, 10))
-    selected = ranked[:capacity]
-    deferred = ranked[capacity:]
+    # 容量不再是手填数字，而是“当前空闲工人数”（动态资源约束）。worker_capacity
+    # 参数保留以兼容旧调用，但不再决定派单数量。
+    workers = worker_status_overview()
+    idle_ids = [worker["worker_id"] for worker in workers if not worker["busy"]]
+    idle_count = len(idle_ids)
+    busy_count = len(workers) - idle_count
+
+    ranked = rank_open_work_orders(limit=60)
+    # 只对“仍需派单”的工单做分配：已派/处理中/待复核的工单是工人忙碌的原因，
+    # 不应再作为今日新派目标。
+    pending = [
+        item
+        for item in ranked
+        if item.get("status") not in _BUSY_STATUSES and item.get("status") != "pending_review"
+    ]
+
+    selected: List[Dict] = []
+    deferred: List[Dict] = []
+    available = set(idle_ids)  # 本轮尚未被占用的空闲工人
+    for item in pending:
+        worker_id = item.get("recommended_worker_id")
+        worker_name = item.get("recommended_worker_name") or "对口工人"
+        if worker_id in available:
+            available.discard(worker_id)
+            selected.append(
+                {
+                    **item,
+                    "assigned_to_worker_id": worker_id,
+                    "assigned_to_worker_name": worker_name,
+                }
+            )
+        else:
+            if worker_id in idle_ids:
+                defer_reason = f"{worker_name}本轮已分配 1 单，需等其完工后再派"
+            else:
+                defer_reason = f"{worker_name}当前正在处理工单，需等其完工后再派"
+            deferred.append({**item, "defer_reason": defer_reason})
+
     total_loss = round(sum(_as_float(item.get("wasted_cost_yuan")) for item in selected), 2)
     total_saving = round(sum(_as_float(item.get("estimated_saving_yuan")) for item in selected), 2)
     total_carbon = round(sum(_as_float(item.get("carbon_kg")) for item in selected), 2)
+
+    if idle_count == 0:
+        summary = (
+            f"{len(workers)} 名工人当前都在处理工单，暂无空闲人力派单；"
+            f"可等其中一人完工后再派。"
+        )
+    elif selected:
+        summary = (
+            f"当前 {idle_count} 名工人空闲，建议优先派出 {len(selected)} 个对口高分工单，"
+            f"覆盖约 {total_loss:,.0f} 元预计损失、{total_carbon:,.1f} kg 碳排影响。"
+        )
+    else:
+        summary = f"当前 {idle_count} 名工人空闲，但暂无待派工单，可安排巡检或复盘。"
+
     return {
-        "worker_capacity": capacity,
+        "worker_capacity": idle_count,
+        "idle_worker_count": idle_count,
+        "busy_worker_count": busy_count,
+        "workers": workers,
         "selected": selected,
         "deferred": deferred[:5],
         "total_selected_loss_yuan": total_loss,
         "total_selected_recoverable_yuan": total_saving,
         "total_selected_carbon_kg": total_carbon,
-        "summary": (
-            f"今天若只能派 {capacity} 名工人，建议优先处理 {len(selected)} 个高分工单，"
-            f"覆盖约 {total_loss:,.0f} 元预计损失、{total_carbon:,.1f} kg 碳排影响。"
-            if selected
-            else "当前没有待处理工单，可把人力用于巡检和复盘。"
-        ),
+        "summary": summary,
         "generated_at": simulation_service.now_str(),
     }
 
