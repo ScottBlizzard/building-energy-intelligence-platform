@@ -338,27 +338,7 @@ flowchart TB
 
 系统默认面向本地课程演示部署，支持 Windows PowerShell 环境，也可迁移到 Linux 或容器化环境。
 
-```mermaid
-flowchart LR
-  Browser["浏览器<br/>http://127.0.0.1:5173"]
-  Vite["Vite Dev Server<br/>5173"]
-  API["FastAPI/Uvicorn<br/>127.0.0.1:8000"]
-  MCP["MCP Server<br/>stdio 或 8765/mcp"]
-  Files["CSV/JSON/Markdown<br/>data + knowledge_base"]
-  MySQL["MySQL 8.x<br/>可选"]
-  LLM["外部 LLM API<br/>可选"]
-  Client["MCP Client"]
-
-  Browser --> Vite
-  Vite -->|/api/v1 代理| API
-  API <--> Files
-  API <--> MySQL
-  API -.-> LLM
-  Client --> MCP
-  MCP <--> Files
-  MCP <--> MySQL
-  MCP -.-> LLM
-```
+![物理部署架构](images/SDD-3.4-物理部署架构.png)
 
 物理部署节点说明：
 
@@ -717,20 +697,7 @@ risk_score =
 
 状态转换图：
 
-```mermaid
-stateDiagram-v2
-  [*] --> pending_confirm: 自动队列/创建草稿
-  pending_confirm --> assigned: 管理员派单
-  pending_confirm --> ignored: 管理员忽略
-  assigned --> in_progress: 工人接单
-  assigned --> assigned: 管理员改派
-  in_progress --> pending_review: 工人提交处理结果
-  pending_review --> closed: 管理员复核通过
-  pending_review --> rejected: 管理员驳回
-  rejected --> assigned: 管理员重新派单
-  closed --> [*]
-  ignored --> [*]
-```
+![工单状态转换图](images/SDD-4.3.3-工单转换状态图.png)
 
 关键约束：
 
@@ -914,40 +881,7 @@ MCP 主要能力：
 
 #### 5.2.2 核心对象设计
 
-```mermaid
-classDiagram
-  class WorkOrder {
-    work_order_id
-    source_record_id
-    equipment_id
-    status
-    priority
-    assignee_id
-    risk_score
-    wasted_cost_yuan
-    timeline
-  }
-  class WorkOrderStore {
-    list_work_orders()
-    create_work_order()
-    assign_work_order()
-    accept_work_order()
-    submit_work_order()
-    review_work_order()
-    ignore_work_order()
-  }
-  class PermissionService {
-    require_admin_operator()
-    require_worker_operator()
-    build_worker_support()
-  }
-  class SimulationService {
-    register_intervention()
-  }
-  WorkOrderStore --> WorkOrder
-  WorkOrderStore --> PermissionService
-  WorkOrderStore --> SimulationService
-```
+![工单核心类图](images/SDD-5.2.2-工单核心类图.png)
 
 关键异常：
 
@@ -1031,30 +965,7 @@ sequenceDiagram
 
 #### 5.5.2 核心交互设计
 
-```mermaid
-classDiagram
-  class AssistantService {
-    build_assistant_reply(question)
-  }
-  class GroundingService {
-    classify_assistant_question(question)
-    extract_entities(question)
-  }
-  class KnowledgeSearchService {
-    search_and_format_citations(query)
-  }
-  class LLMClient {
-    build_external_assistant_answer()
-  }
-  class MCPServer {
-    ask_energy_assistant()
-    search_energy_knowledge()
-  }
-  AssistantService --> GroundingService
-  AssistantService --> KnowledgeSearchService
-  AssistantService --> LLMClient
-  MCPServer --> AssistantService
-```
+![智能服务类图](images/SDD-5.5.2-核心服务子系统类图.png)
 
 问答响应结构包含：
 
@@ -1109,49 +1020,7 @@ classDiagram
 
 ### 6.2 概念模型设计 (ER Diagram)
 
-```mermaid
-erDiagram
-  ENERGY_READING ||--o{ WORK_ORDER : "source_record_id / equipment_id"
-  ENERGY_READING ||--o{ BUDGET : "building_id"
-  WORK_ORDER ||--o{ WORK_ORDER_TIMELINE : "embedded timeline"
-  WORK_ORDER ||--o{ SIM_INTERVENTION : "closed order registers repair"
-  BUILDING ||--o{ ENERGY_READING : "building_id"
-  BUILDING ||--o{ BUDGET : "building_id"
-  BUILDING ||--o{ ROI_PROJECT : "building_id"
-
-  ENERGY_READING {
-    string record_id
-    string building_id
-    string equipment_id
-    datetime timestamp
-    float electricity_kwh
-    float hvac_kwh
-    float cooling_load_kwh
-    string equipment_status
-  }
-  WORK_ORDER {
-    string work_order_id
-    string source_record_id
-    string equipment_id
-    string status
-    string assignee_id
-    json data
-  }
-  BUDGET {
-    int id
-    string building_id
-    int year
-    int month
-    float budget_kwh
-    json data
-  }
-  SIM_STATE {
-    int id
-    string sim_current_date
-    string sim_start_date
-    json data
-  }
-```
+![数据库ER图](images/SDD-6.2-数据库ER图.png)
 
 说明：`BUILDING`、`WORK_ORDER_TIMELINE`、`SIM_INTERVENTION`、`ROI_PROJECT` 在当前代码中主要作为派生业务对象或 JSON 内嵌结构存在；MySQL 持久化层实际建表包括 `energy_readings`、`work_orders`、`budgets`、`sim_state`。
 

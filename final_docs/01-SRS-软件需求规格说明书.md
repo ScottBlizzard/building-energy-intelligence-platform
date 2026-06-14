@@ -1,4 +1,5 @@
 # 软件需求规格说明书
+
 Software Requirements Specification
 
 项目名称：基于大模型的建筑能源智能管理与运维优化系统
@@ -492,60 +493,7 @@ flowchart TB
 
 系统用例图展示了建筑能源智能管理与运维优化系统的所有主要用例及其参与者关系。
 
-```mermaid
-flowchart LR
-  SysAdmin(("系统管理员"))
-  EnergyAdmin(("能源运营管理员"))
-  Worker(("现场工人"))
-  DataMaintainer(("数据维护者"))
-  Agent(("AI 客户端"))
-  AllUsers(("所有用户"))
-
-  subgraph Platform["建筑能源智能管理与运维优化系统"]
-    subgraph G1["基础设施与组织管理"]
-      UC00["UC-00 用户登录与权限管理"]
-      UC01["UC-01 管理样例数据与演示状态"]
-    end
-    subgraph G2["建筑能源运维生命周期管理"]
-      UC02["UC-02 查看能源总览与数据查询"]
-      UC03["UC-03 统计分析与异常诊断"]
-      UC04["UC-04 派发维修工单"]
-      UC05["UC-05 处理现场工单"]
-      UC06["UC-06 复核关闭工单"]
-      UC07["UC-07 时间沙盘与反事实"]
-    end
-    subgraph G3["智能决策与接入功能"]
-      UC08["UC-08 预算执行与闭环改善"]
-      UC09["UC-09 ROI 改造与运营报告"]
-      UC10["UC-10 可信智能问答"]
-      UC11["UC-11 MCP 工具调用"]
-    end
-    subgraph G4["支撑功能"]
-      UC12["UC-12 项目检查与质量验收"]
-    end
-  end
-
-  AllUsers --> UC00
-  SysAdmin --> UC01
-  SysAdmin --> UC12
-  DataMaintainer --> UC01
-  EnergyAdmin --> UC02
-  EnergyAdmin --> UC03
-  EnergyAdmin --> UC04
-  EnergyAdmin --> UC06
-  EnergyAdmin --> UC07
-  EnergyAdmin --> UC08
-  EnergyAdmin --> UC09
-  EnergyAdmin --> UC10
-  Worker --> UC05
-  Worker --> UC10
-  Agent --> UC11
-  UC04 -.extend.-> UC03
-  UC06 -.include.-> UC07
-  UC10 -.include.-> UC02
-  UC11 -.include.-> UC02
-  UC11 -.include.-> UC03
-```
+![系统用例图](images/SRS-4.0-系统用例图.png)
 
 用例图说明：
 

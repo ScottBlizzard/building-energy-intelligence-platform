@@ -1,0 +1,52 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="商业模式画布" id="gDWk2Y4IobyUXtGKoEHQ">
+    <mxGraphModel dx="679" dy="932" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-1" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=18;fontStyle=1" value="商业模式画布 - 建筑能源智能管理系统" vertex="1">
+          <mxGeometry height="40" width="500" x="550" y="20" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;" value="&lt;b&gt;关键合作 (KP)&lt;/b&gt;&lt;hr&gt;• 高校后勤部门&lt;br&gt;• 物业运维团队&lt;br&gt;• 云资源提供方&lt;br&gt;• 大模型API服务方&lt;br&gt;• 设备和楼控系统供应商&lt;br&gt;• 课程/实验室支持方" vertex="1">
+          <mxGeometry height="360" width="230" x="320" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-3" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;" value="&lt;b&gt;关键活动 (KA)&lt;/b&gt;&lt;hr&gt;• 数据治理&lt;br&gt;• 异常识别&lt;br&gt;• 角色化派单&lt;br&gt;• 沙盘模拟&lt;br&gt;• 预算KPI分析&lt;br&gt;• ROI改造评价&lt;br&gt;• 知识库维护&lt;br&gt;• 模型调用控制&lt;br&gt;• 系统集成和验收测试" vertex="1">
+          <mxGeometry height="200" width="150" x="550" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-4" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;verticalAlign=top;fontSize=11" value="&lt;b&gt;价值主张 (VP)&lt;/b&gt;&lt;hr&gt;将分散能耗数据转化为：&lt;br&gt;• 可解释的异常、损失、优先级&lt;br&gt;• 工单、预算影响、ROI决策&lt;br&gt;&lt;br&gt;用AI问答+MCP能力降低查询、报告和运维沟通成本" vertex="1">
+          <mxGeometry height="360" width="280" x="700" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-5" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;" value="&lt;b&gt;客户关系 (CR)&lt;/b&gt;&lt;hr&gt;• 试点共创&lt;br&gt;• 按建筑/设备持续复核收益&lt;br&gt;• 月度运行报告&lt;br&gt;• 规则与知识库维护&lt;br&gt;• 用户培训和验收支持" vertex="1">
+          <mxGeometry height="200" width="150" x="980" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-6" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;" value="&lt;b&gt;客户细分 (CS)&lt;/b&gt;&lt;hr&gt;• 高校后勤能源管理部门&lt;br&gt;• 园区物业与能源运维团队&lt;br&gt;• 公共建筑管理单位&lt;br&gt;• 需要节能监管和运维闭环的楼宇运营方" vertex="1">
+          <mxGeometry height="360" width="220" x="1130" y="80" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-7" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;verticalAlign=top;" value="&lt;b&gt;渠道 (CH)&lt;/b&gt;&lt;hr&gt;• 校园试点部署&lt;br&gt;• 园区私有化部署&lt;br&gt;• 课程成果展示&lt;br&gt;• 后续科研/创新项目申报&lt;br&gt;• 运维系统集成合作" vertex="1">
+          <mxGeometry height="160" width="150" x="980" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;verticalAlign=top;" value="&lt;b&gt;收入来源 (R$)&lt;/b&gt;&lt;hr&gt;• 试点部署费&lt;br&gt;• 年度维护费&lt;br&gt;• 按建筑/数据规模计费订阅费&lt;br&gt;• AI问答增强包&lt;br&gt;• ROI改造评估服务&lt;br&gt;• 私有化定制服务" vertex="1">
+          <mxGeometry height="160" width="523" x="827" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-9" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;verticalAlign=top;" value="&lt;b&gt;核心资源 (KR)&lt;/b&gt;&lt;hr&gt;• 能耗样例数据、数据字典&lt;br&gt;• 异常分析规则、工单状态机&lt;br&gt;• ROI方法学、领域知识库&lt;br&gt;• RAG素材、MCP Server&lt;br&gt;• 前后端可复用代码和测试资产" vertex="1">
+          <mxGeometry height="160" width="150" x="550" y="280" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;align=left;verticalAlign=top;" value="&lt;b&gt;成本结构 (C$)&lt;/b&gt;&lt;hr&gt;• 软件研发成本&lt;br&gt;• 人力维护成本&lt;br&gt;• 服务器和数据库成本&lt;br&gt;• 外部LLM API成本&lt;br&gt;• 数据清洗与知识库更新成本&lt;br&gt;• 试点培训与部署成本&lt;br&gt;• 未来硬件和接口集成成本" vertex="1">
+          <mxGeometry height="160" width="507" x="320" y="440" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-11" edge="1" parent="1" source="g-2xfZcFVa0Jix1N14NC-2" style="endArrow=none;html=1;strokeWidth=1;strokeColor=#999999;dashed=1" target="g-2xfZcFVa0Jix1N14NC-3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-12" edge="1" parent="1" source="g-2xfZcFVa0Jix1N14NC-3" style="endArrow=none;html=1;strokeWidth=1;strokeColor=#999999;dashed=1" target="g-2xfZcFVa0Jix1N14NC-4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-13" edge="1" parent="1" source="g-2xfZcFVa0Jix1N14NC-4" style="endArrow=none;html=1;strokeWidth=1;strokeColor=#999999;dashed=1" target="g-2xfZcFVa0Jix1N14NC-5" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="g-2xfZcFVa0Jix1N14NC-14" edge="1" parent="1" source="g-2xfZcFVa0Jix1N14NC-5" style="endArrow=none;html=1;strokeWidth=1;strokeColor=#999999;dashed=1" target="g-2xfZcFVa0Jix1N14NC-6" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
