@@ -833,6 +833,8 @@ sequenceDiagram
   UI-->>Admin: 展示派单成功
 ```
 
+![UC-04-时序图](images/SRS-4.2.3-UC-04派单时序图.png)
+
 业务规则：
 
 - BR-140：同一设备同一时刻只允许存在一张未关闭工单。
@@ -967,6 +969,8 @@ sequenceDiagram
   Engine->>Decision: 刷新预算和报告上下文
   API-->>Admin: 返回已关闭工单
 ```
+
+![UC-06时序图](images/SRS-4.2.5-UC-06复核关闭时序图.png)
 
 业务规则：
 
@@ -1227,6 +1231,8 @@ sequenceDiagram
   UI-->>User: 展示结果
 ```
 
+![UC-10时序图](images/SRS-4.3.3-UC-10问答时序图.png)
+
 业务规则：
 
 - BR-200：回答必须基于知识库或实时业务上下文。
@@ -1282,6 +1288,8 @@ sequenceDiagram
   Router-->>MCP: 封装 MCP 响应
   MCP-->>Client: 返回结果或结构化错误
 ```
+
+![UC-11时序图](images/SRS-4.3.3-UC-11时序图.png)
 
 业务规则：
 

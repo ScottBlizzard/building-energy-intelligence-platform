@@ -817,6 +817,7 @@ sequenceDiagram
   end
   API-->>UI: answer + citations + follow_up + grounding_status
 ```
+![UC-10时序图](images/SRS-4.3.3-UC-10问答时序图.png)
 
 #### 4.4.3 MCP 工具服务 (MCP Server)
 
@@ -922,6 +923,8 @@ sequenceDiagram
   Data-->>UI: 已修复设备异常减少
 ```
 
+![关闭工单影响未来时序图](images/SDD-5.3.2-关闭工单影响未来时序图.png)
+
 **资源约束派单**
 
 ```mermaid
@@ -937,6 +940,8 @@ sequenceDiagram
   Decision->>Decision: 计算工人忙闲、风险分、损失、SLA、碳排、重复异常
   Decision-->>Admin: selected + deferred + summary
 ```
+
+![资源约束派单时序图](images/SDD-5.3.2-资源约束派单时序图.png)
 
 ### 5.4 预算与 ROI 子系统 (Budget and ROI Subsystem)
 
