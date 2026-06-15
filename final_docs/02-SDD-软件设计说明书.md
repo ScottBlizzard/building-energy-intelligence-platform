@@ -12,12 +12,9 @@
 | :--- | :--- |
 | **项目名称** | 基于大模型的建筑能源智能管理与运维优化系统 (Building Energy Intelligence Platform) |
 | **文档标题** | 软件设计说明书 (Software Design Description) |
-| **文档版本** | v3.0 |
+| **文档版本** | v1.2 |
 | **文档状态** | 正式提交版 |
 | **发布日期** | 2026年6月 |
-| **发布组织** | 软件工程课程项目组 |
-| **作者** | 项目开发团队 |
-| **版权声明** | © 2026 软件工程课程项目组，课程项目用途 |
 
 ---
 
@@ -26,28 +23,163 @@
 | 版本 | 日期 | 修改人 | 变更说明 |
 | :--- | :--- | :--- | :--- |
 | v1.0 | 2026-05-31 | 项目组 | 形成过程版 SDS，覆盖前后端分离、数据、接口、MCP、测试和部署。 |
-| v2.0 | 2026-06-10 | 项目组 | 补充角色登录、工单闭环、时间沙盘、预算、ROI、可信问答和业务闭环设计。 |
-| v3.0 | 2026-06-12 | 项目组 | 严格参考大型电信运营商智慧合同管理系统 SDD 的 IEEE 1016 结构重构，补充涉众关注点、设计视图、模块设计、子系统详细设计、数据库、接口、安全、非功能、设计理由和附录。 |
+| v1.1 | 2026-06-10 | 项目组 | 补充角色登录、工单闭环、时间沙盘、预算、ROI、可信问答和业务闭环设计。 |
+| v1.2 | 2026-06-12 | 项目组 | 严格参考大型电信运营商智慧合同管理系统 SDD 的 IEEE 1016 结构重构，补充涉众关注点、设计视图、模块设计、子系统详细设计、数据库、接口、安全、非功能、设计理由和附录。 |
 
 ---
 
 ## 目录
 
+本目录显式列出正文一级章节、二级章节和关键三级章节，用于评审、答辩和后续维护时快速定位设计内容。
+
+0. 文档前置部分
+   - Software Design Description
+   - 文档标识信息
+   - 文档修订历史
+   - 目录
 1. 引言 (Introduction)
+   - 1.1 编写目的
+   - 1.2 项目背景与范围
+   - 1.3 参考资料
+   - 1.4 术语与缩略语定义
 2. 设计涉众与关注点 (Design Stakeholders and Concerns)
-3. 系统总体设计 (System Architecture)
-4. 系统功能模块设计 (Module Design)
-5. 子系统详细设计 (Subsystem Detailed Design)
-6. 数据库设计 (Database Design)
-7. 接口设计 (Interface Design)
-8. 安全设计 (Security Design)
-9. 非功能性设计 (Non-functional Design)
+   - 2.1 设计涉众识别
+   - 2.2 设计关注点声明
+   - 2.3 关注点与 IEEE 设计视图映射
+3. 系统总体设计 (System Architecture, Context/Logical/Dependency Viewpoints)
+   - 3.1 设计原则
+   - 3.2 系统逻辑架构
+   - 3.3 技术架构选型
+     - 3.3.1 前端技术栈
+     - 3.3.2 后端技术栈
+     - 3.3.3 AI 与 MCP 技术栈
+     - 3.3.4 数据存储与环境
+   - 3.4 物理部署架构
+   - 3.5 系统部署方案
+     - 3.5.1 部署环境要求
+     - 3.5.2 本地部署架构
+     - 3.5.3 配置说明
+     - 3.5.4 部署流程
+     - 3.5.5 服务访问方式
+     - 3.5.6 运维管理
+     - 3.5.7 故障排查
+     - 3.5.8 生产环境优化方案
+4. 系统功能模块设计 (Module Design, Composition/State/Algorithm Viewpoints)
+   - 4.1 模块划分概述
+   - 4.2 基础设施层设计
+     - 4.2.1 用户认证与权限管理
+     - 4.2.2 配置与环境管理
+     - 4.2.3 数据仓储切换设计
+     - 4.2.4 工程支撑与验收脚本设计
+   - 4.3 核心业务层设计
+     - 4.3.1 建筑能源数据生命周期管理
+     - 4.3.2 异常诊断与风险评分设计
+     - 4.3.3 工单状态机与运维闭环设计
+     - 4.3.4 时间沙盘与反事实设计
+     - 4.3.5 预算、KPI 与 ROI 决策设计
+   - 4.4 智能增强层设计
+     - 4.4.1 知识库管理
+     - 4.4.2 可信智能问答服务
+     - 4.4.3 MCP 工具服务
+5. 子系统详细设计 (Subsystem Detailed Design, Logical/Structure/Interaction Viewpoints)
+   - 5.1 数据与分析子系统
+     - 5.1.1 功能描述
+     - 5.1.2 设计元素与数据流
+     - 5.1.3 核心类/函数设计
+     - 5.1.4 异常边界与一致性约束
+   - 5.2 工单与权限子系统
+     - 5.2.1 功能描述
+     - 5.2.2 核心对象设计
+     - 5.2.3 交互时序设计
+     - 5.2.4 核心类/函数设计
+     - 5.2.5 状态与权限契约
+   - 5.3 时间沙盘与决策子系统
+     - 5.3.1 功能描述
+     - 5.3.2 核心设计元素
+     - 5.3.3 交互时序设计
+     - 5.3.4 核心类/函数设计
+     - 5.3.5 状态一致性与边界
+   - 5.4 预算与 ROI 子系统
+     - 5.4.1 功能描述
+     - 5.4.2 核心对象设计
+     - 5.4.3 交互时序设计
+     - 5.4.4 核心类/函数设计
+     - 5.4.5 经济口径与一致性约束
+   - 5.5 智能服务子系统
+     - 5.5.1 功能描述
+     - 5.5.2 核心对象设计
+     - 5.5.3 核心交互设计
+     - 5.5.4 核心类/函数设计
+     - 5.5.5 降级与事实校验契约
+   - 5.6 前端展示子系统
+     - 5.6.1 功能描述
+     - 5.6.2 状态管理与导航设计
+     - 5.6.3 组件设计
+     - 5.6.4 API 适配层设计
+     - 5.6.5 关键交互流程
+     - 5.6.6 前端异常与可用性边界
+6. 数据库设计 (Database Design, Information Viewpoint)
+   - 6.1 数据库设计原则
+   - 6.2 概念模型设计
+   - 6.3 物理数据模型
+     - 6.3.1 能耗读数表
+     - 6.3.2 工单表
+     - 6.3.3 预算表
+     - 6.3.4 沙盘状态表
+   - 6.4 文件存储模型
+7. 接口设计 (Interface Design, Interface Viewpoint)
+   - 7.1 接口设计规范
+   - 7.2 内部子系统接口
+     - 7.2.1 服务层接口
+     - 7.2.2 后端与外部 LLM 接口
+   - 7.3 前后端交互接口
+     - 7.3.1 关键业务接口契约
+   - 7.4 MCP 接口设计
+     - 7.4.1 MCP Tools
+     - 7.4.2 MCP Resources
+     - 7.4.3 MCP Prompt
+8. 安全设计 (Security Design, Cross-cutting Interface/Information Concerns)
+   - 8.1 身份认证与会话管理
+   - 8.2 访问控制策略
+   - 8.3 数据安全与隐私保护
+   - 8.4 操作审计设计
+9. 非功能性设计 (Non-functional Design, Resource Viewpoint)
+   - 9.1 性能设计
+   - 9.2 可靠性与可用性
+   - 9.3 可扩展性
+   - 9.4 可维护性
+   - 9.5 可测试性
 10. 设计理由说明 (Design Rationale)
+    - 10.1 架构决策理由
+    - 10.2 设计模式应用理由
+    - 10.3 技术选型理由
+    - 10.4 约束与权衡
 11. 需求追踪矩阵 (Requirements Traceability Matrix, RTM)
+    - 11.1 用例与功能需求追踪矩阵
+    - 11.2 业务规则追踪矩阵
+    - 11.3 接口需求追踪矩阵
+    - 11.4 非功能需求追踪矩阵
+    - 11.5 设计元素反向追踪
 12. 附录A：第三方库清单
+    - 12.1 第三方库清单
+      - 后端依赖
+      - 前端依赖
+    - 12.2 修订历史
 13. 附录B：图片需求清单
+    - 13.1 现有图示清单
+    - 13.2 图片完整性说明
 14. 附录C：建筑能源业务对象设计详情
+    - C.1 设计原则
+    - C.2 建筑与设备结构
+    - C.3 异常事件字段
+    - C.4 数据质量层级
 15. 附录D：工单闭环与经济决策规则矩阵
+    - D.1 治理原则
+    - D.2 工单优先级评分矩阵
+    - D.3 派单路径配置
+    - D.4 ROI 措施配置
+    - D.5 关键常量速查
+    - D.6 工单状态种子数据格式
 
 ---
 
@@ -55,7 +187,7 @@
 
 ### 1.1 编写目的
 
-本软件设计说明书（Software Design Description, SDD）旨在详细描述“基于大模型的建筑能源智能管理与运维优化系统”的系统架构、模块划分、关键算法、接口契约、数据存储、安全机制、部署方案和设计取舍。本文档基于同目录下的软件需求规格说明书 `final_docs/01-SRS-软件需求规格说明书.md` 编写，是将需求用例、业务规则和非功能需求转化为工程实现方案的设计蓝图。
+本软件设计说明书（Software Design Description, SDD）旨在详细描述“基于大模型的建筑能源智能管理与运维优化系统”的系统架构、模块划分、关键算法、接口契约、数据存储、安全机制、部署方案和设计取舍。本文档是将需求用例、业务规则和非功能需求转化为工程实现方案的设计蓝图。
 
 本文档的主要预期读者包括：
 
@@ -89,16 +221,15 @@
 ### 1.3 参考资料
 
 1. `final_docs/01-SRS-软件需求规格说明书.md`
-2. `final_docs/ref/SDD/大型电信运营商智慧合同管理系统-SDD.md`
-3. `docs/06-api-contract.md`
-4. `docs/16-mcp-integration.md`
-5. `docs/22-business-logic-iteration-plan.md`
-6. `docs/23-business-logic-closure-acceptance.md`
+2. `docs/06-api-contract.md`
+3. `docs/16-mcp-integration.md`
+4. `docs/22-business-logic-iteration-plan.md`
+5. `docs/23-business-logic-closure-acceptance.md`
+6. `docs/30-system-reference-for-final-reports.md`
 7. `docs/24-time-machine-and-causal-upgrade.md`
 8. `docs/28-roi-retrofit-methodology-redesign.md`
 9. `docs/29-data-quality-acceptance-spec.md`
-10. `docs/30-system-reference-for-final-reports.md`
-11. FastAPI、Vue 3、Vite、Pandas、SQLAlchemy、MCP Python SDK 官方文档
+10. FastAPI、Vue 3、Vite、Pandas、SQLAlchemy、MCP Python SDK 官方文档
 
 ### 1.4 术语与缩略语定义
 
@@ -178,34 +309,7 @@
 
 **系统上下文图**
 
-```mermaid
-flowchart LR
-  Admin["能源运营管理员"]
-  Worker["现场工人"]
-  Browser["Web 浏览器"]
-  MCPClient["MCP/AI 客户端"]
-  LLM["外部 OpenAI-compatible LLM（可选）"]
-
-  subgraph System["建筑能源智能管理与运维优化系统"]
-    Frontend["Vue 3 前端工作台"]
-    Backend["FastAPI REST 后端"]
-    Services["业务服务层"]
-    MCP["MCP Server"]
-    Store["CSV/JSON 或 MySQL"]
-    KB["Markdown 知识库"]
-  end
-
-  Admin --> Browser
-  Worker --> Browser
-  Browser --> Frontend
-  Frontend --> Backend
-  Backend --> Services
-  MCPClient --> MCP
-  MCP --> Services
-  Services <--> Store
-  Services --> KB
-  Services -.可选增强.-> LLM
-```
+![SDD-2.3-系统上下文图](images/SDD-2.3-系统上下文图.png)
 
 ---
 
@@ -227,49 +331,7 @@ flowchart LR
 
 系统采用分层架构，自上而下分为展示层、应用接口层、业务服务层、数据与知识层、外部增强层。
 
-```mermaid
-flowchart TB
-  subgraph Presentation["展示层"]
-    P1["Vue 3 单页工作台"]
-    P2["ECharts 图表组件"]
-    P3["三维楼层风险视图"]
-    P4["AI 助手面板"]
-  end
-
-  subgraph Application["应用接口层"]
-    A1["FastAPI REST Routes"]
-    A2["MCP Server Tools/Resources"]
-    A3["Pydantic Schemas"]
-  end
-
-  subgraph Domain["业务服务层"]
-    D1["数据加载与统计分析"]
-    D2["异常诊断与风险量化"]
-    D3["工单状态机与权限"]
-    D4["时间沙盘与反事实"]
-    D5["预算、KPI 与 ROI"]
-    D6["可信问答与知识检索"]
-  end
-
-  subgraph Data["数据与知识层"]
-    S1["energy_records.csv"]
-    S2["work_orders.json / budgets.json / sim_state.json"]
-    S3["MySQL 可选持久化"]
-    S4["knowledge_base Markdown"]
-  end
-
-  subgraph External["外部增强层"]
-    E1["OpenAI-compatible LLM"]
-    E2["MCP Client"]
-  end
-
-  Presentation --> Application
-  A1 --> Domain
-  A2 --> Domain
-  Domain <--> Data
-  Domain -.可选调用.-> E1
-  E2 --> A2
-```
+![系统逻辑架构](images/SDD-3.2.png)
 
 各层职责如下：
 
@@ -469,42 +531,7 @@ flowchart TB
 
 系统按照“基础设施层、核心业务层、智能增强层、展示交互层”进行功能模块划分。
 
-```mermaid
-flowchart TB
-  subgraph Infra["基础设施层"]
-    I1["配置管理"]
-    I2["认证与权限"]
-    I3["数据仓储切换"]
-    I4["启动与检查脚本"]
-  end
-
-  subgraph Core["核心业务层"]
-    C1["数据查询与导出"]
-    C2["统计分析与异常诊断"]
-    C3["工单状态机"]
-    C4["时间沙盘"]
-    C5["预算/KPI/ROI"]
-    C6["决策报告"]
-  end
-
-  subgraph Intelligence["智能增强层"]
-    G1["知识库检索"]
-    G2["可信问答"]
-    G3["外部 LLM"]
-    G4["MCP Server"]
-  end
-
-  subgraph UI["展示交互层"]
-    U1["管理员工作台"]
-    U2["工人工作台"]
-    U3["图表和三维风险"]
-    U4["AI 助手面板"]
-  end
-
-  UI --> Core
-  Core --> Infra
-  Intelligence --> Core
-```
+![模块图](images/SDD-4.1.png)
 
 模块与代码映射：
 
@@ -582,7 +609,9 @@ backend/app/core/config.py
 
 仓储层通过 `backend/app/db/repository.py` 提供统一读写函数。上层服务只调用 `read_work_orders()`、`write_work_orders()`、`read_budgets()`、`write_budgets()`、`read_sim_state()`、`write_sim_state()` 等函数，不直接关心底层是文件还是数据库。
 
-#### 4.2.4 项目脚本与质量检查
+#### 4.2.4 工程支撑与验收脚本设计
+
+本小节对应 SRS 中“工程支撑与验收支撑”的交付约束和 NFR-033 可验收性要求，用于说明项目启动、检查、测试和演示支撑脚本的设计；该内容不作为独立功能用例或功能需求编号纳入 RTM。
 
 | 脚本 | 职责 |
 | :--- | :--- |
@@ -794,29 +823,6 @@ knowledge_base/
 
 问答服务采用“本地规则回答优先 + 实时上下文接地 + 知识库引用 + 可选外部模型增强”的设计。
 
-```mermaid
-sequenceDiagram
-  participant User as 用户
-  participant UI as AI助手面板
-  participant API as /assistant/query
-  participant Ground as grounding_service
-  participant Local as assistant_service
-  participant KB as knowledge_search_service
-  participant LLM as 外部LLM
-
-  User->>UI: 输入问题
-  UI->>API: POST question/provider/model
-  API->>Ground: 分类问题和抽取实体
-  API->>Local: 构造本地业务回答
-  API->>KB: 检索知识库引用
-  alt 启用外部模型且调用成功
-    API->>LLM: 发送接地上下文
-    LLM-->>API: 增强回答
-  else 未启用或失败
-    API-->>UI: 返回本地回答
-  end
-  API-->>UI: answer + citations + follow_up + grounding_status
-```
 ![UC-10时序图](images/SRS-4.3.3-UC-10问答时序图.png)
 
 #### 4.4.3 MCP 工具服务 (MCP Server)
@@ -837,52 +843,90 @@ MCP 主要能力：
 
 ## 5. 子系统详细设计 (Subsystem Detailed Design, Logical/Structure/Interaction Viewpoints)
 
-本章提供逻辑视图、结构视图和交互视图，定义主要设计元素的职责、依赖、交互时序和可执行边界。
+本章提供逻辑视图、结构视图和交互视图，定义主要子系统的职责、设计元素、内部依赖、交互时序、核心函数和异常边界。各子系统均遵循“路由层负责协议适配、服务层负责业务规则、仓储层负责持久化细节”的分层原则，避免 REST API、MCP 工具和前端页面各自实现一套业务逻辑。
 
 ### 5.1 数据与分析子系统 (Data and Analytics Subsystem)
 
 #### 5.1.1 功能描述
 
-数据与分析子系统负责加载能耗记录、应用沙盘过滤、派生业务维度、构建统计图表数据、识别异常、解释异常、生成优化建议和运营报告。
+数据与分析子系统负责加载能耗记录、应用沙盘过滤、派生业务维度、构建统计图表数据、识别异常、解释异常、生成优化建议和运营报告。该子系统是总览、数据浏览、统计分析、工单建议、预算、ROI、报告和智能问答的共同数据来源。
 
 主要输入：
 
-- `data/samples/energy_records.csv`
-- MySQL `energy_readings` 表（可选）
-- 时间沙盘当前日期
-- 建筑、楼层、时间等筛选参数
+- `data/samples/energy_records.csv`。
+- MySQL `energy_readings` 表（可选）。
+- 时间沙盘当前日期、定时故障和维修干预。
+- 建筑、楼层、开始时间、结束时间、limit 等筛选参数。
+- 工单列表，用于生成运营报告中的闭环指标。
 
 主要输出：
 
-- 总览 KPI。
-- 记录列表。
-- 时间汇总、建筑对比、COP 排名。
-- 异常明细、异常解释、异常原因分布。
+- 总览 KPI、建筑清单、数据集元信息和记录列表。
+- 时间汇总、建筑对比、COP 排名和异常原因分布。
+- 异常明细、异常解释、异常工单草稿和优化建议。
 - 楼层汇总、楼层台账、设备摘要。
-- 优化建议和运营报告。
+- 运营日报、MCP 结构化返回和 AI 问答接地上下文。
 
-#### 5.1.2 核心类/函数设计
+#### 5.1.2 设计元素与数据流
 
-| 文件/函数 | 职责 |
-| :--- | :--- |
-| `data_loader.read_dataset()` | 读取 CSV 或数据库能耗数据，并校验必需字段。 |
-| `data_loader.get_filtered_dataset()` | 根据建筑、时间和沙盘状态返回可见数据切片。 |
-| `analysis_service.build_analysis_frame()` | 添加楼层、设备类型、异常、业务影响等分析字段。 |
-| `analysis_service.build_overview()` | 构建总览 KPI。 |
-| `analysis_service.build_time_summary()` | 构建时段汇总。 |
-| `analysis_service.build_anomaly_summary()` | 输出异常列表。 |
-| `analysis_service.build_anomaly_explanation()` | 输出单条异常解释。 |
-| `analysis_service.build_operation_report()` | 汇总运营日报。 |
+| 设计元素 | 类型 | 职责 | 主要依赖 |
+| :--- | :--- | :--- | :--- |
+| `EnergyRecord` | 数据行 | 表示 CSV/MySQL 中的一条原始能耗记录。 | `energy_records.csv` 或 `energy_readings` |
+| `VisibleDataset` | DataFrame | 经过建筑、时间和沙盘窗口过滤后的可见数据集。 | `data_loader`、`simulation_service` |
+| `AnalysisFrame` | DataFrame | 增加楼层、区域、设备类型、异常、风险和业务影响字段。 | `analysis_service` |
+| `DisplayRecord` | DTO | 前端数据表、导出和 MCP 记录查询使用的可序列化对象。 | `to_serializable_records()` |
+| `AnomalyExplanation` | DTO | 单条异常的原因、规则、SLA、损失和建议动作。 | `build_anomaly_explanation()` |
+| `OperationReport` | DTO | 汇总能耗、异常、工单、预算和管理建议。 | `build_operation_report()` |
+
+处理流程：
+
+![数据分析处理流程图](images/SDD-5.1.2-数据分析处理流程图.png)
+
+#### 5.1.3 核心类/函数设计
+
+![数据与分析核心类图](images/SDD-5.1.3-数据与分析核心类图.png)
+
+| 文件/函数 | 功能 | 前置条件 | 后置条件 |
+| :--- | :--- | :--- | :--- |
+| `data_loader.read_dataset()` | 读取 CSV 或数据库能耗数据，并校验必需字段。 | 数据文件存在，或 `DATABASE_URL` 可连接且表已初始化。 | 返回字段完整的 DataFrame，并进入进程级缓存。 |
+| `data_loader.get_filtered_dataset()` | 根据建筑、时间、limit 和沙盘状态返回可见数据切片。 | 筛选参数合法；沙盘状态可读取。 | 返回不晚于沙盘业务日期的数据；不修改原始数据。 |
+| `data_loader.get_dataset_meta()` | 生成数据集元信息。 | 数据集可读取。 | 返回记录数、字段列表、时间范围和建筑数量。 |
+| `analysis_service.build_analysis_frame()` | 添加楼层、区域、设备类型、COP、异常、风险和业务影响字段。 | 输入包含能耗、时间、建筑、设备字段。 | 输出分析字段完整的 DataFrame。 |
+| `analysis_service.build_overview()` | 构建总览 KPI。 | 输入为可见数据集。 | 返回总电耗、水耗、HVAC 占比、异常数等指标。 |
+| `analysis_service.build_time_summary()` | 构建按日或按小时的时段汇总。 | `freq` 参数为可支持的 Pandas 聚合频率。 | 返回趋势图可直接消费的数组。 |
+| `analysis_service.build_anomaly_summary()` | 输出异常列表。 | 输入已完成异常字段派生。 | 返回按风险和时间排序的异常明细。 |
+| `analysis_service.build_anomaly_explanation()` | 输出单条异常解释。 | `record_id` 存在于当前可见数据。 | 返回规则命中、业务影响、SLA 和建议处置。 |
+| `analysis_service.build_operation_report()` | 汇总运营日报。 | 可见数据集存在；工单列表可为空。 | 返回能源、异常、闭环和管理决策摘要。 |
+| `export_service.build_csv_content()` | 生成 CSV 导出内容。 | 使用与记录查询相同的筛选参数。 | 返回与当前筛选口径一致的 CSV 文本。 |
+
+#### 5.1.4 异常边界与一致性约束
+
+| 场景 | 处理策略 | 设计理由 |
+| :--- | :--- | :--- |
+| 数据文件缺失或字段缺失 | 路由层返回明确错误，服务层不吞掉结构性错误。 | 让验收人员能定位数据准备问题。 |
+| 筛选后数据为空 | 返回空数组和空态指标，不抛出系统异常。 | 前端可展示空态，不影响其它模块。 |
+| 沙盘已启动 | 所有查询、分析、导出、报告和问答只能使用业务日期及以前数据。 | 满足 SRS 对未来数据隐藏的要求。 |
+| 除零或缺失值 | 使用 `_safe_divide()` 和默认值保护，指标保留可解释含义。 | 避免样例数据局部异常导致页面白屏。 |
+| 记录查询与 CSV 导出 | 必须共享建筑、楼层、时间和 limit 过滤条件。 | 保证前端表格、导出文件和 MCP 查询口径一致。 |
 
 ### 5.2 工单与权限子系统 (Work Order and Permission Subsystem)
 
 #### 5.2.1 功能描述
 
-工单与权限子系统负责将异常记录转化为可执行任务，并约束管理员和工人的操作边界。它覆盖工单创建、自动待确认队列、派单、接单、提交、复核、驳回、关闭、忽略、现场附件和历史案例支持。
+工单与权限子系统负责将异常记录转化为可执行任务，并约束管理员和工人的操作边界。它覆盖工单创建、自动待确认队列、派单、接单、提交、复核、驳回、关闭、忽略、现场附件、历史案例支持和工人忙闲锁。该子系统是系统“发现异常 -> 派发处理 -> 现场反馈 -> 管理复核 -> 影响未来”的闭环核心。
 
 #### 5.2.2 核心对象设计
 
 ![工单核心类图](images/SDD-5.2.2-工单核心类图.png)
+
+| 设计元素 | 类型 | 关键字段/方法 | 职责 |
+| :--- | :--- | :--- | :--- |
+| `WorkOrder` | 业务对象 | `work_order_id`、`source_record_id`、`equipment_id`、`status`、`assignee_id`、`timeline` | 保存工单状态、来源异常、责任人、现场处理信息和审计时间线。 |
+| `TimelineEvent` | 内嵌对象 | `action`、`operator_id`、`operator_name`、`at`、`note` | 记录创建、派单、接单、提交、复核、关闭、驳回、忽略等操作。 |
+| `WorkOrderStore` | 服务模块 | `create_work_order()`、`assign_work_order()`、`submit_work_order()`、`review_work_order()` | 执行状态机约束、忙闲锁、同设备去重和持久化读写。 |
+| `PermissionService` | 服务模块 | `require_admin_operator()`、`require_worker_operator()`、`build_worker_support()` | 校验管理员/工人权限，并构造工人作业支持信息。 |
+| `WorkerSupport` | DTO | 标准作业建议、相似历史案例、当前工单摘要 | 辅助工人完成现场处理。 |
+| `WorkOrderMetrics` | DTO | 各状态数量、关闭率、待复核数量 | 支撑管理员/工人看板和报告。 |
 
 关键异常：
 
@@ -892,56 +936,96 @@ MCP 主要能力：
 | `EquipmentAlreadyHandledError` | 同设备已有未关闭工单或已修复仍重复派单。 | 409 |
 | `PermissionDenied` | 非授权角色执行操作。 | 403 |
 
+#### 5.2.3 交互时序设计
+
+**管理员派单、工人提交、管理员复核**
+
+![工单派单处理复核时序图](images/SDD-5.2.3-工单派单处理复核时序图.png)
+
+**自动待确认队列**
+
+![自动待确认队列时序图](images/SDD-5.2.3-自动待确认队列时序图.png)
+
+#### 5.2.4 核心类/函数设计
+
+![工单核心类图](images/SDD-5.2.2-工单核心类图.png)
+
+| 文件/函数 | 功能 | 前置条件 | 后置条件 |
+| :--- | :--- | :--- | :--- |
+| `work_order_store.list_work_orders()` | 查询工单列表。 | 可选 `assignee_id/status/role` 参数合法。 | 返回按状态和时间排序的工单，工人视图只返回本人相关工单。 |
+| `work_order_store.create_work_order()` | 创建持久化工单。 | 来源异常或手工输入字段完整；同设备无未关闭工单。 | 新工单写入 JSON/MySQL，状态为 `pending_confirm` 或 `assigned`。 |
+| `work_order_store.create_work_order_from_anomaly()` | 从异常记录创建工单。 | `record_id/equipment_id/building_id` 等来源字段存在。 | 保留异常原因、风险、损失和建议动作。 |
+| `work_order_store.assign_work_order()` | 管理员派单或改派。 | 调用者为管理员；目标工人存在且不忙。 | 状态为 `assigned`，timeline 增加派单记录。 |
+| `work_order_store.accept_work_order()` | 工人接单。 | 工单状态为 `assigned`；工单指派给当前工人。 | 状态变为 `in_progress`，工人进入忙碌状态。 |
+| `work_order_store.submit_work_order()` | 工人提交处理结果。 | 工单状态为 `in_progress`；实际原因和处理说明已填写。 | 状态变为 `pending_review`，现场信息和附件元数据被保存。 |
+| `work_order_store.review_work_order()` | 管理员复核通过或驳回。 | 工单状态为 `pending_review`；`approved` 明确。 | 通过时状态为 `closed` 并登记维修干预；驳回时状态为 `rejected`。 |
+| `work_order_store.ignore_work_order()` | 管理员忽略异常工单。 | 调用者为管理员；工单未关闭。 | 状态变为 `ignored`，不登记维修干预。 |
+| `permission_service.build_worker_support()` | 构造工人作业支持信息。 | 当前用户为工人。 | 返回本人待处理工单、标准作业建议和相似案例。 |
+
+#### 5.2.5 状态与权限契约
+
+| 契约 | 约束 |
+| :--- | :--- |
+| 角色边界 | `admin` 可创建、派单、改派、复核、忽略；`worker` 只能接单、提交本人被指派工单。 |
+| 忙闲锁 | 工人持有 `assigned` 或 `in_progress` 工单时视为忙碌。 |
+| 同设备去重 | 同一设备同一时刻只允许一张未关闭工单。 |
+| 设备级修复 | 管理员复核通过后登记设备级维修干预，未来同设备异常被抑制。 |
+| 联动关闭 | 关闭同设备其它未关闭工单时必须写入联动原因。 |
+| 附件可见 | 工人提交的附件元数据随工单保存，管理员复核时可查看。 |
+
 ### 5.3 时间沙盘与决策子系统 (Simulation and Decision Subsystem)
 
 #### 5.3.1 功能描述
 
-时间沙盘与决策子系统负责控制业务时间、注入未来故障、登记维修干预、生成反事实对照、排序待处理工单并输出资源约束派单计划。
+时间沙盘与决策子系统负责控制业务时间、注入未来故障、登记维修干预、生成反事实对照、排序待处理工单并输出资源约束派单计划。它把“当前可见数据”和“如果处理/不处理会怎样”变成可演示、可复现的业务闭环。
 
-#### 5.3.2 交互时序设计
+#### 5.3.2 核心设计元素
+
+| 设计元素 | 类型 | 职责 | 持久化位置 |
+| :--- | :--- | :--- | :--- |
+| `SimulationState` | 状态对象 | 保存 `active`、`current_date`、`start_date`、`interventions` 和数据范围。 | `sim_state` 表或运行期 JSON |
+| `Intervention` | 状态子对象 | 表示某设备自某日期起被维修干预。 | `SimulationState.data.interventions` |
+| `ScheduledFailure` | 派生对象 | 沙盘开启后按排程注入设备劣化。 | 动态计算 |
+| `CounterfactualScenario` | DTO | 表示立即处理、延迟处理、不处理三种策略结果。 | 不持久化 |
+| `DispatchPriority` | DTO | 对开放工单按风险、损失、SLA、碳排和重复异常评分。 | 动态计算 |
+| `DispatchPlan` | DTO | 在工人容量约束下输出 selected、deferred 和 summary。 | 动态计算 |
+
+#### 5.3.3 交互时序设计
 
 **管理员关闭工单并影响未来**
-
-```mermaid
-sequenceDiagram
-  participant Admin as 管理员
-  participant API as WorkOrder API
-  participant Store as work_order_store
-  participant Sim as simulation_service
-  participant Data as data_loader/analysis
-  participant UI as 前端报告
-
-  Admin->>API: PATCH /work-orders/{id}/review approved=true
-  API->>Store: review_work_order()
-  Store->>Store: 状态置为 closed，写入 timeline
-  Store->>Sim: register_intervention(equipment_id)
-  Sim->>Sim: 保存维修干预
-  Admin->>API: POST /sim/advance
-  API->>Sim: advance_day()
-  UI->>Data: 查询未来可见数据
-  Data->>Sim: apply_interventions()
-  Data-->>UI: 已修复设备异常减少
-```
 
 ![关闭工单影响未来时序图](images/SDD-5.3.2-关闭工单影响未来时序图.png)
 
 **资源约束派单**
 
-```mermaid
-sequenceDiagram
-  participant Admin as 管理员
-  participant Decision as decision_service
-  participant Store as work_order_store
-  participant Auth as auth_service
-
-  Admin->>Decision: GET /decisions/dispatch-plan
-  Decision->>Store: list_work_orders()
-  Decision->>Auth: list_demo_users()
-  Decision->>Decision: 计算工人忙闲、风险分、损失、SLA、碳排、重复异常
-  Decision-->>Admin: selected + deferred + summary
-```
-
 ![资源约束派单时序图](images/SDD-5.3.2-资源约束派单时序图.png)
+
+#### 5.3.4 核心类/函数设计
+
+![时间沙盘与决策核心类图](images/SDD-5.3.4-时间沙盘与决策核心类图.png)
+
+| 文件/函数 | 功能 | 前置条件 | 后置条件 |
+| :--- | :--- | :--- | :--- |
+| `simulation_service.get_state()` | 读取当前沙盘状态。 | 运行期状态文件或数据库可读；不存在时可返回空状态。 | 返回规范化的 `SimulationState`。 |
+| `simulation_service.start_simulation()` | 启动沙盘并设置起始业务日期。 | 起始日期在样例数据时间范围内，或使用默认起点。 | `active=true`，写入 `current_date/start_date`。 |
+| `simulation_service.advance_day()` | 推进业务日期。 | 沙盘已启动；`days` 为正整数。 | `current_date` 前移指定天数，后续查询可见窗口变化。 |
+| `simulation_service.reset()` | 重置沙盘。 | 调用方具备演示重置权限。 | 清空沙盘状态和干预信息。 |
+| `simulation_service.register_intervention()` | 登记维修干预。 | 工单已被管理员复核通过；`equipment_id` 存在。 | 状态中追加设备级干预，未来分析时生效。 |
+| `simulation_service.apply_window()` | 应用业务日期窗口。 | 输入为 DataFrame；沙盘状态可读取。 | 过滤掉业务日期之后的数据。 |
+| `simulation_service.apply_interventions()` | 应用维修干预。 | 输入已包含设备字段。 | 同设备未来异常和设备异常状态被抑制。 |
+| `scenario_service.build_counterfactual_scenarios()` | 生成反事实三策略对照。 | 请求包含有效 `record_id` 和延迟天数。 | 返回立即、延迟、不处理的损失、电量、碳排和异常次数。 |
+| `decision_service.rank_open_work_orders()` | 对开放工单排序。 | 工单列表可读取，分析数据可读取。 | 返回带评分解释的优先级列表。 |
+| `decision_service.recommend_dispatch_plan()` | 生成资源约束派单计划。 | `worker_capacity` 为正整数；工人清单可读取。 | 返回 selected、deferred、worker_status 和 summary。 |
+
+#### 5.3.5 状态一致性与边界
+
+| 边界 | 约束 |
+| :--- | :--- |
+| 沙盘不污染原始数据 | 沙盘通过过滤、注入和干预在分析阶段生效，不改写 `energy_records.csv`。 |
+| 反事实不污染真实状态 | `build_counterfactual_scenarios()` 只返回计算结果，不写入 `sim_state`。 |
+| 关闭工单影响未来 | 只有管理员复核通过的工单才登记 `Intervention`。 |
+| 决策建议可解释 | 派单优先级必须保留风险、损失、碳排、SLA、重复异常等评分依据。 |
+| 时间口径统一 | 总览、异常、预算、报告、问答和 MCP 均读取同一沙盘状态。 |
 
 ### 5.4 预算与 ROI 子系统 (Budget and ROI Subsystem)
 
@@ -949,28 +1033,68 @@ sequenceDiagram
 
 预算与 ROI 子系统负责把运维行动和经济决策关联起来。预算服务根据季节中性基线生成月度预算，并计算执行率、预测执行率和年度 KPI；ROI 服务根据设备年化能耗、改造投资和节能率计算经济指标；决策服务汇总关闭工单对预算预测的改善，并识别反复异常设备形成改造候选池。
 
-#### 5.4.2 核心类/函数设计
+#### 5.4.2 核心对象设计
 
-| 文件/函数 | 职责 |
+| 设计元素 | 类型 | 关键字段 | 职责 |
+| :--- | :--- | :--- | :--- |
+| `Budget` | 持久化对象 | `building_id`、`year`、`month`、`budget_kwh`、`baseline_method` | 保存建筑月度预算。 |
+| `BudgetAnalysis` | DTO | `actual_kwh`、`budget_kwh`、`execution_rate`、`forecast_rate`、`risk_level` | 展示预算执行和超预算风险。 |
+| `BudgetKPI` | DTO | `score`、`grade`、`dimensions`、`strengths`、`improvements` | 年度预算和运营绩效评分。 |
+| `BudgetImpactSummary` | DTO | `closed_orders`、`estimated_saving_yuan`、`forecast_improvement` | 汇总关闭工单对预算预测的改善。 |
+| `EquipmentAudit` | DTO | `building_id`、`equipment_type`、`sample_count`、`current_cop`、`target_cop` | 只审计建筑中实际存在且有实测数据的设备类型。 |
+| `ROIProject` | DTO | `investment`、`annual_saving`、`npv`、`irr`、`eaa`、`payback` | 表示单个改造项目经济性。 |
+| `ScenarioComparison` | DTO | `candidates`、`qualified`、`best`、`decision_rule` | 多方案比较并按 NPV/EAA 规则择优。 |
+
+#### 5.4.3 交互时序设计
+
+**预算生成、闭环改善与 ROI 候选**
+
+![预算生成闭环改善与ROI候选时序图](images/SDD-5.4.3-预算生成闭环改善与ROI候选时序图.png)
+
+#### 5.4.4 核心类/函数设计
+
+![预算ROI核心类图](images/SDD-5.4.4-预算ROI核心类图.png)
+
+| 文件/函数 | 功能 | 前置条件 | 后置条件 |
+| :--- | :--- | :--- | :--- |
+| `budget_service.auto_generate_budgets()` | 自动生成建筑月度预算。 | 年月合法；可见数据覆盖目标建筑。 | 写入或返回建筑月度预算，标明基线方法。 |
+| `budget_service.list_budgets()` | 查询预算列表。 | 可选年月参数合法。 | 返回预算对象列表。 |
+| `budget_service.set_budget()` | 手动设置或更新预算。 | 调用者为管理员；预算电耗非负。 | 预算持久化，后续分析使用新值。 |
+| `budget_service.build_budget_analysis()` | 汇总预算执行率、风险状态和预测。 | 目标年月存在预算或可生成预算。 | 返回超预算楼栋、风险等级、预测执行率和汇总指标。 |
+| `budget_service.build_budget_kpi()` | 计算年度 KPI 分数和等级。 | 建筑和年份合法；相关月份有可见数据。 | 返回分维度扣分、等级、优势和改进建议。 |
+| `roi_service.build_equipment_audit()` | 按建筑输出设备能效审计。 | 建筑存在；设备类型有实测样本。 | 返回该建筑实际存在设备类型的审计结果。 |
+| `roi_service.analyze_roi_project()` | 计算单个改造项目 ROI。 | 建筑、设备类型、投资额和节能率合法。 | 返回 NPV、IRR、EAA、回收期、碳价情景和敏感性。 |
+| `roi_service.compare_scenarios()` | 比较多个改造方案。 | 请求中至少包含一个合法方案。 | 先筛选 `NPV(8%) > 0`，再按 `EAA` 最大确定推荐方案。 |
+| `decision_service.summarize_budget_impact_from_closures()` | 计算已关闭工单对预算预测的改善。 | 工单列表和预算分析数据可读取。 | 返回闭环节省、预测执行率改善和说明文字。 |
+| `decision_service.find_roi_candidates_from_repeated_anomalies()` | 识别改造候选设备。 | 可见异常数据可读取。 | 返回重复异常或累计损失较高的设备候选。 |
+
+#### 5.4.5 经济口径与一致性约束
+
+| 约束 | 设计落实 |
 | :--- | :--- |
-| `budget_service.auto_generate_budgets()` | 自动生成建筑月度预算。 |
-| `budget_service.build_budget_analysis()` | 汇总预算执行率、风险状态和预测。 |
-| `budget_service.build_budget_kpi()` | 计算年度 KPI 分数和等级。 |
-| `roi_service.build_equipment_audit()` | 按建筑输出设备能效审计。 |
-| `roi_service.analyze_roi_project()` | 计算单个改造项目 ROI。 |
-| `roi_service.compare_scenarios()` | 比较多个改造方案。 |
-| `decision_service.summarize_budget_impact_from_closures()` | 计算已关闭工单对预算预测的改善。 |
-| `decision_service.find_roi_candidates_from_repeated_anomalies()` | 识别改造候选设备。 |
+| 预算基线 | 使用季节中性日均和季节系数，不用考核月实测值倒推预算。 |
+| 闭环节省 | 关闭工单的预计节省进入预算改善摘要，并与报告、问答共用同一常量。 |
+| ROI 审计范围 | 只输出目标建筑真实存在且有实测数据的设备类型。 |
+| 投资口径 | 使用增量投资法，避免把既有设备沉没成本计入改造投资。 |
+| 多方案比较 | 先筛选 `NPV(8%) > 0`，再按 `EAA` 最大择优。 |
+| 时间口径 | 预算、ROI 候选和运营报告均读取沙盘业务时间。 |
 
 ### 5.5 智能服务子系统 (Intelligent Service Subsystem)
 
 #### 5.5.1 功能描述
 
-智能服务子系统面向两类使用者：Web 端 AI 助手用户和 MCP 客户端。它需要在保证事实来源可靠的前提下回答建筑能源、异常、工单、预算、ROI 和项目说明相关问题。
+智能服务子系统面向两类使用者：Web 端 AI 助手用户和 MCP 客户端。它需要在保证事实来源可靠的前提下回答建筑能源、异常、工单、预算、ROI 和项目说明相关问题。外部 LLM 只作为语言生成增强，事实来源必须来自本地业务数据、知识库和接地上下文。
 
-#### 5.5.2 核心交互设计
+#### 5.5.2 核心对象设计
 
-![智能服务类图](images/SDD-5.5.2-核心服务子系统类图.png)
+| 设计元素 | 类型 | 职责 |
+| :--- | :--- | :--- |
+| `LocalReply` | DTO | `assistant_service.build_assistant_reply()` 生成的本地可信回答。 |
+| `KnowledgeSection` | 对象 | 表示知识库 Markdown 中的一个可检索段落。 |
+| `SearchResult` | DTO | 保存知识库检索得分、命中关键词和来源路径。 |
+| `GroundingContext` | DTO | 保存问题分类、显式实体、相关工单和实体白名单。 |
+| `LLMProviderConfig` | 配置对象 | 保存 provider、model、base_url、api_key 和 configured 状态。 |
+| `AssistantResponse` | API 响应 | 统一返回 answer、citations、follow_up、LLM 状态和事实校验状态。 |
 
 问答响应结构包含：
 
@@ -986,28 +1110,122 @@ sequenceDiagram
 - `validation_warnings`
 - `referenced_entities`
 
+#### 5.5.3 核心交互设计
+
+![智能问答服务时序图](images/SDD-5.5.3-智能问答服务时序图.png)
+
+#### 5.5.4 核心类/函数设计
+
+![智能服务类图](images/SDD-5.5.2-核心服务子系统类图.png)
+
+| 文件/函数 | 功能 | 前置条件 | 后置条件 |
+| :--- | :--- | :--- | :--- |
+| `assistant_service.build_assistant_reply()` | 基于规则、数据和业务上下文生成本地回答。 | 问题非空；数据服务可读取。 | 返回本地 `answer/citations/follow_up`。 |
+| `knowledge_search_service.search_knowledge()` | 检索知识库段落。 | `knowledge_base` 目录可读取。 | 返回按得分排序的 `SearchResult`。 |
+| `knowledge_search_service.search_and_format_citations()` | 生成前端可展示引用。 | 问题文本可分词。 | 返回 title、path、snippet 等引用信息。 |
+| `grounding_service.classify_assistant_question()` | 判断是否需要工单强接地。 | 问题文本非空。 | 返回问题类型和显式实体。 |
+| `grounding_service.build_work_order_grounding_context()` | 构造工单接地上下文。 | 工单列表可读取。 | 返回相关工单、实体白名单和接地状态。 |
+| `grounding_service.validate_grounded_answer()` | 校验回答中的实体和引用。 | 有待校验回答和接地上下文。 | 返回通过状态、warning 和引用实体。 |
+| `grounding_service.build_grounded_fallback_reply()` | 构造本地可信降级回答。 | 本地回答已生成。 | 返回结构完整、事实可追溯的回答。 |
+| `llm_client.list_llm_model_options()` | 列出可用模型配置。 | 配置项可读取。 | 不返回 API Key，仅返回 configured 状态。 |
+| `llm_client.build_external_assistant_answer()` | 调用外部模型增强回答。 | provider/model 已配置且启用。 | 成功时返回增强回答；失败时返回空或触发降级。 |
+
+#### 5.5.5 降级与事实校验契约
+
+| 场景 | 处理策略 |
+| :--- | :--- |
+| 未启用外部模型 | 直接返回本地回答，`llm_used=false`。 |
+| API Key 缺失或模型未配置 | `/assistant/providers` 标记 `configured=false`，问答阶段跳过外部调用。 |
+| 外部模型超时、429、5xx 或网络失败 | 返回本地回答，保留 citations 和 `validation_warnings`。 |
+| 外部回答引用不存在实体 | 丢弃外部回答，使用 `grounding_status=local_fallback`。 |
+| MCP 调用问答 | 与 REST API 复用同一问答服务和事实校验逻辑。 |
+| 前端来源展示 | `AssistantPanel.vue` 必须展示 citations、grounding_sources 和 LLM 使用状态。 |
+
 ### 5.6 前端展示子系统 (Frontend Subsystem)
 
 #### 5.6.1 功能描述
 
-前端展示子系统负责将复杂业务闭环组织为可演示、可操作的单页工作台。页面通过角色登录切换管理员视图和工人视图，通过统一 API 封装调用后端。
+前端展示子系统负责将复杂业务闭环组织为可演示、可操作的单页工作台。页面通过角色登录切换管理员视图和工人视图，通过统一 API 封装调用后端，并用加载态、错误态、空态和状态横幅保证课堂演示时的可理解性。
 
-#### 5.6.2 组件设计
+#### 5.6.2 状态管理与导航设计
 
-| 组件 | 职责 |
+| 状态域 | 主要变量/对象 | 职责 |
+| :--- | :--- | :--- |
+| 认证状态 | `currentUser`、`authToken`、`setApiOperator()` | 保存当前用户、token 和操作者 ID。 |
+| 导航状态 | `activeTab`、`adminTabs`、`workerTabs` | 根据角色展示不同页签。 |
+| 沙盘状态 | `simClock`、`simulation` | 展示业务日期，触发推进、重置和数据刷新。 |
+| 筛选状态 | `recordFilters`、`analysisFilters` | 控制记录查询、图表分析和 CSV 导出参数。 |
+| 工单状态 | `workOrderState`、`enrichedWorkOrders`、`roleScopedWorkOrders` | 保存工单列表、当前草稿、角色可见范围和本地 UI 状态。 |
+| 分析状态 | `analytics`、`overview`、`datasetMeta`、`recordSummary` | 保存总览、图表、异常、楼层和设备摘要。 |
+| 决策状态 | `decisionState` | 保存派单优先级、派单计划、预算影响和 ROI 候选。 |
+| 智能问答状态 | `assistantReply`、`assistantProviders`、`selectedAssistantModelKey` | 保存问答结果、模型列表和模型选择。 |
+| UI 反馈状态 | `loading`、`errors`、`apiStatus`、`exportState` | 管理加载、错误、后端状态和导出过程。 |
+
+角色导航约束：
+
+- 管理员页签覆盖总览、数据浏览、统计分析、工单中心、预算、ROI、报告和 AI 助手。
+- 工人页签仅覆盖“我的工单”和 AI 助手。
+- 前端隐藏页签只是体验优化，后端仍必须执行权限校验。
+
+#### 5.6.3 组件设计
+
+![前端展示核心组件类图](images/SDD-5.6.3-前端展示核心组件类图.png)
+
+| 组件 | 职责 | 主要输入/输出 |
+| :--- | :--- | :--- |
+| `AppHeader.vue` | 顶部标题、登录状态和全局导航区域。 | 当前用户、退出操作。 |
+| `TabNavigation.vue` | 工作台页签导航。 | 可见页签、当前页签、切换事件。 |
+| `KpiCard.vue` | 总览和看板 KPI 卡片。 | 指标标题、数值、单位、变化说明。 |
+| `TrendChart.vue` | 时间趋势图。 | 时间汇总数据、加载和错误状态。 |
+| `BuildingComparisonChart.vue` | 建筑对比图。 | 建筑维度能耗、异常和 COP 指标。 |
+| `AnomalyReasonChart.vue` | 异常原因分布图。 | 原因统计数据。 |
+| `BuildingRiskScene.vue` | 三维楼层风险态势视图。 | 楼层风险、选择楼层事件。 |
+| `DataTable.vue` | 通用数据表。 | 列定义、行数据、空态文本。 |
+| `FilterToolbar.vue` | 筛选条件输入区域。 | 建筑、楼层、时间、提交/重置事件。 |
+| `AssistantPanel.vue` | AI 助手问答、引用和模型状态。 | 问题、回答、citations、provider 列表。 |
+| `CitationCard.vue` | 问答引用卡片。 | 引用标题、路径、摘要。 |
+| `BudgetPanel.vue` | 预算生成、分析和 KPI 展示。 | 预算列表、分析结果、KPI、生成/设置事件。 |
+| `ROIPanel.vue` | 设备审计、ROI 分析和方案比较。 | 建筑列表、设备审计、ROI 结果、比较结果。 |
+| `StatusBanner.vue` | 全局业务状态提示。 | 沙盘、API、错误或成功消息。 |
+| `EmptyState.vue`、`LoadingSpinner.vue` | 空态和加载态处理。 | 状态文案。 |
+
+#### 5.6.4 API 适配层设计
+
+前端通过 `frontend/src/lib/api.js` 统一封装所有 HTTP 调用，页面组件不得直接拼接后端 URL。`request()` 负责组合 `operator_id`、设置 JSON 头、解析错误响应；`downloadCsvExport()` 单独处理 Blob 下载。
+
+| API 函数组 | 代表函数 | 覆盖页面/场景 |
+| :--- | :--- | :--- |
+| 数据与分析 | `fetchOverview()`、`fetchRecords()`、`fetchTimeSummary()`、`fetchAnomalies()`、`fetchOperationReport()` | 总览、数据浏览、统计分析、报告。 |
+| 认证与看板 | `loginUser()`、`fetchCurrentUser()`、`fetchDemoUsers()`、`fetchAdminDashboard()`、`fetchWorkerDashboard()` | 登录、角色看板、用户列表。 |
+| 工单闭环 | `createPersistentWorkOrder()`、`assignPersistentWorkOrder()`、`acceptPersistentWorkOrder()`、`submitPersistentWorkOrder()`、`reviewPersistentWorkOrder()`、`ignorePersistentWorkOrder()` | 工单中心、我的工单。 |
+| 沙盘与反事实 | `fetchSimState()`、`startSimulation()`、`advanceSimulation()`、`resetSimulation()`、`fetchCounterfactualScenario()` | 时间沙盘、反事实分析。 |
+| 预算与决策 | `generateBudgets()`、`setBudget()`、`fetchBudgetAnalysis()`、`fetchBudgetKPI()`、`fetchDecisionDispatchPlan()`、`fetchDecisionBudgetImpact()` | 预算管理、派单决策。 |
+| ROI | `fetchEquipmentAudit()`、`analyzeROIProject()`、`compareROIScenarios()` | ROI 改造分析。 |
+| 智能问答 | `fetchAssistantProviders()`、`queryAssistant()` | AI 助手和模型选择。 |
+| 导出与演示 | `downloadCsvExport()`、`resetDemo()` | CSV 导出、一键重置。 |
+
+#### 5.6.5 关键交互流程
+
+| 流程 | 前端函数 | 设计说明 |
+| :--- | :--- | :--- |
+| 登录和恢复会话 | `handleLogin()`、`restoreSession()`、`bootstrapAuthenticatedApp()` | 登录成功后保存 token 和用户信息，加载用户、看板、沙盘、数据和模型列表。 |
+| 沙盘推进 | `handleStartSimulation()`、`handleAdvanceDay()`、`reloadAfterClockChange()` | 沙盘变化后刷新总览、记录、分析、报告、预算和问答依赖状态。 |
+| 筛选查询 | `handleFilterApply()`、`handleAnalysisReset()`、`handleSceneSelectFloor()` | 数据表、图表和 3D 场景共用筛选状态。 |
+| 派单闭环 | `generateWorkOrder()`、`handleAssignWorkOrder()`、`handleAcceptWorkOrder()`、`handleSubmitWorkOrder()`、`handleReviewWorkOrder()` | 前端提交动作后刷新工单、看板、决策和分析状态。 |
+| 附件提交 | `handleAttachmentSelect()`、`handleSubmitWorkOrder()` | 附件以元数据形式随工单提交，管理员复核时展示。 |
+| 智能问答 | `handleAsk()` | 发送问题和模型选择，展示回答、来源、接地状态和降级提示。 |
+| CSV 导出 | `handleExport()` | 使用当前筛选条件下载导出文件。 |
+
+#### 5.6.6 前端异常与可用性边界
+
+| 场景 | 前端处理 |
 | :--- | :--- |
-| `AppHeader.vue` | 顶部标题、登录状态和全局导航区域。 |
-| `TabNavigation.vue` | 工作台页签导航。 |
-| `KpiCard.vue` | 总览和看板 KPI 卡片。 |
-| `TrendChart.vue` | 时间趋势图。 |
-| `BuildingComparisonChart.vue` | 建筑对比图。 |
-| `AnomalyReasonChart.vue` | 异常原因分布图。 |
-| `BuildingRiskScene.vue` | 三维楼层风险态势视图。 |
-| `DataTable.vue` | 通用数据表。 |
-| `AssistantPanel.vue` | AI 助手问答、引用和模型状态。 |
-| `BudgetPanel.vue` | 预算生成、分析和 KPI 展示。 |
-| `ROIPanel.vue` | 设备审计、ROI 分析和方案比较。 |
-| `StatusBanner.vue`、`EmptyState.vue`、`LoadingSpinner.vue` | 状态反馈和空态处理。 |
+| 后端接口失败 | 写入 `errors` 或 `apiStatus`，展示错误态，不阻塞其它独立模块。 |
+| 空数据结果 | 使用 `EmptyState.vue` 展示空态，不渲染空图表误导用户。 |
+| 长耗时加载 | 使用 `LoadingSpinner.vue` 和按钮 loading 状态防止重复提交。 |
+| 未授权操作 | 依赖后端返回 403/409 并展示错误说明；前端角色限制只作为第一层引导。 |
+| 外部 LLM 降级 | `AssistantPanel.vue` 展示 `llm_used=false`、来源和 warning。 |
+| 本地 UI 状态 | localStorage 仅保存登录展示状态和部分 UI 状态，不作为权限依据。 |
 
 ---
 
@@ -1479,13 +1697,12 @@ REST API 总览：
 | UC-03 / FR-002 | 统计分析与异常诊断 | BR-130、BR-131、BR-132、BR-133 | 4.3.2 异常诊断与风险评分；5.1 数据与分析子系统 | `analysis_service.py`、`GET /analytics/time-summary`、`/anomalies`、`/anomaly-explanations/{record_id}` |
 | UC-04 / FR-003 | 派发维修工单 | BR-140、BR-141、BR-142、BR-143 | 4.3.3 工单状态机；5.2 工单与权限子系统；7.3.1 接口契约 | `work_order_store.py`、`POST /work-orders`、`PATCH /work-orders/{id}/assign`、`work_orders` |
 | UC-05 / FR-003 | 处理现场工单 | BR-150、BR-151、BR-152、BR-153 | 4.3.3 工单状态机；5.2.2 核心对象设计；7.3.1 接口契约 | `PATCH /work-orders/{id}/accept`、`PATCH /work-orders/{id}/submit`、工单 `timeline` JSON |
-| UC-06 / FR-003、FR-004 | 复核关闭工单 | BR-160、BR-161、BR-162、BR-163 | 4.3.3 工单状态机；5.3.2 管理员关闭工单时序；8.4 操作审计 | `PATCH /work-orders/{id}/review`、`simulation_service.register_intervention()`、`work_orders`、`sim_state` |
+| UC-06 / FR-003、FR-004 | 复核关闭工单 | BR-160、BR-161、BR-162、BR-163 | 4.3.3 工单状态机；5.3.3 管理员关闭工单时序；8.4 操作审计 | `PATCH /work-orders/{id}/review`、`simulation_service.register_intervention()`、`work_orders`、`sim_state` |
 | UC-07 / FR-004 | 时间沙盘与反事实 | BR-170、BR-171、BR-172、BR-173 | 4.3.4 时间沙盘与反事实；5.3 时间沙盘与决策子系统 | `simulation_service.py`、`scenario_service.py`、`GET /sim/state`、`POST /sim/advance`、`POST /sim/counterfactual`、`sim_state` |
 | UC-08 / FR-005 | 预算执行与闭环改善 | BR-180、BR-181、BR-182 | 4.3.5 预算、KPI 与 ROI；5.4 预算与 ROI 子系统；6.3.3 预算表 | `budget_service.py`、`decision_service.summarize_budget_impact_from_closures()`、`/budget/budgets*`、`budgets` |
 | UC-09 / FR-005 | ROI 改造与运营报告 | BR-190、BR-191、BR-192、BR-193 | 4.3.5 预算、KPI 与 ROI；5.4 预算与 ROI 子系统；7.1 REST API | `roi_service.py`、`analysis_service.build_operation_report()`、`/roi/analyze`、`/roi/compare`、`/analytics/operation-report` |
 | UC-10 / FR-006 | 可信智能问答 | BR-200、BR-201、BR-202、BR-203 | 4.4.2 可信智能问答；5.5 智能服务子系统；7.2.2 外部 LLM 异常契约 | `assistant_service.py`、`grounding_service.py`、`knowledge_search_service.py`、`llm_client.py`、`POST /assistant/query` |
 | UC-11 / FR-007 | MCP 工具调用 | BR-210、BR-211、BR-212、BR-213 | 4.4.3 MCP 工具服务；7.4 MCP 接口设计 | `backend/app/mcp_server.py`、MCP Tools、MCP Resources |
-| UC-12 / FR-008 | 项目检查与质量验收 | BR-220、BR-221、BR-222、BR-223 | 4.2.4 项目脚本与质量检查；9.5 可测试性 | `scripts/check-project.ps1`、`backend/tests/`、`npm run build` |
 | FR-001 | 能源数据管理与查询 | BR-110、BR-111、BR-112、BR-113、BR-120、BR-121、BR-122、BR-123 | 4.3.1；6.3.1；6.4 | `energy_readings`、`data/samples/energy_records.csv`、`GET /records`、`GET /export/csv` |
 | FR-002 | 统计分析与异常诊断 | BR-130、BR-131、BR-132、BR-133 | 4.3.2 算法视图；5.1 数据与分析子系统 | `analysis_service.py`、异常风险公式、`GET /analytics/*` |
 | FR-003 | 角色化工单闭环 | BR-100、BR-101、BR-102、BR-103、BR-140、BR-141、BR-142、BR-143、BR-150、BR-151、BR-152、BR-153、BR-160、BR-161、BR-162、BR-163 | 4.3.3 状态动态视图；5.2 工单子系统；8.4 审计 | `work_order_store.py`、`permission_service.py`、`work_orders.data.timeline` |
@@ -1493,7 +1710,6 @@ REST API 总览：
 | FR-005 | 预算、ROI 与运营报告 | BR-180、BR-181、BR-182、BR-190、BR-191、BR-192、BR-193 | 4.3.5；5.4；附录D | `budget_service.py`、`roi_service.py`、`decision_service.py`、`budgets` |
 | FR-006 | 可信智能问答 | BR-200、BR-201、BR-202、BR-203 | 4.4.2；5.5；7.2.2 | `assistant_service.py`、`llm_client.py`、`knowledge_base/**/*.md` |
 | FR-007 | MCP 智能体接入 | BR-210、BR-211、BR-212、BR-213 | 4.4.3；7.4 | `mcp_server.py`、`energy://dataset/meta`、`ask_energy_assistant` |
-| FR-008 | 项目检查与质量验收 | BR-220、BR-221、BR-222、BR-223 | 3.5.6 运维管理；9.5 可测试性 | `scripts/*.ps1`、`backend/tests/*.py`、前端构建 |
 
 ### 11.2 业务规则追踪矩阵
 
@@ -1505,13 +1721,12 @@ REST API 总览：
 | BR-130、BR-131、BR-132、BR-133 | 4.3.2 异常诊断与风险评分；附录D 常量 | `analysis_service.py`、风险评分公式、损失/碳排口径 |
 | BR-140、BR-141、BR-142、BR-143 | 4.3.3 工单状态机；5.2 工单与权限子系统；8.4 操作审计 | `work_order_store.py`、`WorkerBusyError`、`EquipmentAlreadyHandledError`、工单 timeline |
 | BR-150、BR-151、BR-152、BR-153 | 4.3.3 关键约束；5.2.1 功能描述；7.3.1 接口契约 | `require_worker_operator()`、`submit_work_order()`、附件元数据、管理员复核页 |
-| BR-160、BR-161、BR-162、BR-163 | 4.3.3 工单状态机；5.3.2 管理员关闭工单时序；7.3.1 接口契约 | `review_work_order()`、`register_intervention()`、联动关闭 timeline、预算/报告/沙盘反馈 |
+| BR-160、BR-161、BR-162、BR-163 | 4.3.3 工单状态机；5.3.3 管理员关闭工单时序；7.3.1 接口契约 | `review_work_order()`、`register_intervention()`、联动关闭 timeline、预算/报告/沙盘反馈 |
 | BR-170、BR-171、BR-172、BR-173 | 4.3.4 时间沙盘与反事实；5.3 时间沙盘与决策子系统 | `simulation_service.py`、`scenario_service.py`、`POST /sim/advance`、`POST /sim/counterfactual` |
 | BR-180、BR-181、BR-182 | 4.3.5 预算、KPI 与 ROI；5.4 预算与 ROI 子系统 | `budget_service.py`、预算风险等级、闭环改善摘要 |
-| BR-190、BR-191、BR-192、BR-193 | 4.3.5 ROI 经济评价；5.4.2 核心函数；7.3.1 接口契约 | `build_equipment_audit()`、`analyze_roi_project()`、`compare_scenarios()`、运营报告沙盘口径 |
+| BR-190、BR-191、BR-192、BR-193 | 4.3.5 ROI 经济评价；5.4.4 核心类/函数设计；7.3.1 接口契约 | `build_equipment_audit()`、`analyze_roi_project()`、`compare_scenarios()`、运营报告沙盘口径 |
 | BR-200、BR-201、BR-202、BR-203 | 4.4.2 可信智能问答；5.5 智能服务；7.2.2 外部 LLM 异常契约 | `assistant_service.py`、`grounding_service.py`、citations、`grounding_status=local_fallback` |
 | BR-210、BR-211、BR-212、BR-213 | 4.4.3 MCP 工具服务；7.4 MCP 接口设计 | `backend/app/mcp_server.py`、MCP Tools、MCP Resources、事实校验复用 |
-| BR-220、BR-221、BR-222、BR-223 | 4.2.4 项目脚本与质量检查；8.3 配置安全；9.5 可测试性 | `scripts/check-project.ps1`、`backend/tests/`、前端构建、`.gitignore` |
 
 ### 11.3 接口需求追踪矩阵
 
@@ -1521,7 +1736,7 @@ REST API 总览：
 | IR-REST-02 | 数据接口 | 4.3.1；7.1 REST API 总览 | `GET /overview`、`GET /dataset-meta`、`GET /buildings`、`GET /records` |
 | IR-REST-03 | 分析接口 | 4.3.2；7.1 REST API 总览 | `GET /analytics/time-summary`、`building-comparison`、`cop-ranking`、`anomalies`、`anomaly-explanations/{record_id}` |
 | IR-REST-04 | 认证接口 | 4.2.1；8.1 身份认证 | `POST /auth/login`、`GET /auth/me`、`GET /auth/users` |
-| IR-REST-05 | 管理看板接口 | 4.2.2；5.6 前端组件映射 | `GET /admin/dashboard`、`GET /admin/worker-dashboard/{user_id}` |
+| IR-REST-05 | 管理看板接口 | 4.2.2；5.6.3 组件设计 | `GET /admin/dashboard`、`GET /admin/worker-dashboard/{user_id}` |
 | IR-REST-06 | 异常事件接口 | 4.3.2；5.1 数据与分析子系统 | `GET /anomaly-events/{record_id}` |
 | IR-REST-07 | 工单接口 | 4.3.3；5.2；7.3.1 接口契约 | `GET /work-orders`、`POST /work-orders`、`PATCH /work-orders/{id}/...` |
 | IR-REST-08 | 沙盘接口 | 4.3.4；5.3；7.3.1 接口契约 | `GET /sim/state`、`POST /sim/start`、`POST /sim/advance`、`POST /sim/reset`、`POST /sim/counterfactual` |
@@ -1552,7 +1767,7 @@ REST API 总览：
 | NFR-010、NFR-011、NFR-012、NFR-013、NFR-014 | 安全性需求 | 8. 安全设计；7.2.2 LLM 接口约束 | `.env` 隔离、`.env.example` 占位、API Key 不返回、管理员/工人权限校验、LLM 降级。 |
 | NFR-020、NFR-021、NFR-022、NFR-023、NFR-024 | 可靠性需求 | 9.2 可靠性与可用性；7.3.1 接口前/后置条件 | 文件模式回退、外部 LLM 回退、非法状态跳转拒绝、一键重置、无 MySQL/LLM 默认可运行。 |
 | NFR-025、NFR-026、NFR-027、NFR-028、NFR-029 | 可维护性需求 | 9.4 可维护性；10.2 设计模式应用理由 | 路由/服务/数据层分离、REST 与 MCP 服务层复用、接口与测试同步、公式常量附录、知识库可扩展。 |
-| NFR-030、NFR-031、NFR-032、NFR-033 | 审计与验收需求 | 8.4 操作审计；9.5 可测试性 | 工单 timeline、派单/接单/提交/复核/关闭/驳回/忽略记录、关键数字口径一致、检查脚本和测试。 |
+| NFR-030、NFR-031、NFR-032、NFR-033 | 审计与验收需求 | 4.2.4 工程支撑与验收脚本设计；8.4 操作审计；9.5 可测试性 | 工单 timeline、派单/接单/提交/复核/关闭/驳回/忽略记录、关键数字口径一致、检查脚本和测试。 |
 
 ### 11.5 设计元素反向追踪
 
@@ -1604,7 +1819,7 @@ REST API 总览：
 
 ### 13.1 现有图示清单
 
-本文档使用 Mermaid 形式给出以下设计图，便于 Markdown 维护和后续转 PDF：
+本文档使用 Mermaid 与 draw.io 图片两种形式组织设计图。第 5 章的 UML 类图和交互时序图已使用 draw.io 重绘，并在 `final_docs/图象重绘/源代码/` 下保留 `.drawio` 与 PlantUML 风格 `.md` 源文件，便于后续编辑和导出。
 
 | 图示 | 所在章节 | 类型 |
 | :--- | :--- | :--- |
@@ -1613,14 +1828,24 @@ REST API 总览：
 | 物理部署架构图 | 3.4 | Deployment |
 | 模块划分图 | 4.1 | Composition |
 | 工单状态转换图 | 4.3.3 | State Dynamics |
-| 工单核心类图 | 5.2.2 | Class Design |
-| 管理员关闭工单时序图 | 5.3.2 | Sequence |
-| 资源约束派单时序图 | 5.3.2 | Sequence |
+| 数据分析处理流程图 | 5.1.2 | Data Flow |
+| 数据与分析核心类图 | 5.1.3 | UML Class |
+| 工单核心类图 | 5.2.2、5.2.4 | UML Class |
+| 工单派单处理复核时序图 | 5.2.3 | UML Sequence |
+| 自动待确认队列时序图 | 5.2.3 | UML Sequence |
+| 管理员关闭工单时序图 | 5.3.3 | Sequence |
+| 资源约束派单时序图 | 5.3.3 | Sequence |
+| 时间沙盘与决策核心类图 | 5.3.4 | UML Class |
+| 预算生成闭环改善与 ROI 候选时序图 | 5.4.3 | UML Sequence |
+| 预算 ROI 核心类图 | 5.4.4 | UML Class |
+| 智能问答服务时序图 | 5.5.3 | UML Sequence |
+| 智能服务类图 | 5.5.4 | UML Class |
+| 前端展示核心组件类图 | 5.6.3 | UML Class |
 | 数据库 ER 图 | 6.2 | Information View |
 
 ### 13.2 图片完整性说明
 
-参考 SDD 使用图片文件组织系统上下文图、逻辑架构图、部署图和模块划分图。考虑到本项目最终 Markdown 文档需要便于版本管理和直接阅读，本文档以 Mermaid 图替代外部图片文件。若后续转换为正式 PDF，可通过支持 Mermaid 的工具渲染为图片，也可使用 draw.io 按本文图示重绘。
+参考 SDD 使用图片文件组织系统上下文图、逻辑架构图、部署图和模块划分图。第 5 章已将主要 UML 类图和交互时序图导出为 PNG，并保留 draw.io 源文件；其它章节仍保留 Mermaid 图以便 Markdown 维护。若后续转换为正式 PDF，可直接引用 PNG，或使用 `.drawio` 源文件重新导出高清图。
 
 ---
 

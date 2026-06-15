@@ -1,13 +1,12 @@
 @startuml
+title 工单与权限子系统核心类图
+
 class WorkOrder {
   - work_order_id
   - source_record_id
   - equipment_id
   - status
-  - priority
   - assignee_id
-  - risk_score
-  - wasted_cost_yuan
   - timeline
 }
 
@@ -27,12 +26,26 @@ class PermissionService {
   + build_worker_support()
 }
 
+class TimelineEvent {
+  + action
+  + operator_id
+  + at
+  + note
+}
+
+class WorkerSupport {
+  + active_orders
+  + standard_guidance
+  + similar_cases
+}
+
 class SimulationService {
   + register_intervention()
 }
 
 WorkOrderStore --> WorkOrder
+WorkOrder --> TimelineEvent
 WorkOrderStore --> PermissionService
+PermissionService --> WorkerSupport
 WorkOrderStore --> SimulationService
-
 @enduml
