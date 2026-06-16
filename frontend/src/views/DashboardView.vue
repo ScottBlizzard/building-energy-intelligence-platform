@@ -56,7 +56,8 @@ import {
   advanceSimulation,
   resetSimulation,
   resetDemo,
-  setApiOperator
+  setApiOperator,
+  setApiAuthToken
 } from "../lib/api";
 
 const TrendChart = defineAsyncComponent(() => import("../components/TrendChart.vue"));
@@ -143,6 +144,7 @@ const persistedAuthState = loadAuthState();
 const currentUser = ref(persistedAuthState.user || null);
 const authToken = ref(persistedAuthState.token || "");
 setApiOperator(currentUser.value?.user_id || null);
+setApiAuthToken(authToken.value || null);
 const simClock = ref({ active: false, current_date: null, interventions: [], data_range: {} });
 const simLoading = ref(false);
 const loginForm = reactive({
@@ -234,6 +236,22 @@ const decisionState = reactive({
   counterfactualLoading: false,
   counterfactualError: ""
 });
+
+const counterfactualMaxDailyLoss = computed(() => {
+  const scenarios = decisionState.counterfactual?.scenarios || [];
+  const values = scenarios.flatMap((scenario) =>
+    (scenario.daily || []).map((point) => Number(point.loss_yuan || 0))
+  );
+  return Math.max(1, ...values);
+});
+
+function counterfactualBarHeight(point) {
+  const loss = Number(point?.loss_yuan || 0);
+  if (loss <= 0) {
+    return 8;
+  }
+  return Math.max(8, Math.min(100, (loss / counterfactualMaxDailyLoss.value) * 100));
+}
 
 const analytics = reactive({
   timeSummary: [],
@@ -777,9 +795,49 @@ const forecastSeries = computed(() => {
 const forecastMax = computed(() =>
   Math.max(...forecastSeries.value.map((item) => item.electricity_kwh || 0), 1)
 );
+const forecastMin = computed(() => {
+  if (!forecastSeries.value.length) return 0;
+  return Math.min(...forecastSeries.value.map((item) => item.electricity_kwh || 0));
+});
+const forecastRange = computed(() =>
+  Math.max(1, forecastMax.value - forecastMin.value)
+);
 const projectedWeekKwh = computed(() =>
   forecastSeries.value.reduce((sum, item) => sum + item.electricity_kwh, 0)
 );
+const forecastPeak = computed(() =>
+  forecastSeries.value.reduce(
+    (peak, item) => (item.electricity_kwh > (peak?.electricity_kwh || 0) ? item : peak),
+    null
+  )
+);
+const forecastTrendPct = computed(() => {
+  if (forecastSeries.value.length < 2) return 0;
+  const first = forecastSeries.value[0].electricity_kwh || 0;
+  const last = forecastSeries.value[forecastSeries.value.length - 1].electricity_kwh || 0;
+  return first ? ((last - first) / first) * 100 : 0;
+});
+
+function forecastBarHeight(item) {
+  const relative = (Number(item?.electricity_kwh || 0) - forecastMin.value) / forecastRange.value;
+  return 54 + relative * 126;
+}
+
+function forecastDeltaLabel(item) {
+  const base = forecastSeries.value[0]?.electricity_kwh || 0;
+  const delta = Number(item?.electricity_kwh || 0) - base;
+  if (!base || Math.abs(delta) < 1) return "基准";
+  const pct = (delta / base) * 100;
+  return `${delta > 0 ? "+" : ""}${pct.toFixed(1)}%`;
+}
+
+function forecastDeltaClass(item) {
+  const base = forecastSeries.value[0]?.electricity_kwh || 0;
+  const delta = Number(item?.electricity_kwh || 0) - base;
+  if (delta > base * 0.01) return "forecast-delta--up";
+  if (delta < -base * 0.01) return "forecast-delta--down";
+  return "";
+}
 const simulationResult = computed(() => {
   const hvacBase = Number(overview.value.totals?.hvac_kwh || 0);
   const electricityBase = Number(overview.value.totals?.electricity_kwh || 0);
@@ -898,7 +956,7 @@ function inferOrderPriority(anomaly) {
   if (anomaly?.anomaly_reason === "设备状态异常") {
     return "高";
   }
-  if (Number(anomaly?.average_cop || 3) < 2.5) {
+  if (Number(anomaly?.average_cop || 3) < 2.2) {
     return "中";
   }
   return "中";
@@ -1050,6 +1108,7 @@ function selectDefaultAssistantModel() {
 
 function persistAuthState() {
   setApiOperator(currentUser.value?.user_id || null);
+  setApiAuthToken(authToken.value || null);
   if (typeof window !== "undefined") {
     window.localStorage.setItem(
       AUTH_STORAGE_KEY,
@@ -1064,6 +1123,7 @@ function clearAuthState() {
   adminDashboard.value = null;
   workerDashboard.value = null;
   setApiOperator(null);
+  setApiAuthToken(null);
   if (typeof window !== "undefined") {
     window.localStorage.removeItem(AUTH_STORAGE_KEY);
   }
@@ -3078,7 +3138,7 @@ onMounted(async () => {
                   <span
                     v-for="point in scenario.daily"
                     :key="point.date"
-                    :style="{ height: `${Math.max(8, Math.min(100, point.loss_yuan / Math.max(1, scenario.total_loss_yuan) * 100))}%` }"
+                    :style="{ height: `${counterfactualBarHeight(point)}%` }"
                     :title="`${point.date} · ${point.loss_yuan} 元 · ${point.anomaly_count} 次异常`"
                   ></span>
                 </div>
@@ -3322,18 +3382,37 @@ onMounted(async () => {
     <template v-else-if="activeTab === 'report'">
       <div class="content-grid">
         <SectionCard eyebrow="Forecast" title="未来 7 天能耗预测" description="基于最近趋势做轻量预测，用于课堂演示能源管理的前瞻判断。">
-          <div v-if="forecastSeries.length" class="forecast-chart">
-            <div
-              v-for="item in forecastSeries"
-              :key="item.day"
-              class="forecast-bar-wrap"
-            >
+          <div v-if="forecastSeries.length" class="forecast-panel">
+            <div class="forecast-summary-strip">
+              <div>
+                <span>7 天预测总量</span>
+                <strong>{{ formatNumber(projectedWeekKwh) }} kWh</strong>
+              </div>
+              <div>
+                <span>峰值日</span>
+                <strong>{{ forecastPeak?.day }} · {{ formatNumber(forecastPeak?.electricity_kwh) }} kWh</strong>
+              </div>
+              <div>
+                <span>首尾趋势</span>
+                <strong :class="{ 'text-danger': forecastTrendPct > 0, 'text-green': forecastTrendPct < 0 }">
+                  {{ forecastTrendPct > 0 ? "+" : "" }}{{ forecastTrendPct.toFixed(1) }}%
+                </strong>
+              </div>
+            </div>
+            <div class="forecast-chart">
               <div
-                class="forecast-bar"
-                :style="{ height: `${Math.max(18, (item.electricity_kwh / forecastMax) * 160)}px` }"
-              ></div>
-              <strong>{{ item.day }}</strong>
-              <span>{{ formatNumber(item.electricity_kwh) }} kWh</span>
+                v-for="item in forecastSeries"
+                :key="item.day"
+                class="forecast-bar-wrap"
+              >
+                <div
+                  class="forecast-bar"
+                  :style="{ height: `${forecastBarHeight(item)}px` }"
+                ></div>
+                <strong>{{ item.day }}</strong>
+                <span>{{ formatNumber(item.electricity_kwh) }} kWh</span>
+                <em :class="forecastDeltaClass(item)">{{ forecastDeltaLabel(item) }}</em>
+              </div>
             </div>
           </div>
           <EmptyState
@@ -4771,12 +4850,44 @@ button.order-summary-card:hover {
   font-size: 13px;
 }
 
+.forecast-panel {
+  display: grid;
+  gap: 16px;
+}
+
+.forecast-summary-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.forecast-summary-strip > div {
+  border: 1px solid rgba(20,34,48,0.07);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.72);
+  padding: 12px;
+}
+
+.forecast-summary-strip span {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+
+.forecast-summary-strip strong {
+  display: block;
+  color: var(--ink-strong);
+  font-size: 16px;
+  margin-top: 4px;
+}
+
 .forecast-chart {
-  min-height: 230px;
+  min-height: 250px;
   display: flex;
   align-items: flex-end;
   gap: 12px;
-  padding: 12px 4px 0;
+  padding: 18px 4px 0;
+  border-top: 1px solid rgba(20,34,48,0.06);
 }
 
 .forecast-bar-wrap {
@@ -4790,11 +4901,13 @@ button.order-summary-card:hover {
 
 .forecast-bar {
   width: 100%;
-  border-radius: 18px 18px 8px 8px;
+  max-width: 52px;
+  border-radius: 12px 12px 6px 6px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.38), transparent 35%),
     linear-gradient(180deg, #ffb84d, #0f8b8d);
   box-shadow: 0 14px 30px rgba(15, 139, 141, 0.18);
+  transition: height 0.3s ease;
 }
 
 .forecast-bar-wrap strong {
@@ -4806,6 +4919,21 @@ button.order-summary-card:hover {
   color: var(--ink-soft);
   font-size: 12px;
   text-align: center;
+}
+
+.forecast-bar-wrap em {
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-style: normal;
+  min-height: 14px;
+}
+
+.forecast-delta--up {
+  color: #d9364f !important;
+}
+
+.forecast-delta--down {
+  color: #16845b !important;
 }
 
 .simulation-form {
@@ -5016,6 +5144,7 @@ button.order-summary-card:hover {
   .floor-registry-grid,
   .registry-meta,
   .report-metric-grid,
+  .forecast-summary-strip,
   .simulation-result {
     grid-template-columns: 1fr;
   }

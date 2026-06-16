@@ -43,3 +43,28 @@ def test_login_rejects_invalid_password():
         json={"username": "admin", "password": "wrong"},
     )
     assert response.status_code == 401
+
+
+def test_production_admin_endpoint_requires_token(monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("APP_ENV", "production")
+    get_settings.cache_clear()
+    response = client.get("/api/v1/budget/budgets/analysis", params={"year": 2026, "month": 5})
+    assert response.status_code == 401
+    get_settings.cache_clear()
+
+
+def test_production_admin_endpoint_accepts_admin_token(monkeypatch):
+    from app.core.config import get_settings
+
+    monkeypatch.setenv("APP_ENV", "production")
+    get_settings.cache_clear()
+    login = client.post("/api/v1/auth/login", json={"username": "admin", "password": "admin123"}).json()
+    response = client.get(
+        "/api/v1/budget/budgets/analysis",
+        params={"year": 2026, "month": 5, "operator_id": "admin"},
+        headers={"Authorization": f"Bearer {login['access_token']}"},
+    )
+    assert response.status_code == 200
+    get_settings.cache_clear()

@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="1780" viewBox="0 0 1320 1780" role="img" aria-label="服务器部署架构图">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#4a5a6a"/>
+    </marker>
+    <style>
+      .title{font:700 36px "Microsoft YaHei",Arial,sans-serif;fill:#111827}
+      .layer{fill:#f8fafc;stroke:#cbd5e1;stroke-width:3;rx:18}
+      .tab{fill:#f8fafc;stroke:#cbd5e1;stroke-width:3}
+      .box{fill:#ffffff;stroke:#5f6f82;stroke-width:2.2;rx:14}
+      .store{fill:#fffdf2;stroke:#d39b1f;stroke-width:2.2;rx:14}
+      .optional{fill:#ffffff;stroke:#5f6f82;stroke-width:2.2;stroke-dasharray:10 7;rx:14}
+      .label{font:700 30px "Microsoft YaHei",Arial,sans-serif;fill:#111827}
+      .layerLabel{font:700 34px "Microsoft YaHei",Arial,sans-serif;fill:#2f4154}
+      .stereo{font:400 25px "Microsoft YaHei",Arial,sans-serif;fill:#111827}
+      .small{font:400 23px "Microsoft YaHei",Arial,sans-serif;fill:#111827}
+      .mono{font:400 23px Consolas,"Microsoft YaHei",monospace;fill:#111827}
+      .line{stroke:#4a5a6a;stroke-width:4;fill:none;marker-end:url(#arrow)}
+      .dash{stroke:#4a5a6a;stroke-width:4;fill:none;stroke-dasharray:12 10;marker-end:url(#arrow)}
+      .legend{fill:#ffffff;stroke:#111827;stroke-width:2.2;rx:14}
+    </style>
+  </defs>
+
+  <rect width="1320" height="1780" fill="#ffffff"/>
+  <text class="title" x="455" y="72">服务器部署架构图</text>
+
+  <rect class="layer" x="135" y="135" width="1000" height="260"/>
+  <path class="tab" d="M135,135 H300 L325,190 H135 Z"/>
+  <text class="layerLabel" x="150" y="178">公网入口层</text>
+
+  <rect class="box" x="218" y="215" width="370" height="120"/>
+  <text class="stereo" x="255" y="260">«客户端»</text>
+  <text class="label" x="255" y="303">浏览器访问</text>
+  <text class="mono" x="255" y="330">http://139.196.59.229</text>
+
+  <rect class="box" x="728" y="215" width="330" height="120"/>
+  <text class="stereo" x="765" y="260">«入口服务»</text>
+  <text class="label" x="765" y="303">Nginx</text>
+  <text class="mono" x="765" y="330">公网 80 端口</text>
+
+  <rect class="layer" x="165" y="530" width="1000" height="560"/>
+  <path class="tab" d="M165,530 H355 L380,585 H165 Z"/>
+  <text class="layerLabel" x="180" y="573">服务器进程层</text>
+
+  <rect class="box" x="230" y="640" width="380" height="150"/>
+  <text class="stereo" x="275" y="690">«静态制品»</text>
+  <text class="label" x="275" y="735">Vue 前端</text>
+  <text class="mono" x="275" y="765">frontend/dist</text>
+
+  <rect class="box" x="710" y="640" width="380" height="150"/>
+  <text class="stereo" x="755" y="690">«后端进程»</text>
+  <text class="label" x="755" y="735">FastAPI / Uvicorn</text>
+  <text class="mono" x="755" y="765">127.0.0.1:8000</text>
+
+  <rect class="box" x="710" y="875" width="380" height="150"/>
+  <text class="stereo" x="755" y="925">«核心进程»</text>
+  <text class="label" x="755" y="970">MCP Server</text>
+  <text class="mono" x="755" y="1000">127.0.0.1:8765/mcp</text>
+
+  <rect class="layer" x="65" y="1235" width="1190" height="330"/>
+  <path class="tab" d="M65,1235 H260 L285,1290 H65 Z"/>
+  <text class="layerLabel" x="80" y="1278">共享资源层</text>
+
+  <rect class="optional" x="110" y="1330" width="270" height="145"/>
+  <text class="stereo" x="155" y="1380">«数据库»</text>
+  <text class="label" x="155" y="1425">MySQL 8.x</text>
+  <text class="small" x="155" y="1455">可选持久化</text>
+
+  <rect class="optional" x="510" y="1330" width="280" height="145"/>
+  <text class="stereo" x="550" y="1380">«外部系统»</text>
+  <text class="label" x="550" y="1425">外部 LLM API</text>
+  <text class="small" x="550" y="1455">可选增强</text>
+
+  <rect class="store" x="900" y="1330" width="300" height="145"/>
+  <text class="stereo" x="940" y="1380">«文件系统»</text>
+  <text class="label" x="940" y="1425">CSV / JSON / Markdown</text>
+  <text class="small" x="940" y="1455">data + knowledge_base</text>
+
+  <path class="line" d="M588,275 H728"/>
+  <text class="small" x="625" y="255">HTTP</text>
+
+  <path class="line" d="M828,335 V640"/>
+  <text class="small" x="842" y="485">静态资源</text>
+
+  <path class="line" d="M898,335 V640"/>
+  <text class="small" x="912" y="485">/api/v1 代理</text>
+
+  <path class="line" d="M998,335 V875"/>
+  <text class="small" x="1012" y="610">/mcp 代理</text>
+
+  <path class="line" d="M900,790 V1330"/>
+  <text class="small" x="915" y="1115">读写</text>
+
+  <path class="line" d="M900,1025 V1330"/>
+  <text class="small" x="915" y="1175">读写</text>
+
+  <path class="dash" d="M780,790 V1165 H245 V1330"/>
+  <text class="small" x="310" y="1140">JDBC / ODBC（可选）</text>
+
+  <path class="dash" d="M810,790 V1165 H650 V1330"/>
+  <text class="small" x="665" y="1140">HTTP（可选）</text>
+
+  <path class="dash" d="M850,1025 V1210 H650 V1330"/>
+  <text class="small" x="685" y="1190">HTTP（可选）</text>
+
+  <rect class="legend" x="435" y="1610" width="450" height="80"/>
+  <text class="small" x="465" y="1645">实线：主要调用 / 访问路径</text>
+  <text class="small" x="465" y="1675">虚线：可选集成</text>
+
+  <text class="small" x="320" y="1740">扁平化分层版：公网入口层 → 服务器进程层 → 共享资源层</text>
+</svg>

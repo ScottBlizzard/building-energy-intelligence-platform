@@ -28,6 +28,8 @@ REQUIRED_COLUMNS = {
     "equipment_status",
 }
 
+DICTIONARY_FILE = "data/dictionaries/energy_records_dictionary.csv"
+
 
 def _load_raw_frame() -> pd.DataFrame:
     """读取原始能耗数据：优先数据库 energy_readings 表，否则回退 CSV。"""
@@ -72,6 +74,7 @@ _FILTERED_CACHE_MAX = 24
 
 def clear_dataset_cache() -> None:
     read_dataset.cache_clear()
+    load_data_dictionary.cache_clear()
     _VISIBLE_CACHE["sig"] = None
     _VISIBLE_CACHE["frame"] = None
     _FILTERED_CACHE.clear()
@@ -144,6 +147,31 @@ def get_building_options() -> List[Dict[str, str]]:
     return buildings.to_dict(orient="records")
 
 
+@lru_cache(maxsize=1)
+def load_data_dictionary() -> List[Dict]:
+    """Load the project data dictionary used by SRS/SDD metadata checks."""
+    path = get_settings()._resolve_path(DICTIONARY_FILE)
+    if not path.exists():
+        return []
+
+    dictionary = pd.read_csv(path).fillna("")
+    items: List[Dict] = []
+    for _, row in dictionary.iterrows():
+        field_name = str(row.get("field_name", "")).strip()
+        if not field_name:
+            continue
+        items.append(
+            {
+                "field_name": field_name,
+                "data_type": str(row.get("data_type", "")).strip(),
+                "required": str(row.get("required", "")).strip().lower() in {"yes", "true", "1"},
+                "description": str(row.get("description", "")).strip(),
+                "example": str(row.get("example", "")).strip(),
+            }
+        )
+    return items
+
+
 def load_dataset_or_raise(
     building_id: Optional[str] = None,
     start_time: Optional[datetime] = None,
@@ -160,8 +188,20 @@ def load_dataset_or_raise(
 
 def get_dataset_meta() -> Dict:
     frame = read_dataset()
+    dictionary = load_data_dictionary()
+    dictionary_fields = {item["field_name"] for item in dictionary}
+    dataset_fields = set(frame.columns)
     return {
         "fields": list(frame.columns),
+        "data_dictionary": dictionary,
+        "field_definitions": {item["field_name"]: item for item in dictionary},
+        "dictionary_coverage": {
+            "defined_field_count": len(dictionary_fields),
+            "dataset_field_count": len(dataset_fields),
+            "matched_field_count": len(dictionary_fields.intersection(dataset_fields)),
+            "missing_in_dictionary": sorted(dataset_fields.difference(dictionary_fields)),
+            "defined_but_missing_in_dataset": sorted(dictionary_fields.difference(dataset_fields)),
+        },
         "building_options": get_building_options(),
         "record_count": int(len(frame)),
         "building_count": int(frame["building_id"].nunique()),

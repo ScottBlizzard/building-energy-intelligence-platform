@@ -4,9 +4,14 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 // read `operator_id` from the query string for a lightweight role check, so we
 // attach it to every request once the user logs in.
 let currentOperatorId = null;
+let currentAuthToken = null;
 
 export function setApiOperator(operatorId) {
   currentOperatorId = operatorId || null;
+}
+
+export function setApiAuthToken(token) {
+  currentAuthToken = token || null;
 }
 
 function buildQueryString(params = {}) {
@@ -28,6 +33,7 @@ async function request(path, options = {}, params = {}) {
   const response = await fetch(buildApiUrl(path, mergedParams), {
     headers: {
       "Content-Type": "application/json",
+      ...(currentAuthToken ? { Authorization: `Bearer ${currentAuthToken}` } : {}),
       ...(options.headers || {})
     },
     ...options

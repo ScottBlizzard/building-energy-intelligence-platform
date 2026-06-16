@@ -157,7 +157,6 @@ def main():
         ("UC-09", "ROI改造与运营报告", ["能源运营管理员"], ["预算与ROI决策引擎", "异常分析引擎", "沙盘服务引擎", "可信问答引擎"]),
         ("UC-10", "可信智能问答", ["能源运营管理员", "现场工人"], ["可信问答引擎", "业务服务层", "外部大模型服务"]),
         ("UC-11", "MCP工具调用", ["AI客户端"], ["MCP Server", "数据加载与查询服务", "异常分析引擎", "工单状态机引擎", "可信问答引擎"]),
-        ("UC-12", "项目检查与质量验收", ["系统管理员", "项目维护人员"], ["项目检查脚本", "后端测试框架", "前端构建工具", "MCP Server"]),
     ]
     for usecase in usecases:
         make_usecase(*usecase)
@@ -199,9 +198,6 @@ def main():
         ("UC-11", "MCP工具调用", ["AI客户端", "MCP Server", "工具路由", "后端服务层"], [
             n("s", 0, 120, "开始", "start", 70, 40), n("connect", 0, 190, "建立MCP连接"), n("list", 1, 270, "返回Tools和Resources"), n("call", 0, 370, "调用Tool并传参"), n("validate", 2, 470, "校验工具名和参数"), n("valid", 2, 570, "参数有效?", "decision", 130, 80), n("err", 1, 700, "返回结构化错误"), n("service", 3, 700, "调用业务服务层"), n("result", 3, 800, "生成结构化业务结果"), n("wrap", 1, 900, "封装MCP响应"), n("return", 0, 1000, "客户端接收结果"), n("end", 0, 1100, "结束", "end", 70, 40)
         ], [("s", "connect"), ("connect", "list"), ("list", "call"), ("call", "validate"), ("validate", "valid"), ("valid", "err", "否"), ("valid", "service", "是"), ("service", "result"), ("result", "wrap"), ("wrap", "return"), ("err", "end"), ("return", "end")]),
-        ("UC-12", "项目检查与质量验收", ["维护人员", "启动脚本", "测试框架", "构建工具"], [
-            n("s", 0, 120, "开始", "start", 70, 40), n("prep", 0, 190, "准备验收"), n("backend", 1, 270, "启动后端"), n("health", 1, 370, "检查健康接口"), n("front", 3, 470, "启动/构建前端"), n("mcp", 1, 570, "启动MCP Server"), n("check", 1, 670, "运行检查脚本"), n("syntax", 2, 770, "Python语法检查"), n("pytest", 2, 870, "后端pytest"), n("build", 3, 970, "前端构建"), n("pass", 2, 1080, "全部通过?", "decision", 140, 80), n("fix", 0, 1200, "定位失败并修复"), n("ready", 0, 1200, "进入可验收状态"), n("end", 1, 1320, "结束", "end", 70, 40)
-        ], [("s", "prep"), ("prep", "backend"), ("backend", "health"), ("health", "front"), ("front", "mcp"), ("mcp", "check"), ("check", "syntax"), ("syntax", "pytest"), ("pytest", "build"), ("build", "pass"), ("pass", "fix", "否"), ("fix", "check"), ("pass", "ready", "是"), ("ready", "end")]),
     ]
 
     for swim in swims:

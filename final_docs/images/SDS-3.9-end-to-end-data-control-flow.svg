@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1380" height="820" viewBox="0 0 1380 820" role="img" aria-label="端到端数据与控制闭环">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#24566f"/>
+    </marker>
+    <marker id="feedbackArrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#8b5e34"/>
+    </marker>
+    <style>
+      .title{font:700 30px "Microsoft YaHei",Arial,sans-serif;fill:#18324a}
+      .sub{font:400 16px "Microsoft YaHei",Arial,sans-serif;fill:#50677c}
+      .lane{fill:#f7fafc;stroke:#cfdae3;stroke-width:2;rx:16}
+      .laneTitle{font:700 17px "Microsoft YaHei",Arial,sans-serif;fill:#23475f}
+      .box{fill:#ffffff;stroke:#7ba7bf;stroke-width:2;rx:10}
+      .service{fill:#edf9f5;stroke:#2a9d8f;stroke-width:2;rx:10}
+      .decision{fill:#fff8e8;stroke:#e9a23b;stroke-width:2;rx:10}
+      .ai{fill:#f4f0ff;stroke:#8a72d6;stroke-width:2;rx:10}
+      .label{font:700 15px "Microsoft YaHei",Arial,sans-serif;fill:#20384f}
+      .small{font:400 12px "Microsoft YaHei",Arial,sans-serif;fill:#4b6075}
+      .mono{font:400 12px Consolas,"Microsoft YaHei",monospace;fill:#41566d}
+      .flow{stroke:#24566f;stroke-width:2.3;fill:none;marker-end:url(#arrow)}
+      .feedback{stroke:#8b5e34;stroke-width:2.3;fill:none;stroke-dasharray:7 5;marker-end:url(#feedbackArrow)}
+      .note{fill:#eef7fa;stroke:#bad5e3;stroke-width:1.5;rx:10}
+    </style>
+  </defs>
+
+  <rect width="1380" height="820" fill="#ffffff"/>
+  <text class="title" x="50" y="56">端到端数据与控制闭环</text>
+  <text class="sub" x="50" y="84">从样例数据进入分析服务，到异常工单、维修干预、沙盘预测、预算 ROI 和决策报告；前端、AI 助手与 MCP 复用同一服务层。</text>
+
+  <rect class="lane" x="45" y="120" width="260" height="575"/>
+  <text class="laneTitle" x="75" y="152">数据与知识层</text>
+
+  <rect class="lane" x="350" y="120" width="670" height="575"/>
+  <text class="laneTitle" x="380" y="152">业务服务层</text>
+
+  <rect class="lane" x="1065" y="120" width="265" height="575"/>
+  <text class="laneTitle" x="1095" y="152">展示与智能接入层</text>
+
+  <rect class="box" x="80" y="190" width="185" height="64"/>
+  <text class="label" x="111" y="218">能耗样例数据</text>
+  <text class="mono" x="108" y="241">energy_records.csv</text>
+
+  <rect class="box" x="80" y="305" width="185" height="64"/>
+  <text class="label" x="105" y="333">数据字典与元信息</text>
+  <text class="mono" x="112" y="356">dictionaries/*.csv</text>
+
+  <rect class="box" x="80" y="420" width="185" height="70"/>
+  <text class="label" x="111" y="450">运行期状态</text>
+  <text class="mono" x="108" y="473">work_orders / budgets</text>
+
+  <rect class="box" x="80" y="545" width="185" height="70"/>
+  <text class="label" x="118" y="575">本地知识库</text>
+  <text class="mono" x="105" y="598">knowledge_base/**/*.md</text>
+
+  <rect class="service" x="390" y="190" width="190" height="64"/>
+  <text class="label" x="424" y="218">数据加载与过滤</text>
+  <text class="small" x="420" y="241">建筑、月份、沙盘日期</text>
+
+  <rect class="service" x="650" y="190" width="190" height="64"/>
+  <text class="label" x="684" y="218">统计分析与异常诊断</text>
+  <text class="small" x="682" y="241">风险、损失、碳排</text>
+
+  <rect class="service" x="390" y="315" width="190" height="64"/>
+  <text class="label" x="430" y="343">工单状态机</text>
+  <text class="small" x="421" y="366">派发、接单、复核</text>
+
+  <rect class="service" x="650" y="315" width="190" height="64"/>
+  <text class="label" x="691" y="343">维修干预登记</text>
+  <text class="small" x="684" y="366">设备级未来影响</text>
+
+  <rect class="decision" x="390" y="445" width="190" height="64"/>
+  <text class="label" x="424" y="473">时间沙盘与预测</text>
+  <text class="small" x="420" y="496">推进日期、反事实</text>
+
+  <rect class="decision" x="650" y="445" width="190" height="64"/>
+  <text class="label" x="689" y="473">预算 KPI 与 ROI</text>
+  <text class="small" x="684" y="496">状态、收益、回本期</text>
+
+  <rect class="decision" x="520" y="575" width="190" height="64"/>
+  <text class="label" x="562" y="603">运营决策报告</text>
+  <text class="small" x="548" y="626">异常、预算、建议汇总</text>
+
+  <rect class="box" x="1105" y="190" width="185" height="64"/>
+  <text class="label" x="1145" y="218">Vue 工作台</text>
+  <text class="small" x="1128" y="241">总览、工单、预算、报告</text>
+
+  <rect class="ai" x="1105" y="340" width="185" height="70"/>
+  <text class="label" x="1157" y="370">AI 助手</text>
+  <text class="small" x="1132" y="393">事实接地、引用、回退</text>
+
+  <rect class="ai" x="1105" y="500" width="185" height="70"/>
+  <text class="label" x="1145" y="530">MCP 工具服务</text>
+  <text class="small" x="1128" y="553">Tools / Resources</text>
+
+  <path class="flow" d="M265,222 H390"/>
+  <path class="flow" d="M265,337 H330 V222 H390"/>
+  <path class="flow" d="M580,222 H650"/>
+  <path class="flow" d="M745,254 V285 H485 V315"/>
+  <path class="flow" d="M580,347 H650"/>
+  <path class="flow" d="M745,379 V415 H485 V445"/>
+  <path class="flow" d="M580,477 H650"/>
+  <path class="flow" d="M745,509 V607 H710"/>
+  <path class="flow" d="M840,222 H1105"/>
+  <path class="flow" d="M840,477 H1035 V222 H1105"/>
+  <path class="flow" d="M710,607 H1035 V375 H1105"/>
+  <path class="flow" d="M710,607 H1035 V535 H1105"/>
+  <path class="flow" d="M265,455 H330 V347 H390"/>
+  <path class="flow" d="M265,580 H330 V375 H1105"/>
+
+  <path class="feedback" d="M650,347 H615 V477 H580"/>
+  <text class="small" x="590" y="430">干预影响未来窗口</text>
+  <path class="feedback" d="M390,477 H330 V222 H390"/>
+  <text class="small" x="318" y="292">沙盘过滤</text>
+  <path class="feedback" d="M1105,222 H1035 V347 H840"/>
+  <text class="small" x="945" y="335">状态回显</text>
+
+  <rect class="note" x="145" y="725" width="1090" height="55"/>
+  <text class="small" x="175" y="755">设计约束：Web 页面、REST API、AI 助手和 MCP Tools 均调用同一套业务服务，异常、工单、预算、ROI 和报告不维护重复口径。</text>
+</svg>

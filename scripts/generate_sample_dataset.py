@@ -10,12 +10,12 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parents[1]
 OUTPUT_PATH = ROOT_DIR / "data" / "samples" / "energy_records.csv"
 
-# Full-year (heating + cooling) synthetic dataset.
+# First-half-year (heating + early cooling) synthetic dataset.
 # Span: 2026-01-01 ~ 2026-06-01 (2026 is NOT a leap year → Feb has 28 days).
 # The seasonal energy curve is bimodal: a winter heating peak (Jan/Feb) and a
 # rising summer cooling load (May/Jun), with an April shoulder trough — so the
 # month-over-month trend, environment temperature and load are physically
-# self-consistent end to end (see docs/29 §1.3).
+# self-consistent end to end for the sampled period (see docs/29 §1.3).
 DATA_START = datetime(2026, 1, 1, 0, 0, 0)
 DATA_END = datetime(2026, 6, 1, 0, 0, 0)
 

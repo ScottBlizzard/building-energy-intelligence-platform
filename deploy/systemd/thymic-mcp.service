@@ -1,0 +1,21 @@
+[Unit]
+Description=Thymic Building Energy MCP service
+After=network.target thymic-backend.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/thymic_project/app/backend
+Environment=APP_ENV=production
+Environment=DATA_FILE=data/samples/energy_records.csv
+Environment=KNOWLEDGE_BASE_DIR=knowledge_base
+Environment=WORK_ORDER_FILE=data/runtime/work_orders.json
+Environment=LLM_ENABLED=false
+Environment=MCP_TRANSPORT=streamable-http
+Environment=MCP_HOST=127.0.0.1
+Environment=MCP_PORT=8765
+ExecStart=/opt/thymic_project/app/.venv/bin/python -m app.mcp_server
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target

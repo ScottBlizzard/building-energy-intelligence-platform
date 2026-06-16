@@ -71,3 +71,36 @@ async def test_mcp_resources_are_available():
     contents = await mcp.read_resource("energy://dataset/meta")
     payload = json.loads(contents[0].content)
     assert payload["record_count"] == 4864
+
+
+@pytest.mark.anyio
+async def test_mcp_assistant_uses_work_order_grounding():
+    from app.services.work_order_store import create_work_order
+
+    order = create_work_order(
+        {
+            "work_order_id": "WO-MCP-GROUND-1",
+            "source_record_id": "R-MCP-GROUND-1",
+            "priority": "high",
+            "building_id": "BLD-C",
+            "building_name": "Library",
+            "floor_label": "4F",
+            "zone_name": "Reading",
+            "equipment_id": "AHU-C-4F-06",
+            "equipment_type": "AHU",
+            "timestamp": "2026-05-01 10:00:00",
+            "anomaly_reason": "equipment status abnormal",
+            "possible_cause": "alarm",
+            "recommended_action": "inspect AHU",
+            "owner_role": "worker",
+            "assignee_id": "worker_ahu",
+            "status": "closed",
+            "actual_cause": "filter blockage",
+            "resolution_note": "cleaned filter",
+        }
+    )
+
+    payload = await _call_tool("ask_energy_assistant", {"question": "刚关闭的工单是什么？"})
+    assert payload["grounding_used"] is True
+    assert payload["grounding_status"] == "grounded"
+    assert order["work_order_id"] in payload["answer"]

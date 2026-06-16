@@ -149,6 +149,12 @@
               <div><span>实际用电</span><strong>{{ formatNumber(selectedKPI.total_actual_kwh) }} kWh</strong></div>
             </div>
           </div>
+          <div v-if="kpiBreakdownItems.length" class="kpi-breakdown-grid">
+            <div v-for="item in kpiBreakdownItems" :key="item.key">
+              <span>{{ item.label }}</span>
+              <strong>{{ item.value }} / {{ item.max }}</strong>
+            </div>
+          </div>
           <div class="kpi-strengths">
             <strong>优势</strong>
             <ul>
@@ -173,6 +179,7 @@
                   <th>预测执行率</th>
                   <th>COP达标率</th>
                   <th>异常数</th>
+                  <th>分项评分</th>
                   <th>评分</th>
                 </tr>
               </thead>
@@ -185,6 +192,7 @@
                   <td>{{ m.projected_execution_rate }}%</td>
                   <td>{{ m.cop_pass_rate }}%</td>
                   <td>{{ m.anomaly_count }}</td>
+                  <td class="breakdown-cell" :title="(m.score_reasons || []).join('\n')">{{ formatScoreBreakdown(m.score_breakdown) }}</td>
                   <td>{{ m.score }}</td>
                 </tr>
               </tbody>
@@ -272,20 +280,37 @@ const budgetForm = reactive({
   note: "",
 });
 
+const kpiScoreParts = [
+  { key: "budget_control", label: "预算控制", max: 40 },
+  { key: "efficiency", label: "能效表现", max: 20 },
+  { key: "anomaly_risk", label: "异常风险", max: 20 },
+  { key: "work_order_closure", label: "工单闭环", max: 15 },
+  { key: "improvement", label: "改善收益", max: 5 },
+];
+
+function rateClass(rate) {
+  if (rate > 103) return "kpi-card--danger";
+  if (rate > 100) return "kpi-card--warn";
+  return "kpi-card--safe";
+}
+
 const execRateClass = computed(() => {
   if (!analysis.value) return "";
-  const rate = analysis.value.total_execution_rate;
-  if (rate > 100) return "kpi-card--danger";
-  if (rate > 85) return "kpi-card--warn";
-  return "kpi-card--safe";
+  return rateClass(analysis.value.total_execution_rate);
 });
 
 const projectedRateClass = computed(() => {
   if (!analysis.value) return "";
-  const rate = analysis.value.total_projected_execution_rate;
-  if (rate > 100) return "kpi-card--danger";
-  if (rate > 85) return "kpi-card--warn";
-  return "kpi-card--safe";
+  return rateClass(analysis.value.total_projected_execution_rate);
+});
+
+const kpiBreakdownItems = computed(() => {
+  const breakdown = selectedKPI.value?.score_breakdown;
+  if (!breakdown) return [];
+  return kpiScoreParts.map((item) => ({
+    ...item,
+    value: Number(breakdown[item.key] || 0).toFixed(1),
+  }));
 });
 
 const periodNote = computed(() => {
@@ -304,6 +329,13 @@ function formatNumber(val) {
   const num = Number(val);
   if (Number.isNaN(num)) return "-";
   return num.toLocaleString("zh-CN", { maximumFractionDigits: 0 });
+}
+
+function formatScoreBreakdown(breakdown) {
+  if (!breakdown) return "-";
+  return kpiScoreParts
+    .map((item) => `${item.label.slice(0, 2)} ${Number(breakdown[item.key] || 0).toFixed(1)}`)
+    .join(" / ");
 }
 
 async function loadBudgetAnalysis() {
@@ -561,6 +593,29 @@ onMounted(() => {
 .kpi-summary div { display: flex; justify-content: space-between; max-width: 320px; }
 .kpi-summary span { color: var(--ink-soft); font-size: 13px; }
 .kpi-summary strong { font-size: 18px; }
+.kpi-breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin: 4px 0 16px;
+}
+.kpi-breakdown-grid div {
+  border: 1px solid rgba(20,34,48,0.08);
+  border-radius: 8px;
+  background: rgba(255,255,255,0.62);
+  padding: 10px;
+}
+.kpi-breakdown-grid span {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 12px;
+}
+.kpi-breakdown-grid strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--ink-strong);
+  font-size: 15px;
+}
 .kpi-strengths, .kpi-improvements { margin-bottom: 12px; }
 .kpi-strengths strong, .kpi-improvements strong { color: var(--ink-strong); font-size: 14px; }
 .kpi-strengths ul, .kpi-improvements ul { margin: 4px 0 0 16px; color: var(--ink-soft); font-size: 13px; }
@@ -568,6 +623,7 @@ onMounted(() => {
 .kpi-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .kpi-table th, .kpi-table td { padding: 8px 10px; border-bottom: 1px solid rgba(20,34,48,0.06); text-align: center; }
 .kpi-table th { color: var(--ink-soft); font-weight: 500; }
+.breakdown-cell { min-width: 190px; color: var(--ink-soft); font-size: 12px; }
 .row-warn { background: rgba(249, 231, 159, 0.22); }
 
 .budget-set-form { margin-top: 8px; }
@@ -596,6 +652,7 @@ onMounted(() => {
     grid-template-columns: 1fr;
   }
   .budget-set-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .kpi-breakdown-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .budget-bar-subtitle { flex-direction: column; gap: 2px; }
 }
 </style>

@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="EV-PV-AC 挣值分析曲线">
+  <defs>
+    <style>
+      .title{font:700 30px "Microsoft YaHei",Arial,sans-serif;fill:#18324a}
+      .sub{font:400 16px "Microsoft YaHei",Arial,sans-serif;fill:#53687a}
+      .axis{stroke:#31495c;stroke-width:2}
+      .grid{stroke:#d8e2ea;stroke-width:1}
+      .pv{stroke:#697386;stroke-width:4;fill:none}
+      .ev{stroke:#2f80ed;stroke-width:4;fill:none}
+      .ac{stroke:#d94841;stroke-width:4;fill:none}
+      .pv-fill{fill:#697386}
+      .ev-fill{fill:#2f80ed}
+      .ac-fill{fill:#d94841}
+      .label{font:700 15px "Microsoft YaHei",Arial,sans-serif;fill:#25384b}
+      .small{font:400 13px "Microsoft YaHei",Arial,sans-serif;fill:#4c6072}
+      .num{font:400 12px "Microsoft YaHei",Arial,sans-serif;fill:#5d7182}
+      .note{font:400 14px "Microsoft YaHei",Arial,sans-serif;fill:#53687a}
+    </style>
+  </defs>
+  <rect width="1280" height="720" fill="#f8fbfd"/>
+  <text class="title" x="54" y="56">EV-PV-AC 挣值分析曲线（累计人时）</text>
+  <text class="sub" x="54" y="84">以 1,928.64 人时为计划总量，按周跟踪计划价值、挣值和实际消耗。</text>
+
+  <g transform="translate(120,90)">
+    <line class="axis" x1="0" y1="440" x2="1000" y2="440"/>
+    <line class="axis" x1="0" y1="0" x2="0" y2="440"/>
+    <line class="grid" x1="0" y1="0" x2="1000" y2="0"/>
+    <line class="grid" x1="0" y1="88" x2="1000" y2="88"/>
+    <line class="grid" x1="0" y1="176" x2="1000" y2="176"/>
+    <line class="grid" x1="0" y1="264" x2="1000" y2="264"/>
+    <line class="grid" x1="0" y1="352" x2="1000" y2="352"/>
+    <text class="num" x="-45" y="4">2100</text>
+    <text class="num" x="-45" y="92">1680</text>
+    <text class="num" x="-45" y="180">1260</text>
+    <text class="num" x="-38" y="268">840</text>
+    <text class="num" x="-38" y="356">420</text>
+    <text class="num" x="-25" y="444">0</text>
+    <text class="label" x="-80" y="-24">累计人时</text>
+
+    <polyline class="pv" points="0,440 125,396 250,343.6 375,291.2 500,238.9 625,186.5 750,134.1 875,81.7 1000,35.9"/>
+    <polyline class="ev" points="0,440 125,402.3 250,352 375,303.8 500,251.4 625,205.3 750,123.6 875,67 1000,39.9"/>
+    <polyline class="ac" points="0,440 125,399.1 250,335.2 375,283.9 500,225.2 625,170.8 750,127.8 875,54.5 1000,18.4"/>
+
+    <g class="pv-fill">
+      <circle cx="0" cy="440" r="5"/>
+      <circle cx="125" cy="396" r="5"/>
+      <circle cx="250" cy="343.6" r="5"/>
+      <circle cx="375" cy="291.2" r="5"/>
+      <circle cx="500" cy="238.9" r="5"/>
+      <circle cx="625" cy="186.5" r="5"/>
+      <circle cx="750" cy="134.1" r="5"/>
+      <circle cx="875" cy="81.7" r="5"/>
+      <circle cx="1000" cy="35.9" r="5"/>
+    </g>
+    <g class="ev-fill">
+      <circle cx="0" cy="440" r="5"/>
+      <circle cx="125" cy="402.3" r="5"/>
+      <circle cx="250" cy="352" r="5"/>
+      <circle cx="375" cy="303.8" r="5"/>
+      <circle cx="500" cy="251.4" r="5"/>
+      <circle cx="625" cy="205.3" r="5"/>
+      <circle cx="750" cy="123.6" r="5"/>
+      <circle cx="875" cy="67" r="5"/>
+      <circle cx="1000" cy="39.9" r="5"/>
+    </g>
+    <g class="ac-fill">
+      <circle cx="0" cy="440" r="5"/>
+      <circle cx="125" cy="399.1" r="5"/>
+      <circle cx="250" cy="335.2" r="5"/>
+      <circle cx="375" cy="283.9" r="5"/>
+      <circle cx="500" cy="225.2" r="5"/>
+      <circle cx="625" cy="170.8" r="5"/>
+      <circle cx="750" cy="127.8" r="5"/>
+      <circle cx="875" cy="54.5" r="5"/>
+      <circle cx="1000" cy="18.4" r="5"/>
+    </g>
+
+    <text class="small" x="-10" y="476">起点</text>
+    <text class="small" x="103" y="476">第1周</text>
+    <text class="small" x="228" y="476">第2周</text>
+    <text class="small" x="353" y="476">第3周</text>
+    <text class="small" x="478" y="476">第4周</text>
+    <text class="small" x="603" y="476">第5周</text>
+    <text class="small" x="728" y="476">第6周</text>
+    <text class="small" x="853" y="476">第7周</text>
+    <text class="small" x="978" y="476">第8周</text>
+
+    <text class="note" x="646" y="104">EV 在第 6-7 周追上计划线</text>
+    <line x1="732" y1="110" x2="750" y2="123.6" stroke="#2f80ed" stroke-width="2"/>
+    <text class="note" x="716" y="34">AC 在封版阶段再次上扬</text>
+    <line x1="860" y1="40" x2="875" y2="54.5" stroke="#d94841" stroke-width="2"/>
+  </g>
+
+  <rect x="760" y="14" width="390" height="70" fill="#ffffff" stroke="#c7d5df" rx="10"/>
+  <line x1="790" y1="40" x2="850" y2="40" class="pv"/>
+  <text class="small" x="862" y="45">PV 计划价值</text>
+  <line x1="968" y1="40" x2="1028" y2="40" class="ev"/>
+  <text class="small" x="1040" y="45">EV 挣值</text>
+  <line x1="790" y1="66" x2="850" y2="66" class="ac"/>
+  <text class="small" x="862" y="71">AC 实际消耗</text>
+
+  <rect x="96" y="612" width="1088" height="54" fill="#ffffff" stroke="#d6e1e8" rx="8"/>
+  <text class="small" x="120" y="636">复盘：累计曲线从起点 0 开始；第 3-5 周数据质量和知识库补齐导致 AC 高于 EV；第 6-7 周集中联调使 EV 短暂追上 PV。</text>
+  <text class="small" x="120" y="658">结果：PV=1,928.64 人时，EV=1,909.35 人时，AC=2,012.00 人时，SPI=0.99，CPI=0.95。</text>
+</svg>

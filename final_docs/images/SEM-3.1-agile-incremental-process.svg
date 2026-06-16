@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="680" viewBox="0 0 1280 680" role="img" aria-label="阶段化增量与轻量 Scrum 过程模型">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#2f5368"/>
+    </marker>
+    <style>
+      .title{font:700 30px "Microsoft YaHei",Arial,sans-serif;fill:#17324d}
+      .sub{font:400 16px "Microsoft YaHei",Arial,sans-serif;fill:#4b6075}
+      .stage{fill:#ffffff;stroke:#7aa6c2;stroke-width:2;rx:14}
+      .sprint{fill:#edf8f5;stroke:#2a9d8f;stroke-width:2;rx:14}
+      .gate{fill:#fff6df;stroke:#df9b22;stroke-width:2;rx:12}
+      .deliver{fill:#f3f1fb;stroke:#7a66b3;stroke-width:2;rx:12}
+      .label{font:700 17px "Microsoft YaHei",Arial,sans-serif;fill:#24364a}
+      .small{font:400 13px "Microsoft YaHei",Arial,sans-serif;fill:#475b70}
+      .arrow{stroke:#2f5368;stroke-width:2.4;fill:none;marker-end:url(#arrow)}
+      .loop{stroke:#2a9d8f;stroke-width:2.6;fill:none;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1280" height="680" fill="#f8fbfd"/>
+  <text class="title" x="54" y="56">阶段化增量 + 轻量 Scrum 过程模型</text>
+  <text class="sub" x="54" y="84">阶段门控制课程交付物，Sprint 循环保证每个增量可运行、可测试、可演示。</text>
+
+  <rect class="stage" x="70" y="145" width="165" height="86"/>
+  <text class="label" x="106" y="178">P1 启动</text>
+  <text class="small" x="100" y="205">脚手架与范围</text>
+  <rect class="stage" x="270" y="145" width="165" height="86"/>
+  <text class="label" x="302" y="178">P2 第一轮</text>
+  <text class="small" x="308" y="205">并行任务</text>
+  <rect class="stage" x="470" y="145" width="165" height="86"/>
+  <text class="label" x="502" y="178">P3 集成</text>
+  <text class="small" x="506" y="205">接口对齐</text>
+  <rect class="stage" x="670" y="145" width="165" height="86"/>
+  <text class="label" x="694" y="178">P4 基础交付</text>
+  <text class="small" x="710" y="205">MCP 与文档</text>
+  <rect class="stage" x="870" y="145" width="165" height="86"/>
+  <text class="label" x="894" y="178">P5 闭环增强</text>
+  <text class="small" x="900" y="205">工单/预算/ROI</text>
+  <rect class="stage" x="1070" y="145" width="165" height="86"/>
+  <text class="label" x="1094" y="178">P6 封版发布</text>
+  <text class="small" x="1104" y="205">测试与交付</text>
+
+  <path class="arrow" d="M235,188 L264,188"/>
+  <path class="arrow" d="M435,188 L464,188"/>
+  <path class="arrow" d="M635,188 L664,188"/>
+  <path class="arrow" d="M835,188 L864,188"/>
+  <path class="arrow" d="M1035,188 L1064,188"/>
+
+  <rect class="gate" x="90" y="272" width="145" height="58"/>
+  <text class="label" x="126" y="307">G1</text>
+  <text class="small" x="115" y="325">启动门</text>
+  <rect class="gate" x="290" y="272" width="145" height="58"/>
+  <text class="label" x="326" y="307">G2</text>
+  <text class="small" x="315" y="325">任务门</text>
+  <rect class="gate" x="490" y="272" width="145" height="58"/>
+  <text class="label" x="526" y="307">G3</text>
+  <text class="small" x="515" y="325">集成门</text>
+  <rect class="gate" x="690" y="272" width="145" height="58"/>
+  <text class="label" x="726" y="307">G4</text>
+  <text class="small" x="704" y="325">MCP/文档门</text>
+  <rect class="gate" x="890" y="272" width="145" height="58"/>
+  <text class="label" x="926" y="307">G5</text>
+  <text class="small" x="915" y="325">闭环门</text>
+  <rect class="gate" x="1090" y="272" width="145" height="58"/>
+  <text class="label" x="1126" y="307">G6</text>
+  <text class="small" x="1115" y="325">发布门</text>
+
+  <path class="arrow" d="M155,232 L155,266"/>
+  <path class="arrow" d="M355,232 L355,266"/>
+  <path class="arrow" d="M555,232 L555,266"/>
+  <path class="arrow" d="M755,232 L755,266"/>
+  <path class="arrow" d="M955,232 L955,266"/>
+  <path class="arrow" d="M1155,232 L1155,266"/>
+
+  <rect class="sprint" x="240" y="405" width="800" height="150"/>
+  <text class="label" x="280" y="442">Sprint 迭代循环</text>
+  <text class="small" x="280" y="468">产品待办 -> Sprint 计划 -> 开发与集成 -> 测试评审 -> 回顾改进 -> 可运行增量</text>
+
+  <rect class="deliver" x="300" y="500" width="140" height="44"/>
+  <text class="small" x="342" y="527">待办拆分</text>
+  <rect class="deliver" x="480" y="500" width="140" height="44"/>
+  <text class="small" x="522" y="527">开发联调</text>
+  <rect class="deliver" x="660" y="500" width="140" height="44"/>
+  <text class="small" x="702" y="527">测试评审</text>
+  <rect class="deliver" x="840" y="500" width="140" height="44"/>
+  <text class="small" x="882" y="527">回顾改进</text>
+  <path class="loop" d="M440,522 L474,522"/>
+  <path class="loop" d="M620,522 L654,522"/>
+  <path class="loop" d="M800,522 L834,522"/>
+  <path class="loop" d="M910,500 C930,450 366,450 370,495"/>
+
+  <path class="arrow" d="M640,555 L640,595"/>
+  <rect class="deliver" x="470" y="600" width="340" height="46"/>
+  <text class="label" x="520" y="629">可运行、可测试、可演示的增量</text>
+</svg>

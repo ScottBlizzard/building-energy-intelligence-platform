@@ -397,7 +397,7 @@ def build_assistant_reply(question: str) -> Dict[str, List]:
         )
         answer = (
             f"当前样例数据计算得到的整体平均 COP 为 {overview['average_cop']}。"
-            f"按照知识库规则，COP 低于 2.5 应视为告警。{best_text}"
+            f"按照当前分析规则，COP 低于 2.2 应视为告警。{best_text}"
         )
         return {
             "answer": answer,

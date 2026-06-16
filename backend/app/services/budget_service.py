@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 import os
+import math
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
 from app.core.config import get_settings
 from app.services import simulation_service
-from app.services.analysis_service import _add_operational_dimensions, _safe_divide
+from app.services.analysis_service import _COP_TARGET, _add_operational_dimensions, _safe_divide
 from app.services.data_loader import get_visible_dataset
 from app.services.work_order_store import list_work_orders
 
@@ -24,6 +25,32 @@ _SEASONAL_COEFFICIENTS = {
 # 含义：维持现状（不处置异常/不改造）约会到 1/0.97≈103% 而略微超标；
 # 处置异常、推进改造可把实际压到目标线以内。这是预算"超额"的可解释来源。
 _TARGET_FACTOR = 0.97
+_PRICE_YUAN_PER_KWH = 0.82
+_BUDGET_WARNING_LIMIT = 100.0
+_BUDGET_OVER_LIMIT = 103.0
+_COP_EXCELLENT_TARGET = 3.0
+_COP_STRETCH_TARGET = 3.2
+
+
+def _as_float(value, default: float = 0.0) -> float:
+    try:
+        if value in (None, ""):
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _clamp(value: float, low: float = 0.0, high: float = 100.0) -> float:
+    return max(low, min(high, float(value)))
+
+
+def _budget_status(rate: float) -> str:
+    if rate > _BUDGET_OVER_LIMIT:
+        return "over"
+    if rate > _BUDGET_WARNING_LIMIT:
+        return "warning"
+    return "healthy"
 
 
 def _budget_path() -> Path:
@@ -280,18 +307,17 @@ def build_budget_analysis(year: int, month: int) -> Dict:
         variance = round(actual_kwh - budget_kwh, 2)
         anomaly_count = int(building_data["is_anomaly"].sum()) if not building_data.empty and "is_anomaly" in building_data.columns else 0
         observed_days = int(building_data["timestamp"].dt.normalize().nunique()) if not building_data.empty else 0
-        month_end_estimate = round(_safe_divide(actual_kwh, max(observed_days, 1)) * 30, 2) if observed_days else 0.0
+        if period_status == "settled":
+            month_end_estimate = actual_kwh
+        else:
+            month_end_estimate = round(_safe_divide(actual_kwh, max(observed_days, 1)) * 30, 2) if observed_days else 0.0
         projected_execution_rate = round(_safe_divide(month_end_estimate, budget_kwh) * 100, 1)
 
         total_actual += actual_kwh
         total_budget += budget_kwh
         total_month_end_estimate += month_end_estimate
 
-        status = "healthy"
-        if projected_execution_rate > 100:
-            status = "over"
-        elif projected_execution_rate > 85:
-            status = "warning"
+        status = _budget_status(projected_execution_rate)
 
         building_details.append(
             {
@@ -367,34 +393,29 @@ def build_budget_kpi(building_id: str, year: int) -> Dict:
         # 会出现“实际 102.8% 超预算、归一后 99.5% 评分却给满分”的口径矛盾。
         projected_exec_rate = exec_rate
         cop_pass_rate = (
-            _safe_divide(int((month_frame["average_cop"] >= 2.4).sum()), len(month_frame)) * 100
+            _safe_divide(int((month_frame["average_cop"] >= _COP_TARGET).sum()), len(month_frame)) * 100
             if not month_frame.empty and "average_cop" in month_frame.columns
             else 0.0
         )
         total_budget += budget_kwh
         total_actual += actual
 
-        # 评分口径（满分 100，扣分项可解释）：
-        #   预算控制（主项，权重 40）：实际执行率每超目标线 1% 扣 4 分，超 10% 即扣满 40；
-        #   能效 COP 达标（权重 15）、异常高发（权重 15）、异常响应及时率（权重 10）。
-        # 这样“整月超预算”不会再拿到 A，而处置异常/改造把实际压回目标线内才能保住高分。
-        score = 100.0
-        if exec_rate > 1.0:
-            score -= min(40, (exec_rate - 1.0) * 400)
-
         anomaly_count = int(month_frame["is_anomaly"].sum()) if not month_frame.empty and "is_anomaly" in month_frame.columns else 0
         response_metrics = _work_order_response_metrics(building_id, year, month)
-        anomaly_response_rate = (
-            response_metrics["timely_rate"]
-            if response_metrics
-            else max(0.0, 100.0 - max(0, anomaly_count - 10) * 5)
+        if response_metrics:
+            anomaly_response_rate = response_metrics["timely_rate"]
+        elif anomaly_count > 0:
+            anomaly_response_rate = 0.0
+        else:
+            anomaly_response_rate = 100.0
+        score_result = _kpi_score_month(
+            month_frame,
+            exec_rate=exec_rate,
+            cop_pass_rate=cop_pass_rate,
+            anomaly_count=anomaly_count,
+            response_metrics=response_metrics,
         )
-        if anomaly_count > 10:
-            score -= min(15, anomaly_count * 0.5)
-        if cop_pass_rate < 80:
-            score -= min(15, (80 - cop_pass_rate) * 0.25)
-        if anomaly_response_rate < 80:
-            score -= min(10, (80 - anomaly_response_rate) * 0.2)
+        score = score_result["score"]
 
         monthly_scores.append(
             {
@@ -408,6 +429,17 @@ def build_budget_kpi(building_id: str, year: int) -> Dict:
                 "anomaly_response_timely_rate": round(anomaly_response_rate, 1),
                 "response_order_count": response_metrics["total"] if response_metrics else 0,
                 "response_timely_count": response_metrics["timely"] if response_metrics else 0,
+                "response_closed_count": response_metrics["closed"] if response_metrics else 0,
+                "estimated_wasted_kwh": score_result["estimated_wasted_kwh"],
+                "estimated_wasted_cost_yuan": score_result["estimated_wasted_cost_yuan"],
+                "anomaly_rate": score_result["anomaly_rate"],
+                "cop_excellent_rate": score_result["cop_excellent_rate"],
+                "average_cop": score_result["average_cop"],
+                "anomaly_coverage_rate": score_result["anomaly_coverage_rate"],
+                "work_order_closure_rate": score_result["work_order_closure_rate"],
+                "improvement_saved_kwh": score_result["improvement_saved_kwh"],
+                "score_breakdown": score_result["score_breakdown"],
+                "score_reasons": score_result["score_reasons"],
                 "score": round(max(0, score), 1),
             }
         )
@@ -448,6 +480,7 @@ def build_budget_kpi(building_id: str, year: int) -> Dict:
         "average_score": avg_score,
         "grade": grade,
         "budget_control_rate": round(100 - max(0, overall_exec_rate - 100), 1),
+        "score_breakdown": _average_score_breakdown(monthly_scores),
         "cop_pass_rate": round(
             sum(m["cop_pass_rate"] for m in monthly_scores) / len(monthly_scores),
             1,
@@ -466,16 +499,159 @@ def build_budget_kpi(building_id: str, year: int) -> Dict:
     }
 
 
+def _estimate_month_waste(month_frame) -> tuple[float, float]:
+    if month_frame.empty or "is_anomaly" not in month_frame.columns:
+        return 0.0, 0.0
+    wasted_kwh = 0.0
+    for _, row in month_frame[month_frame["is_anomaly"]].iterrows():
+        electricity = _as_float(row.get("electricity_kwh"))
+        upper_bound = _as_float(row.get("upper_bound"), electricity)
+        baseline = _as_float(row.get("baseline_mean"), _as_float(row.get("building_mean"), electricity))
+        row_waste = max(0.0, electricity - upper_bound)
+        if row_waste <= 0:
+            row_waste = max(0.0, electricity - baseline * 0.9)
+        if row_waste <= 0:
+            row_waste = electricity * 0.03
+        wasted_kwh += row_waste
+    return round(wasted_kwh, 2), round(wasted_kwh * _PRICE_YUAN_PER_KWH, 2)
+
+
+def _kpi_score_month(
+    month_frame,
+    *,
+    exec_rate: float,
+    cop_pass_rate: float,
+    anomaly_count: int,
+    response_metrics: Optional[Dict],
+) -> Dict:
+    exec_pct = exec_rate * 100
+    total_records = len(month_frame) if not month_frame.empty else 0
+    actual_kwh = float(month_frame["electricity_kwh"].sum()) if not month_frame.empty else 0.0
+
+    budget_control = round(max(0.0, 40.0 - min(40.0, max(0.0, exec_pct - 100.0) * 4.0)), 1)
+
+    if not month_frame.empty and "average_cop" in month_frame.columns:
+        cop_values = month_frame["average_cop"].dropna()
+        average_cop = round(float(cop_values.mean()), 2) if not cop_values.empty else 0.0
+        cop_excellent_rate = _safe_divide(int((cop_values >= _COP_EXCELLENT_TARGET).sum()), len(cop_values)) * 100
+    else:
+        average_cop = 0.0
+        cop_excellent_rate = 0.0
+    cop_quality = _clamp(_safe_divide(average_cop - _COP_TARGET, _COP_STRETCH_TARGET - _COP_TARGET), 0.0, 1.0)
+    efficiency = round(
+        10.0 * _clamp(cop_pass_rate / 100.0, 0.0, 1.0)
+        + 6.0 * _clamp(cop_excellent_rate / 100.0, 0.0, 1.0)
+        + 4.0 * cop_quality,
+        1,
+    )
+
+    wasted_kwh, wasted_cost = _estimate_month_waste(month_frame)
+    anomaly_rate = _safe_divide(anomaly_count, total_records) * 100 if total_records else 0.0
+    waste_ratio_pct = _safe_divide(wasted_kwh, actual_kwh) * 100 if actual_kwh else 0.0
+    severe_count = 0
+    if not month_frame.empty:
+        anomaly_rows = month_frame[month_frame["is_anomaly"]] if "is_anomaly" in month_frame.columns else month_frame.iloc[0:0]
+        if not anomaly_rows.empty and "equipment_status" in anomaly_rows.columns:
+            severe_count += int((anomaly_rows["equipment_status"].astype(str).str.lower() != "normal").sum())
+        if not anomaly_rows.empty and {"electricity_kwh", "upper_bound"}.issubset(anomaly_rows.columns):
+            severe_count += int((anomaly_rows["electricity_kwh"] > anomaly_rows["upper_bound"] * 1.05).sum())
+    severe_rate = _safe_divide(severe_count, total_records) * 100 if total_records else 0.0
+    anomaly_risk = round(
+        max(
+            0.0,
+            20.0
+            - min(8.0, anomaly_rate * 0.8)
+            - min(7.0, waste_ratio_pct * 1.4)
+            - min(5.0, severe_rate * 1.0),
+        ),
+        1,
+    )
+
+    expected_orders = max(1, math.ceil(anomaly_count / 5)) if anomaly_count > 0 else 0
+    if anomaly_count <= 0:
+        anomaly_coverage_rate = 100.0
+        work_order_closure_rate = 100.0
+        work_order_closure = 15.0
+    elif response_metrics:
+        anomaly_coverage_rate = round(min(1.0, _safe_divide(response_metrics["total"], expected_orders)) * 100, 1)
+        work_order_closure_rate = round(_safe_divide(response_metrics["closed"], response_metrics["total"]) * 100, 1)
+        work_order_closure = round(
+            5.0 * _clamp(anomaly_coverage_rate / 100.0, 0.0, 1.0)
+            + 5.0 * _clamp(response_metrics["timely_rate"] / 100.0, 0.0, 1.0)
+            + 5.0 * _clamp(work_order_closure_rate / 100.0, 0.0, 1.0),
+            1,
+        )
+    else:
+        anomaly_coverage_rate = 0.0
+        work_order_closure_rate = 0.0
+        # Historical months may not have full ticket records, but anomalies without
+        # an auditable closure should still lose KPI credit instead of defaulting to 100.
+        work_order_closure = round(max(0.0, 8.0 - min(6.0, anomaly_count * 0.4)), 1)
+
+    saved_kwh = response_metrics["saved_kwh"] if response_metrics else 0.0
+    if saved_kwh > 0:
+        improvement = round(min(5.0, 2.0 + _safe_divide(saved_kwh, max(actual_kwh, 1.0)) * 500), 1)
+    elif anomaly_count <= 0:
+        improvement = 4.0
+    else:
+        improvement = 2.0 if response_metrics else 1.0
+
+    score_breakdown = {
+        "budget_control": budget_control,
+        "efficiency": efficiency,
+        "anomaly_risk": anomaly_risk,
+        "work_order_closure": work_order_closure,
+        "improvement": improvement,
+    }
+    score = round(sum(score_breakdown.values()), 1)
+    score_reasons = [
+        f"预算执行率 {exec_pct:.1f}%，预算控制 {budget_control:.1f}/40。",
+        f"COP 达标率 {cop_pass_rate:.1f}%，优秀率 {cop_excellent_rate:.1f}%，能效 {efficiency:.1f}/20。",
+        f"异常 {anomaly_count} 条、异常率 {anomaly_rate:.1f}%，估算浪费 {wasted_kwh:,.1f} kWh，异常风险 {anomaly_risk:.1f}/20。",
+        f"工单覆盖率 {anomaly_coverage_rate:.1f}%，关闭率 {work_order_closure_rate:.1f}%，闭环 {work_order_closure:.1f}/15。",
+        f"闭环节省 {saved_kwh:,.1f} kWh，改善收益 {improvement:.1f}/5。",
+    ]
+    return {
+        "score": score,
+        "score_breakdown": score_breakdown,
+        "score_reasons": score_reasons,
+        "average_cop": average_cop,
+        "cop_excellent_rate": round(cop_excellent_rate, 1),
+        "anomaly_rate": round(anomaly_rate, 1),
+        "estimated_wasted_kwh": wasted_kwh,
+        "estimated_wasted_cost_yuan": wasted_cost,
+        "anomaly_coverage_rate": anomaly_coverage_rate,
+        "work_order_closure_rate": work_order_closure_rate,
+        "improvement_saved_kwh": round(saved_kwh, 2),
+    }
+
+
+def _average_score_breakdown(scores: List[Dict]) -> Dict:
+    keys = ["budget_control", "efficiency", "anomaly_risk", "work_order_closure", "improvement"]
+    if not scores:
+        return {key: 0.0 for key in keys}
+    return {
+        key: round(sum(_as_float(item.get("score_breakdown", {}).get(key)) for item in scores) / len(scores), 1)
+        for key in keys
+    }
+
+
 def _identify_strengths(scores: List[Dict]) -> List[str]:
     strengths = []
     under_budget = [m for m in scores if m["projected_execution_rate"] < 95]
     if under_budget:
         months = "、".join(f"{m['month']}月" for m in under_budget[:3])
         strengths.append(f"{months} 用电控制在预算以内，执行率良好。")
+    efficient = [m for m in scores if _as_float(m.get("score_breakdown", {}).get("efficiency")) >= 17]
+    if efficient:
+        months = "、".join(f"{m['month']}月" for m in efficient[:3])
+        strengths.append(f"{months} COP 与能效表现较稳，设备效率贡献较高。")
     if scores and all(m["anomaly_count"] < 5 for m in scores):
         strengths.append("全年异常事件较少，设备运行状态整体稳定。")
-    if scores and all(m["anomaly_response_timely_rate"] >= 90 for m in scores):
-        strengths.append("异常工单响应及时率较高，运维闭环执行稳定。")
+    closed_good = [m for m in scores if _as_float(m.get("work_order_closure_rate")) >= 80]
+    if closed_good:
+        months = "、".join(f"{m['month']}月" for m in closed_good[:3])
+        strengths.append(f"{months} 工单关闭率较高，运维闭环执行稳定。")
     return strengths or ["月度能耗管理基本达标。"]
 
 
@@ -485,13 +661,22 @@ def _identify_improvements(scores: List[Dict]) -> List[str]:
     if over_budget:
         months = "、".join(f"{m['month']}月" for m in over_budget[:3])
         improvements.append(f"{months} 超出预算，建议分析用电高峰原因并制定节能策略。")
+    weak_efficiency = [m for m in scores if _as_float(m.get("score_breakdown", {}).get("efficiency")) < 14]
+    if weak_efficiency:
+        months = "、".join(f"{m['month']}月" for m in weak_efficiency[:3])
+        improvements.append(f"{months} 能效分偏低，建议复核 COP、HVAC 电耗占比和设备运行策略。")
     high_anomaly = [m for m in scores if m["anomaly_count"] > 10]
     if high_anomaly:
         improvements.append("异常事件较多月份建议加强巡检和设备维护。")
-    slow_response = [m for m in scores if m["anomaly_response_timely_rate"] < 80]
+    slow_response = [
+        m
+        for m in scores
+        if m["anomaly_response_timely_rate"] < 80
+        or _as_float(m.get("score_breakdown", {}).get("work_order_closure")) < 8
+    ]
     if slow_response:
         months = "、".join(f"{m['month']}月" for m in slow_response[:3])
-        improvements.append(f"{months} 工单响应及时率偏低，建议明确派单 SLA 和复核责任人。")
+        improvements.append(f"{months} 工单覆盖或关闭得分偏低，建议补齐派单、响应和复核闭环记录。")
     return improvements or ["建议持续跟踪预算执行情况，优化设备运行策略。"]
 
 
@@ -518,20 +703,31 @@ def _work_order_response_metrics(building_id: str, year: int, month: int) -> Opt
         return None
 
     timely = 0
+    closed = 0
+    saved_kwh = 0.0
     for order in orders:
         opened_at = _parse_datetime(order.get("created_at")) or _parse_datetime(order.get("timestamp"))
         response_at = _first_response_time(order)
-        if not opened_at or not response_at:
-            continue
-        priority = str(order.get("priority", "中"))
-        sla_hours = 8 if priority == "高" else 24 if priority == "中" else 72
-        elapsed_hours = (response_at - opened_at).total_seconds() / 3600
-        if elapsed_hours <= sla_hours:
-            timely += 1
+        if opened_at and response_at:
+            priority = str(order.get("priority", "中"))
+            sla_hours = 8 if priority == "高" else 24 if priority == "中" else 72
+            elapsed_hours = (response_at - opened_at).total_seconds() / 3600
+            if elapsed_hours <= sla_hours:
+                timely += 1
+        if order.get("status") == "closed":
+            closed += 1
+            before_kwh = _as_float(order.get("before_kwh"))
+            after_kwh = _as_float(order.get("after_kwh"), before_kwh)
+            row_saved = max(0.0, before_kwh - after_kwh)
+            if row_saved <= 0:
+                row_saved = _as_float(order.get("estimated_saving_yuan")) / _PRICE_YUAN_PER_KWH
+            saved_kwh += row_saved
 
     return {
         "total": len(orders),
         "timely": timely,
+        "closed": closed,
+        "saved_kwh": round(saved_kwh, 2),
         "timely_rate": round(_safe_divide(timely, len(orders)) * 100, 1),
     }
 

@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.api.deps import current_user_from_header
 from app.schemas.auth import LoginReply, LoginRequest, UserListReply, UserProfile
 from app.services.auth_service import (
     authenticate_user,
     build_demo_token,
     list_demo_users,
-    user_from_token,
 )
 
 
@@ -21,11 +21,7 @@ def login(payload: LoginRequest):
 
 
 @router.get("/me", response_model=UserProfile)
-def me(authorization: str = Header(default="")):
-    token = authorization.removeprefix("Bearer ").strip()
-    user = user_from_token(token)
-    if not user:
-        raise HTTPException(status_code=401, detail="Invalid or missing demo token")
+def me(user=Depends(current_user_from_header)):
     return user
 
 

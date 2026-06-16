@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="680" viewBox="0 0 1280 680" role="img" aria-label="Sprint 燃尽图">
+  <defs>
+    <style>
+      .title{font:700 30px "Microsoft YaHei",Arial,sans-serif;fill:#17324d}
+      .sub{font:400 16px "Microsoft YaHei",Arial,sans-serif;fill:#4b6075}
+      .axis{stroke:#34495e;stroke-width:2}
+      .grid{stroke:#d7e1e8;stroke-width:1}
+      .ideal{stroke:#2a9d8f;stroke-width:4;fill:none}
+      .actual{stroke:#e76f51;stroke-width:4;fill:none}
+      .scope{stroke:#7a66b3;stroke-width:3;stroke-dasharray:8 6;fill:none}
+      .label{font:700 15px "Microsoft YaHei",Arial,sans-serif;fill:#24364a}
+      .small{font:400 13px "Microsoft YaHei",Arial,sans-serif;fill:#475b70}
+      .num{font:400 12px "Microsoft YaHei",Arial,sans-serif;fill:#5b6f82}
+    </style>
+  </defs>
+  <rect width="1280" height="680" fill="#f8fbfd"/>
+  <text class="title" x="54" y="56">Sprint 燃尽图</text>
+  <text class="sub" x="54" y="84">以 100 个计划价值点跟踪 S1-S6 的剩余工作量，体现 S5 范围增长与 S6 封版收敛。</text>
+
+  <g transform="translate(118,120)">
+    <line class="axis" x1="0" y1="440" x2="1030" y2="440"/>
+    <line class="axis" x1="0" y1="0" x2="0" y2="440"/>
+    <line class="grid" x1="0" y1="0" x2="1030" y2="0"/>
+    <line class="grid" x1="0" y1="88" x2="1030" y2="88"/>
+    <line class="grid" x1="0" y1="176" x2="1030" y2="176"/>
+    <line class="grid" x1="0" y1="264" x2="1030" y2="264"/>
+    <line class="grid" x1="0" y1="352" x2="1030" y2="352"/>
+    <text class="num" x="-36" y="4">100</text>
+    <text class="num" x="-30" y="92">80</text>
+    <text class="num" x="-30" y="180">60</text>
+    <text class="num" x="-30" y="268">40</text>
+    <text class="num" x="-30" y="356">20</text>
+    <text class="num" x="-24" y="444">0</text>
+
+    <path class="ideal" d="M0,0 L172,73 L343,145 L515,220 L687,293 L858,367 L1030,440"/>
+    <path class="actual" d="M0,0 L172,53 L343,123 L515,211 L687,185 L858,352 L1030,427"/>
+    <path class="scope" d="M515,211 L687,185"/>
+
+    <g fill="#2a9d8f">
+      <circle cx="0" cy="0" r="5"/>
+      <circle cx="172" cy="73" r="5"/>
+      <circle cx="343" cy="145" r="5"/>
+      <circle cx="515" cy="220" r="5"/>
+      <circle cx="687" cy="293" r="5"/>
+      <circle cx="858" cy="367" r="5"/>
+      <circle cx="1030" cy="440" r="5"/>
+    </g>
+    <g fill="#e76f51">
+      <circle cx="0" cy="0" r="5"/>
+      <circle cx="172" cy="53" r="5"/>
+      <circle cx="343" cy="123" r="5"/>
+      <circle cx="515" cy="211" r="5"/>
+      <circle cx="687" cy="185" r="5"/>
+      <circle cx="858" cy="352" r="5"/>
+      <circle cx="1030" cy="427" r="5"/>
+    </g>
+
+    <text class="label" x="-86" y="-22">剩余工作量（点）</text>
+    <text class="small" x="-18" y="474">S1</text>
+    <text class="small" x="154" y="474">S2</text>
+    <text class="small" x="326" y="474">S3</text>
+    <text class="small" x="498" y="474">S4</text>
+    <text class="small" x="670" y="474">S5</text>
+    <text class="small" x="842" y="474">S6</text>
+    <text class="small" x="1000" y="474">发布</text>
+    <text class="small" x="604" y="134">S5 范围增长：工单闭环、ROI、权限与部署复核</text>
+    <line x1="690" y1="145" x2="688" y2="184" stroke="#7a66b3" stroke-width="2" stroke-dasharray="4 4"/>
+  </g>
+
+  <rect x="820" y="66" width="330" height="82" fill="#ffffff" stroke="#c7d5df" rx="10"/>
+  <line x1="846" y1="92" x2="906" y2="92" class="ideal"/>
+  <text class="small" x="920" y="97">理想燃尽线</text>
+  <line x1="846" y1="122" x2="906" y2="122" class="actual"/>
+  <text class="small" x="920" y="127">实际剩余工作量</text>
+  <line x1="1020" y1="92" x2="1080" y2="92" class="scope"/>
+  <text class="small" x="1092" y="97">范围增长</text>
+
+  <text class="small" x="118" y="625">结论：S5 因业务闭环、ROI、权限和部署复核产生范围增长；S6 冻结新增范围，集中测试和文档对齐后完成封版。</text>
+</svg>

@@ -32,15 +32,10 @@ package "建筑能源智能管理与运维优化系统" {
     usecase "UC-11 MCP 工具调用" as UC11
   }
   
-  package "支撑功能" {
-    usecase "UC-12 项目检查与质量验收" as UC12
-  }
-  
 }
 
 AllUsers --> UC00
 SysAdmin --> UC01
-SysAdmin --> UC12
 DataMaintainer --> UC01
 EnergyAdmin --> UC02
 EnergyAdmin --> UC03

@@ -23,6 +23,15 @@ def test_dataset_meta_has_time_range():
     assert "end" in payload["time_range"]
 
 
+def test_dataset_meta_exposes_data_dictionary():
+    response = client.get("/api/v1/dataset-meta")
+    payload = response.json()
+    assert payload["data_dictionary"]
+    assert "field_definitions" in payload
+    assert payload["field_definitions"]["electricity_kwh"]["data_type"] == "float"
+    assert payload["dictionary_coverage"]["matched_field_count"] >= 1
+
+
 def test_buildings_endpoint():
     response = client.get("/api/v1/buildings")
     assert response.status_code == 200

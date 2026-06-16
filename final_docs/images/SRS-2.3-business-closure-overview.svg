@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-label="业务闭环总览图">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M2,2 L10,6 L2,10 Z" fill="#28536b"/>
+    </marker>
+    <style>
+      .title{font:700 30px "Microsoft YaHei","SimHei",Arial,sans-serif;fill:#17324d}
+      .sub{font:400 16px "Microsoft YaHei","SimHei",Arial,sans-serif;fill:#4b6075}
+      .box{fill:#ffffff;stroke:#8fb3c8;stroke-width:2;rx:12}
+      .core{fill:#ecf8f4;stroke:#2a9d8f;stroke-width:2;rx:14}
+      .decision{fill:#fff8e8;stroke:#e9a23b;stroke-width:2;rx:14}
+      .ai{fill:#f3f1fb;stroke:#7a66b3;stroke-width:2;rx:14}
+      .label{font:700 17px "Microsoft YaHei","SimHei",Arial,sans-serif;fill:#1f3349}
+      .small{font:400 13px "Microsoft YaHei","SimHei",Arial,sans-serif;fill:#41566d}
+      .arrow{stroke:#28536b;stroke-width:2.4;fill:none;marker-end:url(#arrow)}
+      .dash{stroke:#8a9bab;stroke-width:2;fill:none;stroke-dasharray:7 5;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1280" height="720" fill="#f7fafc"/>
+  <text class="title" x="54" y="58">能源运营业务闭环总览</text>
+  <text class="sub" x="54" y="86">数据、异常诊断、工单、沙盘、预算、ROI、报告和 AI/MCP 接入共享同一套业务事实基线。</text>
+
+  <rect class="box" x="70" y="160" width="190" height="92"/>
+  <text class="label" x="116" y="194">样例数据</text>
+  <text class="small" x="102" y="220">能耗 CSV 记录</text>
+  <text class="small" x="102" y="240">字段数据字典</text>
+
+  <rect class="core" x="330" y="160" width="210" height="92"/>
+  <text class="label" x="374" y="194">可见数据窗口</text>
+  <text class="small" x="365" y="220">筛选条件 + 沙盘日期</text>
+  <text class="small" x="365" y="240">Web 与 MCP 共用</text>
+
+  <rect class="core" x="610" y="160" width="210" height="92"/>
+  <text class="label" x="654" y="194">异常诊断</text>
+  <text class="small" x="650" y="220">风险分与 SLA</text>
+  <text class="small" x="650" y="240">浪费费用与碳排</text>
+
+  <rect class="core" x="890" y="160" width="220" height="92"/>
+  <text class="label" x="944" y="194">工单闭环</text>
+  <text class="small" x="930" y="220">派单 -> 接单</text>
+  <text class="small" x="930" y="240">提交 -> 复核</text>
+
+  <rect class="core" x="610" y="330" width="220" height="98"/>
+  <text class="label" x="652" y="366">维修干预</text>
+  <text class="small" x="650" y="392">设备级闭环修复</text>
+  <text class="small" x="650" y="412">抑制未来异常</text>
+
+  <rect class="decision" x="330" y="330" width="210" height="98"/>
+  <text class="label" x="374" y="366">时间沙盘</text>
+  <text class="small" x="365" y="392">推进业务日期</text>
+  <text class="small" x="365" y="412">反事实策略对比</text>
+
+  <rect class="decision" x="890" y="330" width="220" height="98"/>
+  <text class="label" x="930" y="366">预算与 ROI</text>
+  <text class="small" x="930" y="392">KPI 分项评分</text>
+  <text class="small" x="930" y="412">改造经济性评价</text>
+
+  <rect class="ai" x="230" y="535" width="250" height="92"/>
+  <text class="label" x="286" y="570">运营报告</text>
+  <text class="small" x="270" y="596">预测与行动项</text>
+  <text class="small" x="270" y="616">管理摘要</text>
+
+  <rect class="ai" x="530" y="535" width="250" height="92"/>
+  <text class="label" x="584" y="570">可信问答</text>
+  <text class="small" x="570" y="596">业务接地回答</text>
+  <text class="small" x="570" y="616">引用与降级回退</text>
+
+  <rect class="ai" x="830" y="535" width="250" height="92"/>
+  <text class="label" x="884" y="570">MCP 工具</text>
+  <text class="small" x="870" y="596">数据、分析</text>
+  <text class="small" x="870" y="616">工单、报告、问答</text>
+
+  <path class="arrow" d="M260,206 L324,206"/>
+  <path class="arrow" d="M540,206 L604,206"/>
+  <path class="arrow" d="M820,206 L884,206"/>
+  <path class="arrow" d="M1000,252 L1000,324"/>
+  <path class="arrow" d="M890,379 L836,379"/>
+  <path class="arrow" d="M610,379 L546,379"/>
+  <path class="arrow" d="M435,330 C420,290 426,262 434,254"/>
+  <path class="arrow" d="M720,330 L720,258"/>
+  <path class="dash" d="M1000,428 C990,482 965,504 955,530"/>
+  <path class="dash" d="M720,428 C690,482 665,505 655,530"/>
+  <path class="dash" d="M435,428 C410,482 370,505 355,530"/>
+  <path class="dash" d="M715,252 C700,305 690,315 700,330"/>
+
+  <text class="small" x="70" y="680">验收重点：每张已关闭工单都应能从来源异常追溯到维修干预、预算影响、运营报告和 AI/MCP 回答。</text>
+</svg>

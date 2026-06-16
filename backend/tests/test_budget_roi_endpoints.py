@@ -37,9 +37,12 @@ def test_budget_analysis_and_kpi_use_business_metrics(tmp_path, monkeypatch):
     assert "cop_pass_rate" in kpi
     assert "budget_control_rate" in kpi
     assert "anomaly_response_timely_rate" in kpi
+    assert "score_breakdown" in kpi
     assert kpi["monthly_details"]
     assert "projected_execution_rate" in kpi["monthly_details"][0]
     assert "anomaly_response_timely_rate" in kpi["monthly_details"][0]
+    assert "score_breakdown" in kpi["monthly_details"][0]
+    assert "score_reasons" in kpi["monthly_details"][0]
 
 
 def test_roi_audit_and_analysis_support_clean_and_legacy_routes():

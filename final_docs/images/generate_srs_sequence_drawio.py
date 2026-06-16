@@ -351,30 +351,6 @@ def main():
                 ("page", "admin", "展示ROI和报告", "return"),
             ],
         ),
-        (
-            "UC-12",
-            "项目检查与质量验收",
-            [
-                ("maintainer", "维护人员", "actor"),
-                ("script", "检查脚本", "object"),
-                ("backend", "后端测试框架", "object"),
-                ("frontend", "前端构建工具", "object"),
-                ("mcp", "MCP Server", "object"),
-                ("report", "验收记录", "object"),
-            ],
-            [
-                ("maintainer", "script", "运行 scripts/check-project.ps1"),
-                ("script", "backend", "Python语法检查与 pytest"),
-                ("backend", "script", "返回后端测试结果", "return"),
-                ("script", "frontend", "npm run build"),
-                ("frontend", "script", "返回构建结果", "return"),
-                ("script", "mcp", "启动并检查 MCP Server"),
-                ("mcp", "script", "返回工具可用状态", "return"),
-                ("script", "report", "生成检查摘要"),
-                ("report", "script", "返回通过/失败清单", "return"),
-                ("script", "maintainer", "输出验收结果", "return"),
-            ],
-        ),
     ]
 
     for args in diagrams:

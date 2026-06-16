@@ -38,6 +38,12 @@ from app.services.data_loader import (
 )
 from app.services.knowledge_search_service import search_and_format_citations
 from app.services.llm_client import build_external_assistant_answer
+from app.services.grounding_service import (
+    build_grounded_fallback_reply,
+    build_work_order_grounding_context,
+    format_grounding_context_for_llm,
+    validate_grounded_answer,
+)
 from app.services.work_order_store import build_work_order_metrics, list_work_orders
 
 
@@ -363,14 +369,42 @@ def ask_energy_assistant(
     kb_result = search_and_format_citations(question)
     reply["citations"] = _merge_citations(reply["citations"], kb_result)
     reply["llm_used"] = False
+    grounding_context = build_work_order_grounding_context(question)
+    grounding_text = format_grounding_context_for_llm(grounding_context)
+    if grounding_context.get("applies"):
+        reply = build_grounded_fallback_reply(question, grounding_context, reply)
+    else:
+        reply.setdefault("grounding_used", False)
+        reply.setdefault("grounding_sources", [])
+        reply.setdefault("grounding_status", "none")
+        reply.setdefault("validation_warnings", [])
+        reply.setdefault("referenced_entities", {})
 
     if use_external_llm:
-        external_answer = build_external_assistant_answer(question, reply, kb_result)
+        external_answer = build_external_assistant_answer(
+            question,
+            reply,
+            kb_result,
+            grounding_context_text=grounding_text,
+        )
         if external_answer:
-            reply["answer"] = external_answer["answer"]
-            reply["llm_used"] = True
-            reply["llm_provider"] = external_answer["provider"]
-            reply["llm_model"] = external_answer["model"]
+            validation = validate_grounded_answer(external_answer["answer"], grounding_context)
+            if validation["valid"]:
+                reply["answer"] = external_answer["answer"]
+                reply["llm_used"] = True
+                reply["llm_provider"] = external_answer["provider"]
+                reply["llm_model"] = external_answer["model"]
+                if grounding_context.get("applies"):
+                    reply["grounding_status"] = "validated"
+                    reply["grounding_used"] = True
+                    reply["grounding_sources"] = ["work_orders", "knowledge_base", "external_llm"]
+                    if validation.get("referenced_entities"):
+                        reply["referenced_entities"] = validation["referenced_entities"]
+                reply["validation_warnings"] = []
+            else:
+                reply["llm_used"] = False
+                reply["grounding_status"] = "fallback_after_validation"
+                reply["validation_warnings"] = validation["warnings"]
 
     return reply
 
